@@ -28,7 +28,11 @@ trait Scanner {
     fn scan_number(&mut self) -> Result<Token, &'static str>;
     fn scan_string(&mut self) -> Result<Token, &'static str>;
     fn scan_identifier(&mut self) -> Result<Token, &'static str>;
-    fn scan_conditional(&mut self, options: &[(char, TokenKind)], fallback: TokenKind) -> Result<Token, &'static str>;
+    fn scan_conditional(
+        &mut self,
+        options: &[(char, TokenKind)],
+        fallback: TokenKind,
+    ) -> Result<Token, &'static str>;
     fn scan_whitespace(&mut self);
 
     fn scan_token(&mut self) -> Result<Token, &'static str>;
@@ -98,7 +102,11 @@ impl Scanner for ScannerContext {
         }
     }
 
-    fn scan_conditional(&mut self, options: &[(char, TokenKind)], fallback: TokenKind) -> Result<Token, &'static str> {
+    fn scan_conditional(
+        &mut self,
+        options: &[(char, TokenKind)],
+        fallback: TokenKind,
+    ) -> Result<Token, &'static str> {
         for (c, kind) in options.iter() {
             if !self.is_at_end() && *c == self.peek_char().unwrap_or('\0') {
                 self.next_char();
@@ -143,14 +151,12 @@ impl Scanner for ScannerContext {
 
             // Check if the integer after '.' is actually an integer.
             let fraction = match fractional_comp {
-                Ok(tok) => {
-                    match tok.kind {
-                        TokenKind::Integer(num) => num,
-                        _ => 0,
-                    }
+                Ok(tok) => match tok.kind {
+                    TokenKind::Integer(num) => num,
+                    _ => 0,
                 },
 
-                Err(_) => return Err("Expected digits after '.' in float.")
+                Err(_) => return Err("Expected digits after '.' in float."),
             };
 
             let integer = match integer_comp.kind {
@@ -276,15 +282,10 @@ impl Scanner for ScannerContext {
                     ':' => Ok(self.new_symbol_token(TokenKind::Colon)),
                     '?' => Ok(self.new_symbol_token(TokenKind::Question)),
 
-                    '!' => {
-                        self.scan_conditional(&[('=', TokenKind::NotEqual)], TokenKind::Bang)
-                    }
-                    '=' => {
-                        self.scan_conditional(&[('=', TokenKind::Equality)], TokenKind::Equal)
-                    }
+                    '!' => self.scan_conditional(&[('=', TokenKind::NotEqual)], TokenKind::Bang),
+                    '=' => self.scan_conditional(&[('=', TokenKind::Equality)], TokenKind::Equal),
                     '>' => {
-                        self
-                            .scan_conditional(&[('=', TokenKind::GreaterEq)], TokenKind::Greater)
+                        self.scan_conditional(&[('=', TokenKind::GreaterEq)], TokenKind::Greater)
                     }
                     '<' => self.scan_conditional(&[('=', TokenKind::LessEq)], TokenKind::Less),
 

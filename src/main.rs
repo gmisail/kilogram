@@ -17,7 +17,7 @@ fn main() {
 
     let tokens = match scanner::scan(s) {
         Ok(t) => t,
-        Err(e) => panic!("[err] {}", e)
+        Err(e) => panic!("[err] {}", e),
     };
 
     for tok in tokens {
