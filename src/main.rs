@@ -15,7 +15,10 @@ fn main() {
         Ok(_) => println!("opened file",),
     }
 
-    let tokens = scanner::scan(s);
+    let tokens = match scanner::scan(s) {
+        Ok(t) => t,
+        Err(e) => panic!("[err] {}", e)
+    };
 
     for tok in tokens {
         println!(
