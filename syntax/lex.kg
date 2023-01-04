@@ -1,0 +1,20 @@
+function hello(): int
+	let x: string = "first part"
+	let y: int = 123456
+	let z: float = 3.14159
+
+	let a: bool = false
+	let b: bool = true
+
+	z + y
+end
+
+module Math
+	PI: float,
+	E: float
+end
+
+10 >= 5
+6 == 1
+7 <= 32
+true != false
