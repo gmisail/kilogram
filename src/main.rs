@@ -4,7 +4,7 @@ pub mod scanner;
 pub mod token;
 
 fn main() {
-    let mut file = match File::open("./syntax/lex.kg") {
+    let mut file = match File::open("./syntax/hello_world.kg") {
         Err(e) => panic!("couldn't open file: {}", e),
         Ok(file) => file,
     };
