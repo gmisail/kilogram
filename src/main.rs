@@ -19,5 +19,7 @@ fn main() {
         Ok(_) => println!("opened file",),
     }
 
-    let tree = parse(s);
+    let tree = parse(s).unwrap();
+
+    println!("{}", tree)
 }

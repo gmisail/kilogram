@@ -20,5 +20,11 @@ pub fn parse(input: String) -> Result<ast::Expression, &'static str> {
     let tokens = scanner::scan(input)?;
     let context = Parser { current: 0, tokens };
 
-    Err("Not implemented")
+    Ok(
+        ast::Expression::Binary(
+            Box::new(ast::Expression::Integer(1234)), 
+            ast::BinaryOperator::Add, 
+            Box::new(ast::Expression::Unary(Box::new(ast::Expression::Float(0.678)), ast::UnaryOperator::Minus))
+        )
+    )
 }

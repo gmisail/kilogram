@@ -1,14 +1,51 @@
+use std::fmt::Display;
+
 #[derive(Clone)]
 pub enum UnaryOperator {
     Minus,
     Bang,
 }
 
+impl Display for UnaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            UnaryOperator::Minus => "-",
+            UnaryOperator::Bang => "!"
+        })
+    }
+}
+
 #[derive(Clone)]
 pub enum BinaryOperator {
-    Minus,
-    Bang,
+    Add,
+    Sub,
+    Mult,
+    Div,
+    Equality,
+    NotEqual,
+    Greater,
+    GreaterEq,
+    Less,
+    LessEq
 }
+
+impl Display for BinaryOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            BinaryOperator::Add => "+",
+            BinaryOperator::Sub => "-",
+            BinaryOperator::Mult => "*",
+            BinaryOperator::Div => "/",
+            BinaryOperator::Equality => "==", 
+            BinaryOperator::NotEqual => "!=",
+            BinaryOperator::Greater => ">",
+            BinaryOperator::GreaterEq => ">=",
+            BinaryOperator::Less => "<",
+            BinaryOperator::LessEq => "<="
+        })
+    }
+}
+
 
 #[derive(Clone)]
 pub enum LogicalOperator {
@@ -16,10 +53,28 @@ pub enum LogicalOperator {
     Or,
 }
 
+impl Display for LogicalOperator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            LogicalOperator::And => "&&",
+            LogicalOperator::Or => "||"
+        })
+    }
+}
+
 #[derive(Clone)]
 pub enum Type {
     Base(String),               // string, int, ...
     Generic(String, Box<Type>), // array<string>, list<int>, ...
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            Type::Base(name) => format!("(Type, name: {})", name),
+            Type::Generic(name, sub_type) => format!("(GenericType, name: {}, sub_type: {})", name, sub_type)
+        })
+    }
 }
 
 #[derive(Clone)]
@@ -43,4 +98,27 @@ pub enum Expression {
     // Declarations
     Let(String, Type, Box<Expression>),
     Function(String, Type, Vec<(String, Type)>, Box<Expression>),
+}
+
+impl Display for Expression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value: String = match self {
+            Expression::Integer(value) => format!("(Integer, value: '{}')", value),
+            Expression::Float(value) => format!("(Float, value: '{}')", value),
+            Expression::Str(value) => format!("(String, value: '{}')", value),
+            Expression::Boolean(value) => format!("(Boolean, value: '{}')", value), 
+            Expression::Variable(name) => format!("(Variable, name: '{}')", name),
+
+            Expression::Unary(expression, operation) => format!("(Unary, operation: {}, value: {})", operation, expression),
+            Expression::Binary(left, operation, right) => format!("(Binary, operation: {}, left: {}, right: {})", operation, left, right),
+            Expression::Logical(left, operation, right) => format!("(Logical, operation: {}, left: {}, right: {})", operation, left, right),
+
+            Expression::If(if_expr, then_expr, else_expr) => format!("(If, condition: {}, then: {}, else: {})", if_expr, then_expr, else_expr),
+
+            Expression::Let(name, var_type, value) => format!("(Let, name: '{}', type: {}, value: {})", name, var_type, value),
+            Expression::Function(name, func_type, _, value) => format!("(Function, name: '{}', type: {}, value: {})", name, func_type, value)
+        };
+
+        write!(f, "{}", value)
+    }
 }
