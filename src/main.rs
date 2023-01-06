@@ -1,5 +1,9 @@
 use std::{fs::File, io::Read};
 
+use parser::parse;
+
+pub mod ast;
+pub mod parser;
 pub mod scanner;
 pub mod token;
 
@@ -15,18 +19,5 @@ fn main() {
         Ok(_) => println!("opened file",),
     }
 
-    let tokens = match scanner::scan(s) {
-        Ok(t) => t,
-        Err(e) => panic!("[err] {}", e),
-    };
-
-    for tok in tokens {
-        println!(
-            "line {} ({}...{}): {}",
-            tok.line,
-            tok.relative,
-            tok.relative + tok.length,
-            tok.kind
-        );
-    }
+    let tree = parse(s);
 }
