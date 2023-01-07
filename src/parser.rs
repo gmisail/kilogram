@@ -16,21 +16,34 @@ impl Parser {
         }
     }
 
-    fn peek_token(&self) -> Option<&token::Token> {
+    fn peek_token(&self) -> Option<&Token> {
         self.tokens.get(self.current) 
     }
 
-    fn next_token(&mut self) -> Option<&token::Token> {
+    fn next_token(&mut self) -> Option<&Token> {
         self.current += 1;
         self.peek_token()
     }
 
-    fn match_token(&self, kind: token::TokenKind) -> bool {
+    fn match_token(&self, kind: &TokenKind) -> bool {
         let peeked = self.peek_token();
         
         match peeked {
-            Some(t) => t.kind == kind,
+            Some(t) => t.kind == *kind,
             None => false
+        }
+    }
+
+    fn expect_token(&mut self, kind: TokenKind) -> Result<&Token, String> {
+        let peeked_token = match self.peek_token() {
+            Some(t) => t,
+            None => return Err(format!("Expected token with kind '{}', got nothing instead.", kind))
+        };
+
+        if self.match_token(&kind) {
+            Ok(peeked_token)
+        } else {
+            Err(format!("Expected token with kind '{}', got '{}' instead.", kind, peeked_token.kind))
         }
     }
 }
