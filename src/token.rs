@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum TokenKind {
     // Symbols (single-width)
     LeftParen,
