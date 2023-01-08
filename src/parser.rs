@@ -1,3 +1,5 @@
+use crate::ast::Expression;
+
 use super::ast;
 use super::token;
 use super::scanner;
@@ -18,6 +20,18 @@ impl Parser {
 
     fn peek_token(&self) -> Option<&Token> {
         self.tokens.get(self.current) 
+    }
+
+    fn advance_token(&mut self) -> Option<&Token> {
+        let peeked_token = self.tokens.get(self.current);
+
+        match peeked_token {
+            Some(token) => {
+                self.current += 1;
+                Some(token)
+            },
+            None => None
+        }
     }
 
     fn next_token(&mut self) -> Option<&Token> {
@@ -46,6 +60,26 @@ impl Parser {
             Err(format!("Expected token with kind '{}', got '{}' instead.", kind, peeked_token.kind))
         }
     }
+
+    fn parse_primary(&mut self) -> Result<Expression, String> {
+        let token = match self.advance_token() {
+            Some(t) => t,
+            None => return Err(String::from("Failed to load token while parsing primary expression."))
+        };
+
+        match &token.kind {
+            TokenKind::Boolean(value) => Ok(Expression::Boolean(*value)),
+            TokenKind::Str(value) => Ok(Expression::Str(value.clone())),
+            TokenKind::Integer(value) => Ok(Expression::Integer(*value)),
+            TokenKind::Float(value) => Ok(Expression::Float(*value)),
+            TokenKind::Identifier(name) => Ok(Expression::Variable(name.clone())),
+            _ => Err(format!("Failed to parse expression beginning with token '{}'", token.kind))
+        }
+    }
+
+    fn parse_expression(&mut self) -> Result<Expression, String> {
+        return self.parse_primary()
+    }
 }
 
 pub fn parse(input: String) -> Result<ast::Expression, &'static str> {
@@ -53,9 +87,10 @@ pub fn parse(input: String) -> Result<ast::Expression, &'static str> {
     let mut context = Parser { current: 0, tokens };
 
     while !context.is_at_end() {
-        println!("token: {}", context.peek_token().unwrap().kind);
-        
-        context.next_token();
+        println!("{}", match context.parse_primary() {
+            Ok(_) => String::from("hello"),
+            Err(e) => e
+        })
     }
 
     Ok(
