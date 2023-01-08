@@ -86,6 +86,9 @@ pub enum Expression {
     Boolean(bool),
     Variable(String),
 
+    // Group
+    Group(Box<Expression>),
+
     // Operators
     Unary(Box<Expression>, UnaryOperator),
     Binary(Box<Expression>, BinaryOperator, Box<Expression>),
@@ -108,6 +111,8 @@ impl Display for Expression {
             Expression::Str(value) => format!("(String, value: '{}')", value),
             Expression::Boolean(value) => format!("(Boolean, value: '{}')", value), 
             Expression::Variable(name) => format!("(Variable, name: '{}')", name),
+
+            Expression::Group(expression) => format!("(Group, value: {})", expression),
 
             Expression::Unary(expression, operation) => format!("(Unary, operation: {}, value: {})", operation, expression),
             Expression::Binary(left, operation, right) => format!("(Binary, operation: {}, left: {}, right: {})", operation, left, right),

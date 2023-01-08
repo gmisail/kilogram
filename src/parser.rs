@@ -73,6 +73,11 @@ impl Parser {
             TokenKind::Integer(value) => Ok(Expression::Integer(*value)),
             TokenKind::Float(value) => Ok(Expression::Float(*value)),
             TokenKind::Identifier(name) => Ok(Expression::Variable(name.clone())),
+            TokenKind::LeftParen => {
+                let grouped_expr = Expression::Group(Box::new(self.parse_expression()?));
+                self.expect_token(TokenKind::RightParen)?;
+                Ok(grouped_expr)
+            }
             _ => Err(format!("Failed to parse expression beginning with token '{}'", token.kind))
         }
     }
@@ -88,16 +93,10 @@ pub fn parse(input: String) -> Result<ast::Expression, &'static str> {
 
     while !context.is_at_end() {
         println!("{}", match context.parse_primary() {
-            Ok(_) => String::from("hello"),
+            Ok(node) => format!("{}", node),
             Err(e) => e
-        })
+        });
     }
 
-    Ok(
-        ast::Expression::Binary(
-            Box::new(ast::Expression::Integer(1234)), 
-            ast::BinaryOperator::Add, 
-            Box::new(ast::Expression::Unary(Box::new(ast::Expression::Float(0.678)), ast::UnaryOperator::Minus))
-        )
-    )
+    Err("...")
 }
