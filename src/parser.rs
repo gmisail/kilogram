@@ -1,7 +1,6 @@
 use crate::ast::Expression;
 
 use super::ast;
-use super::token;
 use super::scanner;
 use super::token::{Token, TokenKind};
 
@@ -13,77 +12,104 @@ struct Parser {
 impl Parser {
     fn is_at_end(&self) -> bool {
         match self.tokens.get(self.current) {
-            Some(t) => matches!(t.kind, TokenKind::Eof), 
+            Some(t) => matches!(t.kind, TokenKind::Eof),
             None => true,
         }
     }
 
     fn peek_token(&self) -> Option<&Token> {
-        self.tokens.get(self.current) 
+        self.tokens.get(self.current)
     }
 
-    fn advance_token(&mut self) -> Option<&Token> {
-        let peeked_token = self.tokens.get(self.current);
-
-        match peeked_token {
-            Some(token) => {
-                self.current += 1;
-                Some(token)
-            },
-            None => None
-        }
-    }
-
-    fn next_token(&mut self) -> Option<&Token> {
+    fn advance_token(&mut self) {
         self.current += 1;
-        self.peek_token()
     }
 
-    fn match_token(&self, kind: &TokenKind) -> bool {
+    fn match_token(&mut self, kind: &TokenKind) -> bool {
         let peeked = self.peek_token();
-        
+
         match peeked {
             Some(t) => t.kind == *kind,
-            None => false
+            None => false,
         }
     }
 
-    fn expect_token(&mut self, kind: TokenKind) -> Result<&Token, String> {
-        let peeked_token = match self.peek_token() {
-            Some(t) => t,
-            None => return Err(format!("Expected token with kind '{}', got nothing instead.", kind))
-        };
-
+    fn expect_token(&mut self, kind: TokenKind) -> Result<Option<&Token>, String> {
         if self.match_token(&kind) {
-            Ok(peeked_token)
+            self.advance_token();
+
+            Ok(self.peek_token())
         } else {
-            Err(format!("Expected token with kind '{}', got '{}' instead.", kind, peeked_token.kind))
+            let actual_kind = match self.peek_token() {
+                Some(t) => &t.kind,
+                None => &TokenKind::Eof,
+            };
+
+            Err(format!(
+                "Expected token with kind '{}', got '{}' instead.",
+                kind, actual_kind
+            ))
         }
+    }
+
+    fn parse_boolean(&mut self, value: bool) -> Result<Expression, String> {
+        self.advance_token();
+        Ok(Expression::Boolean(value))
+    }
+
+    fn parse_string(&mut self, value: String) -> Result<Expression, String> {
+        self.advance_token();
+        Ok(Expression::Str(value))
+    }
+
+    fn parse_integer(&mut self, value: i32) -> Result<Expression, String> {
+        self.advance_token();
+        Ok(Expression::Integer(value))
+    }
+
+    fn parse_float(&mut self, value: f32) -> Result<Expression, String> {
+        self.advance_token();
+        Ok(Expression::Float(value))
+    }
+
+    fn parse_identifier(&mut self, name: String) -> Result<Expression, String> {
+        self.advance_token();
+        Ok(Expression::Variable(name))
+    }
+
+    fn parse_group(&mut self) -> Result<Expression, String> {
+        self.advance_token();
+
+        // ( inner_expr )
+        let inner_expr = Expression::Group(Box::new(self.parse_expression()?));
+        self.expect_token(TokenKind::RightParen)?;
+
+        Ok(inner_expr)
     }
 
     fn parse_primary(&mut self) -> Result<Expression, String> {
-        let token = match self.advance_token() {
-            Some(t) => t,
-            None => return Err(String::from("Failed to load token while parsing primary expression."))
-        };
+        match self.peek_token() {
+            Some(t) => match &t.kind {
+                TokenKind::Boolean(value) => self.parse_boolean(*value),
+                TokenKind::Str(value) => self.parse_string(value.clone()),
+                TokenKind::Integer(value) => self.parse_integer(*value),
+                TokenKind::Float(value) => self.parse_float(*value),
+                TokenKind::Identifier(name) => self.parse_identifier(name.clone()),
+                TokenKind::LeftParen => self.parse_group(),
+                _ => Err(format!(
+                    "Failed to parse expression beginning with token '{}'",
+                    t.kind
+                )),
+            },
 
-        match &token.kind {
-            TokenKind::Boolean(value) => Ok(Expression::Boolean(*value)),
-            TokenKind::Str(value) => Ok(Expression::Str(value.clone())),
-            TokenKind::Integer(value) => Ok(Expression::Integer(*value)),
-            TokenKind::Float(value) => Ok(Expression::Float(*value)),
-            TokenKind::Identifier(name) => Ok(Expression::Variable(name.clone())),
-            TokenKind::LeftParen => {
-                let grouped_expr = Expression::Group(Box::new(self.parse_expression()?));
-                self.expect_token(TokenKind::RightParen)?;
-                Ok(grouped_expr)
-            }
-            _ => Err(format!("Failed to parse expression beginning with token '{}'", token.kind))
+            None => Err(String::from(
+                "Failed to load token while parsing primary expression.",
+            )),
         }
     }
 
     fn parse_expression(&mut self) -> Result<Expression, String> {
-        return self.parse_primary()
+        self.parse_primary()
     }
 }
 
@@ -92,10 +118,16 @@ pub fn parse(input: String) -> Result<ast::Expression, &'static str> {
     let mut context = Parser { current: 0, tokens };
 
     while !context.is_at_end() {
-        println!("{}", match context.parse_primary() {
-            Ok(node) => format!("{}", node),
-            Err(e) => e
-        });
+        println!(
+            "{}",
+            match context.parse_primary() {
+                Ok(node) => format!("{}", node),
+                Err(e) => {
+                    context.advance_token();
+                    e
+                }
+            }
+        );
     }
 
     Err("...")

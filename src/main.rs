@@ -8,7 +8,7 @@ pub mod scanner;
 pub mod token;
 
 fn main() {
-    let mut file = match File::open("./syntax/hello_world.kg") {
+    let mut file = match File::open("./syntax/primary.kg") {
         Err(e) => panic!("couldn't open file: {}", e),
         Ok(file) => file,
     };
@@ -19,5 +19,5 @@ fn main() {
         Ok(_) => println!("opened file",),
     }
 
-    let tree = parse(s);
+    let _tree = parse(s);
 }
