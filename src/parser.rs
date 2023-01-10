@@ -108,8 +108,21 @@ impl Parser {
         }
     }
 
+    fn parse_logical_or(&mut self) -> Result<Expression, String> {
+        let mut expr = self.parse_primary()?;
+
+        while self.match_token(&TokenKind::Or) {
+            self.advance_token();
+
+            let right_expr = self.parse_primary()?; 
+            expr = ast::Expression::Logical(Box::new(expr), ast::LogicalOperator::Or, Box::new(right_expr));
+        }
+
+        Ok(expr)
+    } 
+
     fn parse_expression(&mut self) -> Result<Expression, String> {
-        self.parse_primary()
+        self.parse_logical_or()
     }
 }
 
@@ -120,7 +133,7 @@ pub fn parse(input: String) -> Result<ast::Expression, &'static str> {
     while !context.is_at_end() {
         println!(
             "{}",
-            match context.parse_primary() {
+            match context.parse_expression() {
                 Ok(node) => format!("{}", node),
                 Err(e) => {
                     context.advance_token();
