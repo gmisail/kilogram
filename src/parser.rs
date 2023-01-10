@@ -108,18 +108,39 @@ impl Parser {
         }
     }
 
-    fn parse_logical_or(&mut self) -> Result<Expression, String> {
+    fn parse_logical_and(&mut self) -> Result<Expression, String> {
         let mut expr = self.parse_primary()?;
+
+        while self.match_token(&TokenKind::And) {
+            self.advance_token();
+
+            let right_expr = self.parse_logical_and()?;
+            expr = ast::Expression::Logical(
+                Box::new(expr),
+                ast::LogicalOperator::And,
+                Box::new(right_expr),
+            );
+        }
+
+        Ok(expr)
+    }
+
+    fn parse_logical_or(&mut self) -> Result<Expression, String> {
+        let mut expr = self.parse_logical_and()?;
 
         while self.match_token(&TokenKind::Or) {
             self.advance_token();
 
-            let right_expr = self.parse_primary()?; 
-            expr = ast::Expression::Logical(Box::new(expr), ast::LogicalOperator::Or, Box::new(right_expr));
+            let right_expr = self.parse_primary()?;
+            expr = ast::Expression::Logical(
+                Box::new(expr),
+                ast::LogicalOperator::Or,
+                Box::new(right_expr),
+            );
         }
 
         Ok(expr)
-    } 
+    }
 
     fn parse_expression(&mut self) -> Result<Expression, String> {
         self.parse_logical_or()

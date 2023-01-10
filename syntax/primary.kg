@@ -1,1 +1,1 @@
-"hello" or ("test" or "foo") 
+"hello" or ("test" and (12 or 50)) 
