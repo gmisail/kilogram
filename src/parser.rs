@@ -108,13 +108,39 @@ impl Parser {
         }
     }
 
-    fn parse_logical_and(&mut self) -> Result<Expression, String> {
+    fn parse_equality(&mut self) -> Result<Expression, String> {
         let mut expr = self.parse_primary()?;
+
+        while self.match_token(&TokenKind::Equality) || self.match_token(&TokenKind::NotEqual) {
+            let operator_kind = match self.peek_token() {
+                Some(t) => match &t.kind {
+                    TokenKind::Equality => ast::BinaryOperator::Equality,
+                    TokenKind::NotEqual => ast::BinaryOperator::NotEqual,
+                    _ => return Err("Cannot parse binary expression with unknown operator.".to_string())
+                },
+                None => return Err("Cannot parse binary expression, unable to find operator.".to_string())
+            };
+
+            self.advance_token();
+
+            let right_expr = self.parse_primary()?;
+            expr = ast::Expression::Binary(
+                Box::new(expr),
+                operator_kind,
+                Box::new(right_expr),
+            );
+        }
+
+        Ok(expr)
+    }
+
+    fn parse_logical_and(&mut self) -> Result<Expression, String> {
+        let mut expr = self.parse_equality()?;
 
         while self.match_token(&TokenKind::And) {
             self.advance_token();
 
-            let right_expr = self.parse_logical_and()?;
+            let right_expr = self.parse_equality()?;
             expr = ast::Expression::Logical(
                 Box::new(expr),
                 ast::LogicalOperator::And,
