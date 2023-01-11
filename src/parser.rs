@@ -108,8 +108,96 @@ impl Parser {
         }
     }
 
-    fn parse_equality(&mut self) -> Result<Expression, String> {
+    fn parse_factor(&mut self) -> Result<Expression, String> {
         let mut expr = self.parse_primary()?;
+
+        while self.match_token(&TokenKind::Mult) || self.match_token(&TokenKind::Div) {
+            let operator_kind = match self.peek_token() {
+                Some(t) => match &t.kind {
+                    TokenKind::Mult => ast::BinaryOperator::Mult,
+                    TokenKind::Div => ast::BinaryOperator::Div,
+                    _ => {
+                        return Err(
+                            "Cannot parse binary expression with unknown operator.".to_string()
+                        )
+                    }
+                },
+                None => {
+                    return Err(
+                        "Cannot parse binary expression, unable to find operator.".to_string()
+                    )
+                }
+            };
+
+            self.advance_token();
+
+            let right_expr = self.parse_factor()?;
+            expr = ast::Expression::Binary(Box::new(expr), operator_kind, Box::new(right_expr));
+        }
+
+        Ok(expr)
+    }
+
+    fn parse_term(&mut self) -> Result<Expression, String> {
+        let mut expr = self.parse_factor()?;
+
+        while self.match_token(&TokenKind::Add) || self.match_token(&TokenKind::Sub) {
+            let operator_kind = match self.peek_token() {
+                Some(t) => match &t.kind {
+                    TokenKind::Add => ast::BinaryOperator::Add,
+                    TokenKind::Sub => ast::BinaryOperator::Sub,
+                    _ => {
+                        return Err(
+                            "Cannot parse binary expression with unknown operator.".to_string()
+                        )
+                    }
+                },
+                None => {
+                    return Err(
+                        "Cannot parse binary expression, unable to find operator.".to_string()
+                    )
+                }
+            };
+
+            self.advance_token();
+
+            let right_expr = self.parse_factor()?;
+            expr = ast::Expression::Binary(Box::new(expr), operator_kind, Box::new(right_expr));
+        }
+
+        Ok(expr)
+    }
+
+    fn parse_comparison(&mut self) -> Result<Expression, String> {
+        let mut expr = self.parse_term()?;
+
+        while self.match_token(&TokenKind::Greater)
+            || self.match_token(&TokenKind::GreaterEq)
+            || self.match_token(&TokenKind::Less)
+            || self.match_token(&TokenKind::LessEq)
+        {
+            let operator = match self.peek_token() {
+                Some(t) => match &t.kind {
+                    TokenKind::Greater => ast::BinaryOperator::Greater,
+                    TokenKind::GreaterEq => ast::BinaryOperator::GreaterEq,
+                    TokenKind::Less => ast::BinaryOperator::Less,
+                    TokenKind::LessEq => ast::BinaryOperator::LessEq,
+                    _ => return Err("Invalid operator".to_string()),
+                },
+                None => return Err("Unable to get operator from token.".to_string()),
+            };
+
+            self.advance_token();
+
+            let right_expr = self.parse_term()?;
+            expr = ast::Expression::Binary(Box::new(expr), operator, Box::new(right_expr));
+        }
+
+        Ok(expr)
+    }
+
+    fn parse_equality(&mut self) -> Result<Expression, String> {
+        let mut expr = self.parse_comparison()?;
 
         while self.match_token(&TokenKind::Equality) || self.match_token(&TokenKind::NotEqual) {
             let operator_kind = match self.peek_token() {
@@ -131,48 +219,20 @@ impl Parser {
 
             self.advance_token();
 
-            let right_expr = self.parse_primary()?;
+            let right_expr = self.parse_comparison()?;
             expr = ast::Expression::Binary(Box::new(expr), operator_kind, Box::new(right_expr));
         }
 
         Ok(expr)
     }
 
-    fn parse_comparison(&mut self) -> Result<Expression, String> {
-        let mut expr = self.parse_equality()?;
-
-        while self.match_token(&TokenKind::Greater)
-            || self.match_token(&TokenKind::GreaterEq)
-            || self.match_token(&TokenKind::Less)
-            || self.match_token(&TokenKind::LessEq)
-        {
-            let operator = match self.peek_token() {
-                Some(t) => match &t.kind {
-                    TokenKind::Greater => ast::BinaryOperator::Greater,
-                    TokenKind::GreaterEq => ast::BinaryOperator::GreaterEq,
-                    TokenKind::Less => ast::BinaryOperator::Less,
-                    TokenKind::LessEq => ast::BinaryOperator::LessEq,
-                    _ => return Err("Invalid operator".to_string()),
-                },
-                None => return Err("Unable to get operator from token.".to_string()),
-            };
-
-            self.advance_token();
-
-            let right_expr = self.parse_equality()?;
-            expr = ast::Expression::Binary(Box::new(expr), operator, Box::new(right_expr));
-        }
-
-        Ok(expr)
-    }
-
     fn parse_logical_and(&mut self) -> Result<Expression, String> {
-        let mut expr = self.parse_comparison()?;
+        let mut expr = self.parse_equality()?;
 
         while self.match_token(&TokenKind::And) {
             self.advance_token();
 
-            let right_expr = self.parse_comparison()?;
+            let right_expr = self.parse_equality()?;
             expr = ast::Expression::Logical(
                 Box::new(expr),
                 ast::LogicalOperator::And,
