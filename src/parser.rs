@@ -108,8 +108,36 @@ impl Parser {
         }
     }
 
+    fn parse_unary(&mut self) -> Result<Expression, String> {
+        // Is there a leading '-' or '!'?
+        if self.match_token(&TokenKind::Sub) || self.match_token(&TokenKind::Bang) {
+            let operator_kind = match self.peek_token() {
+                Some(t) => match &t.kind {
+                    TokenKind::Sub => ast::UnaryOperator::Minus,
+                    TokenKind::Bang => ast::UnaryOperator::Bang,
+                    _ => {
+                        return Err(
+                            "Cannot parse unary expression with unknown operator.".to_string()
+                        )
+                    }
+                },
+                None => {
+                    return Err(
+                        "Cannot parse unary expression, unable to find operator.".to_string()
+                    )
+                }
+            };
+
+            self.advance_token();
+
+            Ok(ast::Expression::Unary(Box::new(self.parse_primary()?), operator_kind))
+        } else {
+            self.parse_primary()
+        }
+    }
+
     fn parse_factor(&mut self) -> Result<Expression, String> {
-        let mut expr = self.parse_primary()?;
+        let mut expr = self.parse_unary()?;
 
         while self.match_token(&TokenKind::Mult) || self.match_token(&TokenKind::Div) {
             let operator_kind = match self.peek_token() {
@@ -131,7 +159,7 @@ impl Parser {
 
             self.advance_token();
 
-            let right_expr = self.parse_factor()?;
+            let right_expr = self.parse_unary()?;
             expr = ast::Expression::Binary(Box::new(expr), operator_kind, Box::new(right_expr));
         }
 
