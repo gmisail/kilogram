@@ -142,22 +142,22 @@ impl Parser {
         let mut expr = self.parse_equality()?;
 
         while self.match_token(&TokenKind::Greater)
-            && self.match_token(&TokenKind::GreaterEq)
-            && self.match_token(&TokenKind::Less)
-            && self.match_token(&TokenKind::LessEq)
+            || self.match_token(&TokenKind::GreaterEq)
+            || self.match_token(&TokenKind::Less)
+            || self.match_token(&TokenKind::LessEq)
         {
-            self.advance_token();
-
             let operator = match self.peek_token() {
                 Some(t) => match &t.kind {
-                    &TokenKind::Greater => ast::BinaryOperator::Greater,
-                    &TokenKind::GreaterEq => ast::BinaryOperator::GreaterEq,
-                    &TokenKind::Less => ast::BinaryOperator::Less,
-                    &TokenKind::LessEq => ast::BinaryOperator::LessEq,
+                    TokenKind::Greater => ast::BinaryOperator::Greater,
+                    TokenKind::GreaterEq => ast::BinaryOperator::GreaterEq,
+                    TokenKind::Less => ast::BinaryOperator::Less,
+                    TokenKind::LessEq => ast::BinaryOperator::LessEq,
                     _ => return Err("Invalid operator".to_string()),
                 },
                 None => return Err("Unable to get operator from token.".to_string()),
             };
+
+            self.advance_token();
 
             let right_expr = self.parse_equality()?;
             expr = ast::Expression::Binary(Box::new(expr), operator, Box::new(right_expr));
