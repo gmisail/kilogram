@@ -1,1 +1,1 @@
-hello("hello", 123, 3.14, true)
+print("2 * 5 = {}", multiply(2, 5))

@@ -101,9 +101,11 @@ pub enum Expression {
     Str(String),
     Boolean(bool),
     Variable(String),
-
     Group(Box<Expression>),
+
     Get(String, Box<Expression>),
+
+    RecordInstance(String, Vec<(String, Box<Expression>)>),
 
     FunctionCall(Box<Expression>, Vec<Box<Expression>>),
 
@@ -153,6 +155,7 @@ impl Display for Expression {
                 "(Let, name: '{}', type: {}, value: {})",
                 name, var_type, value
             ),
+
             Expression::Function(name, func_type, _, value) => format!(
                 "(Function, name: '{}', type: {}, value: {})",
                 name, func_type, value
@@ -168,6 +171,19 @@ impl Display for Expression {
                     "(FunctionCall, name: {}, arguments: [{}])",
                     name,
                     argument_list.join(", ")
+                )
+            }
+
+            Expression::RecordInstance(name, fields) => {
+                let field_list: Vec<String> = fields
+                    .iter()
+                    .map(|(field_name, field_value)| format!("({}: {})", field_name, field_value))
+                    .collect();
+
+                format!(
+                    "(RecordInstance, name: {}, fields: [{}])",
+                    name,
+                    field_list.join(", ")
                 )
             }
         };
