@@ -102,8 +102,10 @@ pub enum Expression {
     Boolean(bool),
     Variable(String),
 
-    // Group
     Group(Box<Expression>),
+    Get(String, Box<Expression>),
+
+    FunctionCall(Box<Expression>, Vec<Box<Expression>>),
 
     // Operators
     Unary(Box<Expression>, UnaryOperator),
@@ -154,6 +156,16 @@ impl Display for Expression {
             Expression::Function(name, func_type, _, value) => format!(
                 "(Function, name: '{}', type: {}, value: {})",
                 name, func_type, value
+            ),
+
+            Expression::Get(name, expr) => format!(
+                "(Get, name: '{}', parent: {})",
+                name, expr 
+            ),
+
+            Expression::FunctionCall(name, _) => format!(
+                "(FunctionCall, name: '{}')",
+                name 
             ),
         };
 

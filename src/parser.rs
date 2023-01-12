@@ -4,6 +4,8 @@ use super::ast;
 use super::scanner;
 use super::token::{Token, TokenKind};
 
+use std::mem;
+
 struct Parser {
     current: usize,
     tokens: Vec<Token>,
@@ -29,7 +31,7 @@ impl Parser {
         let peeked = self.peek_token();
 
         match peeked {
-            Some(t) => t.kind == *kind,
+            Some(t) => mem::discriminant(&t.kind) == mem::discriminant(kind),
             None => false,
         }
     }
@@ -108,6 +110,60 @@ impl Parser {
         }
     }
 
+    fn finish_function_call(&mut self, expr: Expression) -> Result<Expression, String> {
+        let mut arguments = vec![];
+        
+        // If the next token is ')', then there are *no* arguments in
+        // this function call.
+        if !self.match_token(&TokenKind::RightParen) {
+            loop {
+                arguments.push(Box::new(self.parse_expression()?));
+                
+                if !self.match_token(&TokenKind::Comma) {
+                    break;
+                }
+
+                // Consume the delimiting comma.
+                self.advance_token();
+            }
+        }
+
+        self.expect_token(TokenKind::RightParen)?;
+
+        Ok(ast::Expression::FunctionCall(Box::new(expr), arguments))
+    }
+
+    fn parse_function_call(&mut self) -> Result<Expression, String> {
+        let mut expr = self.parse_primary()?;
+        
+        loop {
+            if self.match_token(&TokenKind::LeftParen) {
+                self.advance_token();
+
+                expr = self.finish_function_call(expr)?;
+            } else if self.match_token(&TokenKind::Period) {
+                self.advance_token();
+                                                  // expect_token only compares token *kind*, thus
+                                                  // the value here doesn't matter-- we just use an
+                                                  // empty string.
+                let identifier = self.expect_token(TokenKind::Identifier("".to_string()))?;
+                let name = match identifier {
+                    Some(t) => match &t.kind {
+                        TokenKind::Identifier(literal) => literal,
+                        _ => return Err("Expected identifier after '.'.".to_string())
+                    },
+                    None => return Err("Expected identifier after '.', got nothing.".to_string())
+                };
+
+                expr = Expression::Get(name.clone(), Box::new(expr));
+            } else {
+                break;
+            }
+        }
+
+        Ok(expr)
+    }
+
     fn parse_unary(&mut self) -> Result<Expression, String> {
         // Is there a leading '-' or '!'?
         if self.match_token(&TokenKind::Sub) || self.match_token(&TokenKind::Bang) {
@@ -132,7 +188,7 @@ impl Parser {
 
             Ok(ast::Expression::Unary(Box::new(self.parse_primary()?), operator_kind))
         } else {
-            self.parse_primary()
+            self.parse_function_call()
         }
     }
 
