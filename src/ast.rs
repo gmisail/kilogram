@@ -158,15 +158,18 @@ impl Display for Expression {
                 name, func_type, value
             ),
 
-            Expression::Get(name, expr) => format!(
-                "(Get, name: '{}', parent: {})",
-                name, expr 
-            ),
+            Expression::Get(name, expr) => format!("(Get, name: '{}', parent: {})", name, expr),
 
-            Expression::FunctionCall(name, _) => format!(
-                "(FunctionCall, name: '{}')",
-                name 
-            ),
+            Expression::FunctionCall(name, arguments) => {
+                let argument_list: Vec<String> =
+                    arguments.iter().map(|arg| arg.to_string()).collect();
+
+                format!(
+                    "(FunctionCall, name: {}, arguments: [{}])",
+                    name,
+                    argument_list.join(", ")
+                )
+            }
         };
 
         write!(f, "{}", value)
