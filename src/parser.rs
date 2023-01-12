@@ -110,6 +110,32 @@ impl Parser {
         }
     }
 
+    fn parse_record_instance(&mut self, record_type: String) -> Result<Expression, String> {
+        let mut fields = vec![];
+
+        loop {
+            if !self.match_token(&TokenKind::Comma) && self.match_token(&TokenKind::RightBrace) {
+                break;
+            }
+
+            let identifier = self.expect_token(TokenKind::Identifier("".to_string()))?;
+            let name = match identifier {
+                Some(t) => match &t.kind {
+                    TokenKind::Identifier(literal) => literal.clone(),
+                    _ => return Err("Expected identifier.".to_string()),
+                },
+                None => return Err("Expected identifier.".to_string()),
+            };
+
+            self.expect_token(TokenKind::Colon)?;
+
+            let value = self.parse_expression()?;
+            fields.push((name, Box::new(value)));
+        }
+
+        Ok(ast::Expression::RecordInstance(record_type, fields))
+    }
+
     fn finish_function_call(&mut self, expr: Expression) -> Result<Expression, String> {
         let mut arguments = vec![];
 
