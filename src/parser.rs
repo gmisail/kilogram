@@ -1,4 +1,5 @@
 use crate::ast::Expression;
+use crate::ast::Type;
 
 use super::ast;
 use super::scanner;
@@ -411,8 +412,46 @@ impl Parser {
         Ok(expr)
     }
 
+    fn parse_type(&mut self) -> Result<Type, String> {
+        self.advance_token();
+
+        Ok(ast::Type::Base("Todo_Type".to_string()))
+    }
+
+    fn parse_let_expression(&mut self) -> Result<Expression, String> {
+        if self.match_token(&TokenKind::Let) {
+            self.advance_token();
+
+            // let <name> : <type> = <value>
+            
+            let name_token = self.expect_token(TokenKind::Identifier("".to_string()))?;
+            let variable_name = match name_token {
+                Some(t) => match &t.kind {
+                    TokenKind::Identifier(name) => name.clone(),
+                    _ => return Err("Expected an identifier as variable name.".to_string()) 
+                },
+                None => return Err("Expected variable name, instead we reached the end of the file.".to_string())
+            };
+
+            
+            self.expect_token(TokenKind::Colon)?;
+
+            let variable_type = self.parse_type()?;
+
+            self.expect_token(TokenKind::Equal)?;
+
+            let variable_value = self.parse_expression()?;
+            
+            let variable_body = self.parse_expression()?;
+
+            Ok(ast::Expression::Let(variable_name, variable_type, Box::new(variable_value), Box::new(variable_body)))
+        } else {
+            self.parse_logical_or()
+        }
+    }
+
     fn parse_expression(&mut self) -> Result<Expression, String> {
-        self.parse_logical_or()
+        self.parse_let_expression()
     }
 }
 

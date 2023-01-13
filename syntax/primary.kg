@@ -1,2 +1,6 @@
-Album { name: "Imperial", artist: "Denzel Curry" }
-Album { name: "TABOO", artist: "Denzel Curry" }
+let sum : int =   
+	let x : int = 100
+	let y : int = 50
+	let z : int = 150
+	x + y + z
+print(sum)
