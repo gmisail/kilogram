@@ -268,7 +268,7 @@ impl Scanner for ScannerContext {
 
                     // check single-character tokens
                     '+' => Ok(self.new_symbol_token(TokenKind::Add)),
-                    '-' => Ok(self.new_symbol_token(TokenKind::Sub)),
+                    '-' => self.scan_conditional(&[('>', TokenKind::ThinArrow)], TokenKind::Sub),
                     '*' => Ok(self.new_symbol_token(TokenKind::Mult)),
                     '/' => Ok(self.new_symbol_token(TokenKind::Div)),
                     '(' => Ok(self.new_symbol_token(TokenKind::LeftParen)),

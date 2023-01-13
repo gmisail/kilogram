@@ -412,7 +412,42 @@ impl Parser {
         Ok(expr)
     }
 
+    fn parse_function_type(&mut self) -> Result<Type, String> {
+        self.advance_token();
+
+        let mut arguments = vec![];
+
+        if !self.match_token(&TokenKind::RightParen) {
+            loop {
+                arguments.push(Box::new(self.parse_type()?));
+
+                if self.match_token(&TokenKind::Comma) {
+                    // Consume a comma after a type, implies there are multiple.
+                    self.advance_token();
+                } else {
+                    // Not a comma? Then we must be done.
+                    self.expect_token(TokenKind::RightParen)?;
+
+                    break;
+                }
+            }
+        } else {
+            // Consume the closing ')'.
+            self.advance_token();
+        }
+
+        self.expect_token(TokenKind::ThinArrow)?;
+
+        let return_type = self.parse_type()?;
+
+        Ok(ast::Type::Function(arguments, Box::new(return_type)))
+    }
+
     fn parse_type(&mut self) -> Result<Type, String> {
+        if self.match_token(&TokenKind::LeftParen) {
+            return self.parse_function_type();
+        }
+
         let base_type = match self.peek_token() {
             Some(t) => match &t.kind {
                 TokenKind::Identifier(name) => name.clone(),
@@ -440,6 +475,69 @@ impl Parser {
         }
     }
 
+    fn parse_function_expression(&mut self) -> Result<Expression, String> {
+        if self.match_token(&TokenKind::Function) {
+            // Consume 'function' keyword.
+            self.advance_token();
+
+            self.expect_token(TokenKind::LeftParen)?;
+
+            let mut arguments = vec![];
+
+            // If we immediately get a '}', don't bother parsing any arguments.
+            if !self.match_token(&TokenKind::RightParen) {
+                loop {
+                    let identifier = self.expect_token(TokenKind::Identifier("".to_string()))?;
+                    let name = match identifier {
+                        Some(t) => match &t.kind {
+                            TokenKind::Identifier(literal) => literal.clone(),
+                            _ => {
+                                return Err(format!("Expected identifier, got {} instead.", t.kind))
+                            }
+                        },
+                        None => {
+                            return Err("Reached end of input while parsing expression.".to_string())
+                        }
+                    };
+
+                    self.expect_token(TokenKind::Colon)?;
+
+                    let argument_type = self.parse_type()?;
+                    arguments.push((name, argument_type));
+
+                    if self.match_token(&TokenKind::Comma) {
+                        // Consume a comma after a argument:type pair, implies there are multiple.
+                        self.advance_token();
+                    } else {
+                        // Not a comma? Then we must be done.
+                        self.expect_token(TokenKind::RightParen)?;
+
+                        break;
+                    }
+                }
+            } else {
+                // Consume the closing '}'.
+                self.advance_token();
+            }
+
+            self.expect_token(TokenKind::Colon)?;
+
+            let function_type = self.parse_type()?;
+            let function_body = self.parse_expression()?;
+
+            self.expect_token(TokenKind::End)?;
+
+            Ok(ast::Expression::Function(
+                "anonymous".to_string(),
+                function_type,
+                arguments,
+                Box::new(function_body),
+            ))
+        } else {
+            self.parse_logical_or()
+        }
+    }
+
     fn parse_if_expression(&mut self) -> Result<Expression, String> {
         if self.match_token(&TokenKind::If) {
             // Consume 'if' token.
@@ -461,7 +559,7 @@ impl Parser {
                 Box::new(else_expression),
             ))
         } else {
-            self.parse_logical_or()
+            self.parse_function_expression()
         }
     }
 
@@ -492,7 +590,6 @@ impl Parser {
             self.expect_token(TokenKind::Equal)?;
 
             let variable_value = self.parse_expression()?;
-
             let variable_body = self.parse_expression()?;
 
             Ok(ast::Expression::Let(

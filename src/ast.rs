@@ -77,6 +77,7 @@ impl Display for LogicalOperator {
 pub enum Type {
     Base(String),               // string, int, ...
     Generic(String, Box<Type>), // array<string>, list<int>, ...
+    Function(Vec<Box<Type>>, Box<Type>),
 }
 
 impl Display for Type {
@@ -88,6 +89,16 @@ impl Display for Type {
                 Type::Base(name) => format!("(Type, name: {})", name),
                 Type::Generic(name, sub_type) =>
                     format!("(GenericType, name: {}, sub_type: {})", name, sub_type),
+                Type::Function(argument_types, return_type) => {
+                    let arg_type_list: Vec<String> =
+                        argument_types.iter().map(|arg| arg.to_string()).collect();
+
+                    format!(
+                        "(FunctionType, arguments: [{}], return: {})",
+                        arg_type_list.join(", "),
+                        return_type
+                    )
+                }
             }
         )
     }
