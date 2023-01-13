@@ -1,5 +1,2 @@
-let concat: (list(a), list(a)) -> list(a) =
-function(first: list(a), second: list(a)): list(a)
-	first + second
-end
-concat()
+let is_odd: int = 10
+is_odd

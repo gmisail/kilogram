@@ -210,7 +210,11 @@ impl Scanner for ScannerContext {
     }
 
     fn scan_identifier(&mut self) -> Result<Token, &'static str> {
-        while !self.is_at_end() && self.peek_char().map_or(false, char::is_alphanumeric) {
+        while !self.is_at_end()
+            && self
+                .peek_char()
+                .map_or(false, |c| c.is_alphanumeric() || c == '_')
+        {
             self.next_char();
         }
 
