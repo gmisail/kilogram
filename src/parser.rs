@@ -440,6 +440,31 @@ impl Parser {
         }
     }
 
+    fn parse_if_expression(&mut self) -> Result<Expression, String> {
+        if self.match_token(&TokenKind::If) {
+            // Consume 'if' token.
+            self.advance_token();
+
+            let if_condition = self.parse_expression()?;
+
+            self.expect_token(TokenKind::Then)?;
+
+            let then_expression = self.parse_expression()?;
+
+            self.expect_token(TokenKind::Else)?;
+
+            let else_expression = self.parse_expression()?;
+
+            Ok(ast::Expression::If(
+                Box::new(if_condition),
+                Box::new(then_expression),
+                Box::new(else_expression),
+            ))
+        } else {
+            self.parse_logical_or()
+        }
+    }
+
     fn parse_let_expression(&mut self) -> Result<Expression, String> {
         if self.match_token(&TokenKind::Let) {
             self.advance_token();
@@ -477,7 +502,7 @@ impl Parser {
                 Box::new(variable_body),
             ))
         } else {
-            self.parse_logical_or()
+            self.parse_if_expression()
         }
     }
 
