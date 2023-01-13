@@ -413,9 +413,27 @@ impl Parser {
     }
 
     fn parse_type(&mut self) -> Result<Type, String> {
-        self.advance_token();
+        let base_type = match self.peek_token() {
+            Some(t) => match &t.kind {
+                TokenKind::Identifier(name) => name.clone(),
+                _ => return Err(format!("Expected an type name, got {} instead.", t.kind))
+            },
+            None => return Err("Expected type name, instead we reached the end of the file.".to_string())
+        };
 
-        Ok(ast::Type::Base("Todo_Type".to_string()))
+        self.advance_token();
+        
+        if self.match_token(&TokenKind::LeftParen) {
+            self.advance_token();
+            
+            let sub_type = self.parse_type()?;
+
+            self.expect_token(TokenKind::RightParen)?;
+            
+            Ok(ast::Type::Generic(base_type, Box::new(sub_type)))
+        } else {
+            Ok(ast::Type::Base(base_type))
+        }
     }
 
     fn parse_let_expression(&mut self) -> Result<Expression, String> {

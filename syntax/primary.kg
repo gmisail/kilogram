@@ -1,6 +1,2 @@
-let sum : int =   
-	let x : int = 100
-	let y : int = 50
-	let z : int = 150
-	x + y + z
-print(sum)
+let values : list(int) = make_values() 
+print("my list of values: {}", values)
