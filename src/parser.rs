@@ -23,6 +23,14 @@ impl Parser {
         self.tokens.get(self.current)
     }
 
+    fn next_token(&self) -> Option<&Token> {
+        self.tokens.get(self.current + 1)
+    }
+
+    fn previous_token(&self) -> Option<&Token> {
+        self.tokens.get(self.current - 1)
+    }
+
     fn advance_token(&mut self) {
         self.current += 1;
     }
@@ -36,11 +44,18 @@ impl Parser {
         }
     }
 
+    fn match_next_token(&mut self, kind: &TokenKind) -> bool {
+        match self.next_token() {
+            Some(t) => mem::discriminant(&t.kind) == mem::discriminant(kind),
+            None => false,
+        }
+    }
+
     fn expect_token(&mut self, kind: TokenKind) -> Result<Option<&Token>, String> {
         if self.match_token(&kind) {
             self.advance_token();
 
-            Ok(self.peek_token())
+            Ok(self.previous_token())
         } else {
             let actual_kind = match self.peek_token() {
                 Some(t) => &t.kind,
@@ -75,8 +90,14 @@ impl Parser {
     }
 
     fn parse_identifier(&mut self, name: String) -> Result<Expression, String> {
+        // Consume the identifer token.
         self.advance_token();
-        Ok(Expression::Variable(name))
+
+        if self.match_token(&TokenKind::LeftBrace) {
+            self.parse_record_instance(name)
+        } else {
+            Ok(Expression::Variable(name))
+        }
     }
 
     fn parse_group(&mut self) -> Result<Expression, String> {
@@ -113,24 +134,41 @@ impl Parser {
     fn parse_record_instance(&mut self, record_type: String) -> Result<Expression, String> {
         let mut fields = vec![];
 
-        loop {
-            if !self.match_token(&TokenKind::Comma) && self.match_token(&TokenKind::RightBrace) {
-                break;
+        // Consume the opening brace.
+        self.advance_token();
+
+        // If we immediately get a '}', don't bother parsing any fields.
+        if !self.match_token(&TokenKind::RightBrace) {
+            loop {
+                let identifier = self.expect_token(TokenKind::Identifier("".to_string()))?;
+                let name = match identifier {
+                    Some(t) => match &t.kind {
+                        TokenKind::Identifier(literal) => literal.clone(),
+                        _ => return Err(format!("Expected identifier, got {} instead.", t.kind)),
+                    },
+                    None => {
+                        return Err("Reached end of input while parsing expression.".to_string())
+                    }
+                };
+
+                self.expect_token(TokenKind::Colon)?;
+
+                let value = self.parse_expression()?;
+                fields.push((name, Box::new(value)));
+
+                if self.match_token(&TokenKind::Comma) {
+                    // Consume a comma after a key:value pair, implies there are multiple.
+                    self.advance_token();
+                } else {
+                    // Not a comma? Then we must be done.
+                    self.expect_token(TokenKind::RightBrace)?;
+
+                    break;
+                }
             }
-
-            let identifier = self.expect_token(TokenKind::Identifier("".to_string()))?;
-            let name = match identifier {
-                Some(t) => match &t.kind {
-                    TokenKind::Identifier(literal) => literal.clone(),
-                    _ => return Err("Expected identifier.".to_string()),
-                },
-                None => return Err("Expected identifier.".to_string()),
-            };
-
-            self.expect_token(TokenKind::Colon)?;
-
-            let value = self.parse_expression()?;
-            fields.push((name, Box::new(value)));
+        } else {
+            // Consume the closing '}'.
+            self.advance_token();
         }
 
         Ok(ast::Expression::RecordInstance(record_type, fields))

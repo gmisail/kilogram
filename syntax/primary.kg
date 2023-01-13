@@ -1,1 +1,2 @@
-print("2 * 5 = {}", multiply(2, 5))
+Album { name: "Imperial", artist: "Denzel Curry" }
+Album { name: "TABOO", artist: "Denzel Curry" }
