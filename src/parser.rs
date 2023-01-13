@@ -416,20 +416,24 @@ impl Parser {
         let base_type = match self.peek_token() {
             Some(t) => match &t.kind {
                 TokenKind::Identifier(name) => name.clone(),
-                _ => return Err(format!("Expected an type name, got {} instead.", t.kind))
+                _ => return Err(format!("Expected an type name, got {} instead.", t.kind)),
             },
-            None => return Err("Expected type name, instead we reached the end of the file.".to_string())
+            None => {
+                return Err(
+                    "Expected type name, instead we reached the end of the file.".to_string(),
+                )
+            }
         };
 
         self.advance_token();
-        
+
         if self.match_token(&TokenKind::LeftParen) {
             self.advance_token();
-            
+
             let sub_type = self.parse_type()?;
 
             self.expect_token(TokenKind::RightParen)?;
-            
+
             Ok(ast::Type::Generic(base_type, Box::new(sub_type)))
         } else {
             Ok(ast::Type::Base(base_type))
@@ -441,17 +445,21 @@ impl Parser {
             self.advance_token();
 
             // let <name> : <type> = <value>
-            
+
             let name_token = self.expect_token(TokenKind::Identifier("".to_string()))?;
             let variable_name = match name_token {
                 Some(t) => match &t.kind {
                     TokenKind::Identifier(name) => name.clone(),
-                    _ => return Err("Expected an identifier as variable name.".to_string()) 
+                    _ => return Err("Expected an identifier as variable name.".to_string()),
                 },
-                None => return Err("Expected variable name, instead we reached the end of the file.".to_string())
+                None => {
+                    return Err(
+                        "Expected variable name, instead we reached the end of the file."
+                            .to_string(),
+                    )
+                }
             };
 
-            
             self.expect_token(TokenKind::Colon)?;
 
             let variable_type = self.parse_type()?;
@@ -459,10 +467,15 @@ impl Parser {
             self.expect_token(TokenKind::Equal)?;
 
             let variable_value = self.parse_expression()?;
-            
+
             let variable_body = self.parse_expression()?;
 
-            Ok(ast::Expression::Let(variable_name, variable_type, Box::new(variable_value), Box::new(variable_body)))
+            Ok(ast::Expression::Let(
+                variable_name,
+                variable_type,
+                Box::new(variable_value),
+                Box::new(variable_body),
+            ))
         } else {
             self.parse_logical_or()
         }
