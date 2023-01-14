@@ -24,10 +24,6 @@ impl Parser {
         self.tokens.get(self.current)
     }
 
-    fn next_token(&self) -> Option<&Token> {
-        self.tokens.get(self.current + 1)
-    }
-
     fn previous_token(&self) -> Option<&Token> {
         self.tokens.get(self.current - 1)
     }
@@ -40,13 +36,6 @@ impl Parser {
         let peeked = self.peek_token();
 
         match peeked {
-            Some(t) => mem::discriminant(&t.kind) == mem::discriminant(kind),
-            None => false,
-        }
-    }
-
-    fn match_next_token(&mut self, kind: &TokenKind) -> bool {
-        match self.next_token() {
             Some(t) => mem::discriminant(&t.kind) == mem::discriminant(kind),
             None => false,
         }
@@ -484,7 +473,7 @@ impl Parser {
 
             let mut arguments = vec![];
 
-            // If we immediately get a '}', don't bother parsing any arguments.
+            // If we immediately get a ')', don't bother parsing any arguments.
             if !self.match_token(&TokenKind::RightParen) {
                 loop {
                     let identifier = self.expect_token(TokenKind::Identifier("".to_string()))?;
@@ -538,6 +527,73 @@ impl Parser {
         }
     }
 
+    fn parse_record_declaration(&mut self) -> Result<Expression, String> {
+        if self.match_token(&TokenKind::Record) {
+            self.advance_token();
+
+            let mut fields = vec![];
+
+            let name_token = self.expect_token(TokenKind::Identifier("".to_string()))?;
+            let record_name = match name_token {
+                Some(t) => match &t.kind {
+                    TokenKind::Identifier(name) => name.clone(),
+                    _ => return Err("Expected an identifier as record name.".to_string()),
+                },
+                None => {
+                    return Err(
+                        "Expected record name, instead we reached the end of the file.".to_string(),
+                    )
+                }
+            };
+
+            // If we immediately get a 'end' don't bother parsing any fields.
+            if !self.match_token(&TokenKind::End) {
+                loop {
+                    let identifier = self.expect_token(TokenKind::Identifier("".to_string()))?;
+                    let field_name = match identifier {
+                        Some(t) => match &t.kind {
+                            TokenKind::Identifier(literal) => literal.clone(),
+                            _ => {
+                                return Err(format!("Expected identifier, got {} instead.", t.kind))
+                            }
+                        },
+                        None => {
+                            return Err("Reached end of input while parsing expression.".to_string())
+                        }
+                    };
+
+                    self.expect_token(TokenKind::Colon)?;
+
+                    let field_type = self.parse_type()?;
+                    fields.push((field_name, field_type));
+
+                    if self.match_token(&TokenKind::Comma) {
+                        // Consume a comma after a field:type pair, implies there are multiple.
+                        self.advance_token();
+                    } else {
+                        // Not a comma? Then we must be done.
+                        self.expect_token(TokenKind::End)?;
+
+                        break;
+                    }
+                }
+            } else {
+                // Consume the closing 'end'.
+                self.advance_token();
+            }
+
+            let body = self.parse_expression()?;
+
+            Ok(ast::Expression::RecordDeclaration(
+                record_name,
+                fields,
+                Box::new(body),
+            ))
+        } else {
+            self.parse_function_expression()
+        }
+    }
+
     fn parse_if_expression(&mut self) -> Result<Expression, String> {
         if self.match_token(&TokenKind::If) {
             // Consume 'if' token.
@@ -559,7 +615,7 @@ impl Parser {
                 Box::new(else_expression),
             ))
         } else {
-            self.parse_function_expression()
+            self.parse_record_declaration()
         }
     }
 

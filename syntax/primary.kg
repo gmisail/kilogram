@@ -1,2 +1,7 @@
+record Album
+	name: string,
+	artist: string
+end
+
 let is_odd: int = 10
 is_odd

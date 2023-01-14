@@ -116,6 +116,7 @@ pub enum Expression {
 
     Get(String, Box<Expression>),
 
+    RecordDeclaration(String, Vec<(String, Type)>, Box<Expression>),
     RecordInstance(String, Vec<(String, Box<Expression>)>),
 
     FunctionCall(Box<Expression>, Vec<Box<Expression>>),
@@ -182,6 +183,20 @@ impl Display for Expression {
                     "(FunctionCall, name: {}, arguments: [{}])",
                     name,
                     argument_list.join(", ")
+                )
+            }
+
+            Expression::RecordDeclaration(name, fields, body) => {
+                let field_list: Vec<String> = fields
+                    .iter()
+                    .map(|(field_name, field_type)| format!("({}: {})", field_name, field_type))
+                    .collect();
+
+                format!(
+                    "(RecordDeclaration, name: {}, fields: [{}], body: {})",
+                    name,
+                    field_list.join(", "),
+                    body
                 )
             }
 
