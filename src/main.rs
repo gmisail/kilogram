@@ -6,6 +6,7 @@ pub mod ast;
 pub mod parser;
 pub mod scanner;
 pub mod token;
+pub mod typechecker;
 
 fn main() {
     let mut file = match File::open("./syntax/primary.kg") {
@@ -19,5 +20,7 @@ fn main() {
         Ok(_) => println!("opened file",),
     }
 
-    let _tree = parse(s);
+    let tree = parse(s).unwrap();
+
+    typechecker::expr_type::from_literal(tree);
 }
