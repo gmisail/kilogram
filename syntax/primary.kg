@@ -3,5 +3,8 @@ record Album
 	artist: string
 end
 
-let is_odd: int = 10
-is_odd
+record FakeAlbum
+	mock: string
+end
+
+consume()

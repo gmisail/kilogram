@@ -32,7 +32,7 @@ impl Parser {
         self.current += 1;
     }
 
-    fn match_token(&mut self, kind: &TokenKind) -> bool {
+    fn match_token(&self, kind: &TokenKind) -> bool {
         let peeked = self.peek_token();
 
         match peeked {
@@ -41,8 +41,8 @@ impl Parser {
         }
     }
 
-    fn expect_token(&mut self, kind: TokenKind) -> Result<Option<&Token>, String> {
-        if self.match_token(&kind) {
+    fn expect_token(&mut self, kind: &TokenKind) -> Result<Option<&Token>, String> {
+        if self.match_token(kind) {
             self.advance_token();
 
             Ok(self.previous_token())
@@ -95,7 +95,7 @@ impl Parser {
 
         // ( inner_expr )
         let inner_expr = Expression::Group(Box::new(self.parse_expression()?));
-        self.expect_token(TokenKind::RightParen)?;
+        self.expect_token(&TokenKind::RightParen)?;
 
         Ok(inner_expr)
     }
@@ -130,7 +130,7 @@ impl Parser {
         // If we immediately get a '}', don't bother parsing any fields.
         if !self.match_token(&TokenKind::RightBrace) {
             loop {
-                let identifier = self.expect_token(TokenKind::Identifier("".to_string()))?;
+                let identifier = self.expect_token(&TokenKind::Identifier("".to_string()))?;
                 let name = match identifier {
                     Some(t) => match &t.kind {
                         TokenKind::Identifier(literal) => literal.clone(),
@@ -141,7 +141,7 @@ impl Parser {
                     }
                 };
 
-                self.expect_token(TokenKind::Colon)?;
+                self.expect_token(&TokenKind::Colon)?;
 
                 let value = self.parse_expression()?;
                 fields.push((name, Box::new(value)));
@@ -151,7 +151,7 @@ impl Parser {
                     self.advance_token();
                 } else {
                     // Not a comma? Then we must be done.
-                    self.expect_token(TokenKind::RightBrace)?;
+                    self.expect_token(&TokenKind::RightBrace)?;
 
                     break;
                 }
@@ -182,7 +182,7 @@ impl Parser {
             }
         }
 
-        self.expect_token(TokenKind::RightParen)?;
+        self.expect_token(&TokenKind::RightParen)?;
 
         Ok(ast::Expression::FunctionCall(Box::new(expr), arguments))
     }
@@ -200,7 +200,7 @@ impl Parser {
                 // expect_token only compares token *kind*, thus
                 // the value here doesn't matter-- we just use an
                 // empty string.
-                let identifier = self.expect_token(TokenKind::Identifier("".to_string()))?;
+                let identifier = self.expect_token(&TokenKind::Identifier("".to_string()))?;
                 let name = match identifier {
                     Some(t) => match &t.kind {
                         TokenKind::Identifier(literal) => literal,
@@ -415,7 +415,7 @@ impl Parser {
                     self.advance_token();
                 } else {
                     // Not a comma? Then we must be done.
-                    self.expect_token(TokenKind::RightParen)?;
+                    self.expect_token(&TokenKind::RightParen)?;
 
                     break;
                 }
@@ -425,7 +425,7 @@ impl Parser {
             self.advance_token();
         }
 
-        self.expect_token(TokenKind::ThinArrow)?;
+        self.expect_token(&TokenKind::ThinArrow)?;
 
         let return_type = self.parse_type()?;
 
@@ -456,7 +456,7 @@ impl Parser {
 
             let sub_type = self.parse_type()?;
 
-            self.expect_token(TokenKind::RightParen)?;
+            self.expect_token(&TokenKind::RightParen)?;
 
             Ok(ast::Type::Generic(base_type, Box::new(sub_type)))
         } else {
@@ -469,14 +469,14 @@ impl Parser {
             // Consume 'function' keyword.
             self.advance_token();
 
-            self.expect_token(TokenKind::LeftParen)?;
+            self.expect_token(&TokenKind::LeftParen)?;
 
             let mut arguments = vec![];
 
             // If we immediately get a ')', don't bother parsing any arguments.
             if !self.match_token(&TokenKind::RightParen) {
                 loop {
-                    let identifier = self.expect_token(TokenKind::Identifier("".to_string()))?;
+                    let identifier = self.expect_token(&TokenKind::Identifier("".to_string()))?;
                     let name = match identifier {
                         Some(t) => match &t.kind {
                             TokenKind::Identifier(literal) => literal.clone(),
@@ -489,7 +489,7 @@ impl Parser {
                         }
                     };
 
-                    self.expect_token(TokenKind::Colon)?;
+                    self.expect_token(&TokenKind::Colon)?;
 
                     let argument_type = self.parse_type()?;
                     arguments.push((name, argument_type));
@@ -499,7 +499,7 @@ impl Parser {
                         self.advance_token();
                     } else {
                         // Not a comma? Then we must be done.
-                        self.expect_token(TokenKind::RightParen)?;
+                        self.expect_token(&TokenKind::RightParen)?;
 
                         break;
                     }
@@ -509,12 +509,12 @@ impl Parser {
                 self.advance_token();
             }
 
-            self.expect_token(TokenKind::Colon)?;
+            self.expect_token(&TokenKind::Colon)?;
 
             let function_type = self.parse_type()?;
             let function_body = self.parse_expression()?;
 
-            self.expect_token(TokenKind::End)?;
+            self.expect_token(&TokenKind::End)?;
 
             Ok(ast::Expression::Function(
                 "anonymous".to_string(),
@@ -533,7 +533,7 @@ impl Parser {
 
             let mut fields = vec![];
 
-            let name_token = self.expect_token(TokenKind::Identifier("".to_string()))?;
+            let name_token = self.expect_token(&TokenKind::Identifier("".to_string()))?;
             let record_name = match name_token {
                 Some(t) => match &t.kind {
                     TokenKind::Identifier(name) => name.clone(),
@@ -549,7 +549,7 @@ impl Parser {
             // If we immediately get a 'end' don't bother parsing any fields.
             if !self.match_token(&TokenKind::End) {
                 loop {
-                    let identifier = self.expect_token(TokenKind::Identifier("".to_string()))?;
+                    let identifier = self.expect_token(&TokenKind::Identifier("".to_string()))?;
                     let field_name = match identifier {
                         Some(t) => match &t.kind {
                             TokenKind::Identifier(literal) => literal.clone(),
@@ -562,7 +562,7 @@ impl Parser {
                         }
                     };
 
-                    self.expect_token(TokenKind::Colon)?;
+                    self.expect_token(&TokenKind::Colon)?;
 
                     let field_type = self.parse_type()?;
                     fields.push((field_name, field_type));
@@ -572,7 +572,7 @@ impl Parser {
                         self.advance_token();
                     } else {
                         // Not a comma? Then we must be done.
-                        self.expect_token(TokenKind::End)?;
+                        self.expect_token(&TokenKind::End)?;
 
                         break;
                     }
@@ -601,11 +601,11 @@ impl Parser {
 
             let if_condition = self.parse_expression()?;
 
-            self.expect_token(TokenKind::Then)?;
+            self.expect_token(&TokenKind::Then)?;
 
             let then_expression = self.parse_expression()?;
 
-            self.expect_token(TokenKind::Else)?;
+            self.expect_token(&TokenKind::Else)?;
 
             let else_expression = self.parse_expression()?;
 
@@ -625,7 +625,7 @@ impl Parser {
 
             // let <name> : <type> = <value>
 
-            let name_token = self.expect_token(TokenKind::Identifier("".to_string()))?;
+            let name_token = self.expect_token(&TokenKind::Identifier("".to_string()))?;
             let variable_name = match name_token {
                 Some(t) => match &t.kind {
                     TokenKind::Identifier(name) => name.clone(),
@@ -639,11 +639,11 @@ impl Parser {
                 }
             };
 
-            self.expect_token(TokenKind::Colon)?;
+            self.expect_token(&TokenKind::Colon)?;
 
             let variable_type = self.parse_type()?;
 
-            self.expect_token(TokenKind::Equal)?;
+            self.expect_token(&TokenKind::Equal)?;
 
             let variable_value = self.parse_expression()?;
             let variable_body = self.parse_expression()?;
@@ -668,11 +668,18 @@ pub fn parse(input: String) -> Result<ast::Expression, &'static str> {
     let tokens = scanner::scan(input)?;
     let mut context = Parser { current: 0, tokens };
 
+    let mut expressions = vec![];
+
     while !context.is_at_end() {
         println!(
             "{}",
             match context.parse_expression() {
-                Ok(node) => format!("{}", node),
+                Ok(node) => {
+                    let str = format!("{}", node);
+                    expressions.push(node);
+
+                    str
+                }
                 Err(e) => {
                     context.advance_token();
                     e
@@ -681,5 +688,5 @@ pub fn parse(input: String) -> Result<ast::Expression, &'static str> {
         );
     }
 
-    Err("...")
+    Ok(expressions.get(0).unwrap().clone())
 }

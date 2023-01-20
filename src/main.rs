@@ -1,6 +1,7 @@
 use std::{fs::File, io::Read};
 
 use parser::parse;
+use typechecker::typechecker::Typechecker;
 
 pub mod ast;
 pub mod parser;
@@ -22,5 +23,6 @@ fn main() {
 
     let tree = parse(s).unwrap();
 
-    typechecker::expr_type::from_literal(tree);
+    let mut checker = Typechecker::new();
+    checker.resolve_type(tree).unwrap();
 }
