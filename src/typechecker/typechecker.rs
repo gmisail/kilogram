@@ -43,18 +43,13 @@ impl Typechecker {
     fn add_record(&mut self, name: &String, fields: &[(String, ast::Type)]) -> Result<(), String> {
         let record_types = fields
             .iter()
-            .map(|(name, type_decl)| {
-                (
-                    name.clone(),
-                    self.from_ast_type(type_decl).unwrap().clone(),
-                )
-            })
+            .map(|(name, type_decl)| (name.clone(), self.from_ast_type(type_decl).unwrap().clone()))
             .collect();
 
-        match self
-            .records
-            .insert(name.clone(), Rc::new(Type::Record(name.clone(), record_types)))
-        {
+        match self.records.insert(
+            name.clone(),
+            Rc::new(Type::Record(name.clone(), record_types)),
+        ) {
             Some(_) => Err(format!("Record '{}' already defined.", name)),
             None => Ok(()),
         }
@@ -87,11 +82,11 @@ impl Typechecker {
                 for ast_argument in ast_argument_types {
                     argument_types.push(self.from_ast_type(&ast_argument)?);
                 }
-                
+
                 let return_type = self.from_ast_type(&ast_return_type)?;
 
                 Ok(Rc::new(Type::Function(argument_types, return_type)))
-            },
+            }
             _ => Err("Unable to convert type to internal type.".to_string()),
         }
     }
@@ -108,11 +103,27 @@ impl Typechecker {
                 let var_type = self.from_ast_type(&var_ast_type)?.clone();
                 let value_type = self.resolve_type(*var_value)?;
 
-                if var_type == value_type {
+                if *var_type == *value_type {
                     self.add_variable(var_name, var_type)?;
                     self.resolve_type(*body)
                 } else {
-                    Err(format!("Can't define variables with incompatible types! Variable is defined as type <insert type here>, but you're assigning it to a value of type <insert different type>."))
+                    Err(format!("Can't define variables with incompatible types! Variable is defined as type {}, but you're assigning it to a value of type {}.", *var_type, *value_type))
+                }
+            }
+            ast::Expression::Function(_, ast_return_type, ast_argument_types, body) => {
+                let body_type = self.resolve_type(*body)?;
+                let return_type = self.from_ast_type(&ast_return_type)?;
+
+                if *body_type == *return_type {
+                    let mut argument_types = vec![];
+
+                    for (_, arg_type) in ast_argument_types {
+                        argument_types.push(self.from_ast_type(&arg_type)?);
+                    }
+
+                    Ok(Rc::new(Type::Function(argument_types, return_type)))
+                } else {
+                    Err("Function return type and actual type returned do not match.".to_string())
                 }
             }
             ast::Expression::RecordDeclaration(name, fields, body) => {

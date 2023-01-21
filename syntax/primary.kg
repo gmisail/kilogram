@@ -12,6 +12,6 @@ let foo: float = 10.3
 let buz: bool = true
 let baz: string = "wahoo!"
 let identity: (int) -> int = function(x: int): int
-	x
+	10
 end
 bar

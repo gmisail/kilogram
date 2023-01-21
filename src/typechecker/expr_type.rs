@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::{collections::HashMap, rc::Rc};
 
 #[derive(Clone)]
@@ -6,7 +7,7 @@ pub enum Type {
     Float,
     Str,
     Boolean,
-    
+
     // Only allow one allocation per type and simply create copies
     // of that immutable memory address.
     Function(Vec<Rc<Type>>, Rc<Type>),
@@ -25,12 +26,12 @@ impl PartialEq for Type {
                     //  1. same # of arguments
                     //  2. return types are equal
                     //  3. corresponding arguments have the same types
-                    arguments.len() != other_arguments.len()
-                        && *return_type != *other_return_type
+                    arguments.len() == other_arguments.len()
+                        && **return_type == **other_return_type
                         && arguments
                             .iter()
                             .zip(other_arguments)
-                            .all(|(type_a, type_b)| *type_a == *type_b)
+                            .all(|(type_a, type_b)| **type_a == **type_b)
                 }
 
                 // Other type not a function? Must not be equal.
@@ -56,5 +57,38 @@ impl PartialEq for Type {
             // the enum names since there are no subfields.
             _ => std::mem::discriminant(self) == std::mem::discriminant(other),
         }
+    }
+}
+
+impl Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Type::Integer => "int".to_string(),
+                Type::Float => "float".to_string(),
+                Type::Boolean => "bool".to_string(),
+                Type::Str => "string".to_string(),
+
+                Type::Function(argument_types, return_type) => {
+                    let arg_type_list: Vec<String> = argument_types
+                        .iter()
+                        .map(|arg| (*arg).to_string())
+                        .collect();
+
+                    format!("({}) -> {}", arg_type_list.join(", "), *return_type)
+                }
+
+                Type::Record(name, field_types) => {
+                    let field_type_list: Vec<String> = field_types
+                        .values()
+                        .map(|field_type| (*field_type).to_string())
+                        .collect();
+
+                    format!("{} {{ {} }}", name, field_type_list.join(", "))
+                }
+            }
+        )
     }
 }
