@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 #[derive(Clone)]
 pub enum Type {
@@ -6,10 +6,11 @@ pub enum Type {
     Float,
     Str,
     Boolean,
-
-    // Make this a pointer instead? i.e. Box<&Type>
-    Function(Vec<Box<Type>>, Box<Type>),
-    Record(String, HashMap<String, Box<Type>>),
+    
+    // Only allow one allocation per type and simply create copies
+    // of that immutable memory address.
+    Function(Vec<Rc<Type>>, Rc<Type>),
+    Record(String, HashMap<String, Rc<Type>>),
 }
 
 impl PartialEq for Type {
