@@ -1,6 +1,6 @@
-use crate::ast;
+use crate::ast::{self, Expression};
 
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 
 use super::expr_type::Type;
 
@@ -26,7 +26,7 @@ impl Typechecker {
     }
 
     // Creates an internal Record type based off of its AST representation.
-    pub fn add_record(&mut self, name: &String, fields: &Vec<(String, ast::Type)>) -> bool {
+    fn add_record(&mut self, name: &String, fields: &Vec<(String, ast::Type)>) -> bool {
         if self.records.contains_key(name) {
             false
         } else {
@@ -49,6 +49,19 @@ impl Typechecker {
         }
     }
 
+    fn add_variable(&mut self, var_name: &String, var_type: Type) -> bool {
+        if self.variables.contains_key(var_name) {
+            false
+        } else {
+            println!("Variable {} added.", var_name);
+
+            self.variables.insert(var_name.clone(), var_type);
+
+            true
+        }
+    }
+    
+
     // Converts an AST type (int, string, ...) into a actual type.
     fn from_ast_type(&self, t: &ast::Type) -> Option<&Type> {
         match t {
@@ -63,13 +76,28 @@ impl Typechecker {
         }
     }
 
-    pub fn resolve_type(&mut self, expression: ast::Expression) -> Result<Type, String> {
+    pub fn resolve_type(&mut self, expression: ast::Expression) -> Result<&Type, String> {
         match expression {
-            ast::Expression::Integer(_) => Ok(Type::Integer),
-            ast::Expression::Float(_) => Ok(Type::Float),
-            ast::Expression::Str(_) => Ok(Type::Str),
-            ast::Expression::Boolean(_) => Ok(Type::Boolean),
+            ast::Expression::Integer(_) => Ok(&Type::Integer),
+            ast::Expression::Float(_) => Ok(&Type::Float),
+            ast::Expression::Str(_) => Ok(&Type::Str),
+            ast::Expression::Boolean(_) => Ok(&Type::Boolean),
             ast::Expression::Group(inner) => self.resolve_type(*inner),
+            ast::Expression::Variable(name) => {
+                match self.variables.get(&name) {
+                    Some(var_type) => Ok(var_type),
+                    None => Err(format!("Variable '{}' is not in scope.", name))
+                }
+            },
+            ast::Expression::Let(var_name, var_type, _, body) => {
+                // TODO: validate that var_type == type(var_value) 
+                
+                if !self.add_variable(&var_name, self.from_ast_type(&var_type).unwrap().clone()) {
+                    Err(format!("Record '{}' already defined.", var_name))
+                } else {
+                    self.resolve_type(*body)
+                }
+            },
             ast::Expression::RecordDeclaration(name, fields, body) => {
                 if !self.add_record(&name, &fields) {
                     Err(format!("Record '{}' already defined.", name))

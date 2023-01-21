@@ -7,4 +7,6 @@ record FakeAlbum
 	mock: string
 end
 
-consume()
+let bar: int = 100
+let foo: float = 10.3 
+bar
