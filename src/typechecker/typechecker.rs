@@ -1,8 +1,7 @@
-use crate::ast::{self, Expression};
-
-use std::{collections::HashMap, ops::Deref};
+use std::collections::HashMap;
 
 use super::expr_type::Type;
+use crate::ast;
 
 pub struct Typechecker {
     variables: HashMap<String, Type>,
@@ -17,62 +16,60 @@ impl Typechecker {
         }
     }
 
-    pub fn get_variable(&self, name: &String) -> Option<&Type> {
-        self.variables.get(name)
+    pub fn get_variable(&self, name: &String) -> Result<&Type, String> {
+        match self.variables.get(name) {
+            Some(var_type) => Ok(var_type),
+            None => Err(format!("Can't find variable with name '{}'", name)),
+        }
     }
 
-    pub fn get_record(&self, name: &String) -> Option<&Type> {
-        self.records.get(name)
+    pub fn get_record(&self, name: &String) -> Result<&Type, String> {
+        match self.records.get(name) {
+            Some(record_type) => Ok(record_type),
+            None => Err(format!("Can't find record with name '{}'", name)),
+        }
     }
 
     // Creates an internal Record type based off of its AST representation.
-    fn add_record(&mut self, name: &String, fields: &Vec<(String, ast::Type)>) -> bool {
-        if self.records.contains_key(name) {
-            false
-        } else {
-            println!("Record {} added.", name);
+    fn add_record(&mut self, name: &String, fields: &[(String, ast::Type)]) -> Result<(), String> {
+        let record_types = fields
+            .iter()
+            .map(|(name, type_decl)| {
+                (
+                    name.clone(),
+                    Box::new(self.from_ast_type(type_decl).unwrap().clone()),
+                )
+            })
+            .collect();
 
-            let record_types = fields
-                .iter()
-                .map(|(name, type_decl)| {
-                    (
-                        name.clone(),
-                        Box::new(self.from_ast_type(type_decl).unwrap().clone()),
-                    )
-                })
-                .collect();
-
-            self.records
-                .insert(name.clone(), Type::Record(name.clone(), record_types));
-
-            true
+        match self
+            .records
+            .insert(name.clone(), Type::Record(name.clone(), record_types))
+        {
+            Some(_) => Err(format!("Record '{}' already defined.", name)),
+            None => Ok(()),
         }
     }
 
-    fn add_variable(&mut self, var_name: &String, var_type: Type) -> bool {
-        if self.variables.contains_key(var_name) {
-            false
-        } else {
-            println!("Variable {} added.", var_name);
-
-            self.variables.insert(var_name.clone(), var_type);
-
-            true
+    // Add a variable to the type-checking context.
+    fn add_variable(&mut self, var_name: String, var_type: Type) -> Result<(), String> {
+        match self.variables.insert(var_name.clone(), var_type) {
+            Some(_) => Err(format!("Variable '{}' already defined.", var_name)),
+            None => Ok(()),
         }
     }
-    
 
     // Converts an AST type (int, string, ...) into a actual type.
-    fn from_ast_type(&self, t: &ast::Type) -> Option<&Type> {
+    fn from_ast_type(&self, t: &ast::Type) -> Result<&Type, String> {
         match t {
             ast::Type::Base(name) => match name.as_str() {
-                "int" => Some(&Type::Integer),
-                "float" => Some(&Type::Float),
-                "string" => Some(&Type::Str),
-                "bool" => Some(&Type::Boolean),
-                _ => self.records.get(name),
+                "int" => Ok(&Type::Integer),
+                "float" => Ok(&Type::Float),
+                "string" => Ok(&Type::Str),
+                "bool" => Ok(&Type::Boolean),
+                _ => self.get_record(name),
             },
-            _ => panic!("Unhandled"),
+            _ => Err("Unable to convert type to internal type.".to_string()),
         }
     }
 
@@ -83,27 +80,21 @@ impl Typechecker {
             ast::Expression::Str(_) => Ok(&Type::Str),
             ast::Expression::Boolean(_) => Ok(&Type::Boolean),
             ast::Expression::Group(inner) => self.resolve_type(*inner),
-            ast::Expression::Variable(name) => {
-                match self.variables.get(&name) {
-                    Some(var_type) => Ok(var_type),
-                    None => Err(format!("Variable '{}' is not in scope.", name))
-                }
-            },
-            ast::Expression::Let(var_name, var_type, _, body) => {
-                // TODO: validate that var_type == type(var_value) 
-                
-                if !self.add_variable(&var_name, self.from_ast_type(&var_type).unwrap().clone()) {
-                    Err(format!("Record '{}' already defined.", var_name))
-                } else {
+            ast::Expression::Variable(name) => self.get_variable(&name),
+            ast::Expression::Let(var_name, var_ast_type, var_value, body) => {
+                let var_type = self.from_ast_type(&var_ast_type)?.clone();
+                let value_type = self.resolve_type(*var_value)?;
+
+                if var_type == *value_type {
+                    self.add_variable(var_name, var_type)?;
                     self.resolve_type(*body)
+                } else {
+                    Err(format!("Can't define variables with incompatible types! Variable is defined as type <insert type here>, but you're assigning it to a value of type <insert different type>."))
                 }
-            },
+            }
             ast::Expression::RecordDeclaration(name, fields, body) => {
-                if !self.add_record(&name, &fields) {
-                    Err(format!("Record '{}' already defined.", name))
-                } else {
-                    self.resolve_type(*body)
-                }
+                self.add_record(&name, &fields)?;
+                self.resolve_type(*body)
             }
             _ => Err("Unable to resolve type for expression.".to_string()),
         }

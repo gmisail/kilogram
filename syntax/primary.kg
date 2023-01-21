@@ -9,4 +9,9 @@ end
 
 let bar: int = 100
 let foo: float = 10.3 
+let buz: bool = true
+let baz: string = "wahoo!"
+let identity: (int) -> int = function(x: int): int
+	x
+end
 bar
