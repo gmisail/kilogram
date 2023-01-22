@@ -18,8 +18,8 @@ let taboo: Album = Album {
 
 let is_odd: bool = if false then true else false 
 
-let identity: (int) -> float = function(x: int): float
-	-10.1
+let demo: (int) -> bool = function(x: int): bool 
+	"he" == "llo"
 end
 
 let get_localhost: (int) -> string = function(port: int): string 
