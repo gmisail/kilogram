@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::expr_type::Type;
+use super::rules::check_unary;
 use crate::ast;
 
 pub struct Typechecker {
@@ -100,7 +101,18 @@ impl Typechecker {
             ast::Expression::Group(inner) => self.resolve_type(*inner),
             ast::Expression::Variable(name) => self.get_variable(&name),
 
-            ast::Expression::Unary(_, _) => todo!(),
+            ast::Expression::Unary(expr, operator) => {
+                let expr_type = self.resolve_type(*expr)?;
+
+                if check_unary(&operator, expr_type.clone()) {
+                    Ok(expr_type)
+                } else {
+                    Err(format!(
+                        "Cannot apply unary operator {} to expression of type {}.",
+                        operator, *expr_type
+                    ))
+                }
+            }
             ast::Expression::Binary(_, _, _) => todo!(),
             ast::Expression::Logical(_, _, _) => todo!(),
 
@@ -110,16 +122,16 @@ impl Typechecker {
                 if *condition_type == Type::Boolean {
                     let then_type = self.resolve_type(*then_expr)?;
                     let else_type = self.resolve_type(*else_expr)?;
-                    
+
                     if *then_type == *else_type {
-                        Ok(then_type)    
+                        Ok(then_type)
                     } else {
                         Err(format!("Branches in 'if' statement must have the same type! Got branches with type {} and {}.", *then_type, *else_type))
                     }
                 } else {
                     Err(format!("Expected condition in 'if' statement to be of type boolean, but was {} instead.", *condition_type))
                 }
-            },
+            }
 
             ast::Expression::Let(var_name, var_ast_type, var_value, body) => {
                 let var_type = self.from_ast_type(&var_ast_type)?.clone();
@@ -158,19 +170,19 @@ impl Typechecker {
                 for (field_name, field_ast_type) in fields {
                     field_types.insert(field_name, self.resolve_type(*field_ast_type)?);
                 }
-                
+
                 if Type::Record(name, field_types) == *record_type {
                     Ok(record_type)
                 } else {
                     Err("Records don't match.".to_string())
                 }
-            },
+            }
             ast::Expression::RecordDeclaration(name, fields, body) => {
                 self.add_record(&name, &fields)?;
                 self.resolve_type(*body)
             }
 
-            ast::Expression::Get(field, parent) => todo!()
+            ast::Expression::Get(field, parent) => todo!(),
         }
     }
 }

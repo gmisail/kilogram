@@ -16,10 +16,10 @@ let taboo: Album = Album {
 	artist: "Denzel Curry"
 }
 
-let is_odd: bool = if 10 then true else false 
+let is_odd: bool = if false then true else false 
 
-let identity: (int) -> int = function(x: int): int
-	10
+let identity: (int) -> float = function(x: int): float
+	-10.1
 end
 
 let get_localhost: (int) -> string = function(port: int): string 
