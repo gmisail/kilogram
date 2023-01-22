@@ -15,10 +15,13 @@ let taboo: Album = Album {
 	name: "TA300",
 	artist: "Denzel Curry"
 }
-let bad_func: (int) -> string = function(a: int): float 
 
-end
 let identity: (int) -> int = function(x: int): int
 	10
 end
+
+let get_localhost: (int) -> string = function(port: int): string 
+	"localhost:8888"  
+end
+
 bar

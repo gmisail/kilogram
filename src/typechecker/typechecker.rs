@@ -99,6 +99,13 @@ impl Typechecker {
             ast::Expression::Boolean(_) => Ok(self.primitives.get("bool").unwrap().clone()),
             ast::Expression::Group(inner) => self.resolve_type(*inner),
             ast::Expression::Variable(name) => self.get_variable(&name),
+
+            ast::Expression::Unary(_, _) => todo!(),
+            ast::Expression::Binary(_, _, _) => todo!(),
+            ast::Expression::Logical(_, _, _) => todo!(),
+
+            ast::Expression::If(_, _, _) => todo!(),
+
             ast::Expression::Let(var_name, var_ast_type, var_value, body) => {
                 let var_type = self.from_ast_type(&var_ast_type)?.clone();
                 let value_type = self.resolve_type(*var_value)?;
@@ -110,6 +117,7 @@ impl Typechecker {
                     Err(format!("Can't define variables with incompatible types! Variable is defined as type {}, but you're assigning it to a value of type {}.", *var_type, *value_type))
                 }
             }
+
             ast::Expression::Function(_, ast_return_type, ast_argument_types, body) => {
                 let body_type = self.resolve_type(*body)?;
                 let return_type = self.from_ast_type(&ast_return_type)?;
@@ -126,6 +134,8 @@ impl Typechecker {
                     Err("Function return type and actual type returned do not match.".to_string())
                 }
             }
+            ast::Expression::FunctionCall(_, _) => todo!(),
+
             ast::Expression::RecordInstance(name, fields) => {
                 let record_type = self.get_record(&name)?;
                 let mut field_types = HashMap::new();
@@ -144,7 +154,8 @@ impl Typechecker {
                 self.add_record(&name, &fields)?;
                 self.resolve_type(*body)
             }
-            _ => Err("Unable to resolve type for expression.".to_string()),
+
+            ast::Expression::Get(field, parent) => todo!()
         }
     }
 }
