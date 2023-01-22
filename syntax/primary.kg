@@ -23,7 +23,7 @@ let demo: (int) -> string = function(x: int): string
 end
 
 let get_localhost: (int) -> string = function(port: int): string 
-	"localhost:8888"  
+	demo(50)
 end
 
 bar

@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -194,7 +195,25 @@ impl Typechecker {
                     Err("Function return type and actual type returned do not match.".to_string())
                 }
             }
-            ast::Expression::FunctionCall(_, _) => todo!(),
+            ast::Expression::FunctionCall(parent, parameters) => {
+                // Verify that the parameter & argument types match.
+                match self.resolve_type(*parent)?.borrow() {
+                    Type::Function(arguments, return_type) => {
+                        // Check that the types of the expressions match the expected type.
+                        for (target_type, parameter) in arguments.iter().zip(parameters) {
+                            let resolved_type = self.resolve_type(*parameter.clone())?;
+
+                            if *target_type != resolved_type {
+                                return Err(format!("Invalid parameter type, expected {} but got {}.", target_type, resolved_type));
+                            }
+                        } 
+
+                        Ok(return_type.clone())
+                    },
+                    
+                    _ => Err("Cannot call non-function.".to_string())
+                }
+            },
 
             ast::Expression::RecordInstance(name, fields) => {
                 let record_type = self.get_record(&name)?;
