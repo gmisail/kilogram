@@ -11,6 +11,13 @@ let bar: int = 100
 let foo: float = 10.3 
 let buz: bool = true
 let baz: string = "wahoo!"
+let taboo: Album = Album {
+	name: "TA300",
+	artist: "Denzel Curry"
+}
+let bad_func: (int) -> string = function(a: int): float 
+
+end
 let identity: (int) -> int = function(x: int): int
 	10
 end

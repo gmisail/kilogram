@@ -126,6 +126,20 @@ impl Typechecker {
                     Err("Function return type and actual type returned do not match.".to_string())
                 }
             }
+            ast::Expression::RecordInstance(name, fields) => {
+                let record_type = self.get_record(&name)?;
+                let mut field_types = HashMap::new();
+
+                for (field_name, field_ast_type) in fields {
+                    field_types.insert(field_name, self.resolve_type(*field_ast_type)?);
+                }
+                
+                if Type::Record(name, field_types) == *record_type {
+                    Ok(record_type)
+                } else {
+                    Err("Records don't match.".to_string())
+                }
+            },
             ast::Expression::RecordDeclaration(name, fields, body) => {
                 self.add_record(&name, &fields)?;
                 self.resolve_type(*body)
