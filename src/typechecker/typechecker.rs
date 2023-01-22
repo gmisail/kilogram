@@ -104,7 +104,22 @@ impl Typechecker {
             ast::Expression::Binary(_, _, _) => todo!(),
             ast::Expression::Logical(_, _, _) => todo!(),
 
-            ast::Expression::If(_, _, _) => todo!(),
+            ast::Expression::If(condition, then_expr, else_expr) => {
+                let condition_type = self.resolve_type(*condition)?;
+
+                if *condition_type == Type::Boolean {
+                    let then_type = self.resolve_type(*then_expr)?;
+                    let else_type = self.resolve_type(*else_expr)?;
+                    
+                    if *then_type == *else_type {
+                        Ok(then_type)    
+                    } else {
+                        Err(format!("Branches in 'if' statement must have the same type! Got branches with type {} and {}.", *then_type, *else_type))
+                    }
+                } else {
+                    Err(format!("Expected condition in 'if' statement to be of type boolean, but was {} instead.", *condition_type))
+                }
+            },
 
             ast::Expression::Let(var_name, var_ast_type, var_value, body) => {
                 let var_type = self.from_ast_type(&var_ast_type)?.clone();
