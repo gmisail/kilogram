@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::ast::{BinaryOperator, UnaryOperator};
+use crate::ast::{BinaryOperator, UnaryOperator, LogicalOperator};
 
 use super::expr_type::Type;
 
@@ -31,6 +31,10 @@ pub fn check_binary(operator: &BinaryOperator, left_type: Rc<Type>, right_type: 
                     _ => false,
                 }
         }
-        BinaryOperator::Equality | BinaryOperator::NotEqual => *left_type == *right_type,
+        &BinaryOperator::Equality | &BinaryOperator::NotEqual => *left_type == *right_type,
     }
+}
+
+pub fn check_logical(_: &LogicalOperator, left_type: Rc<Type>, right_type: Rc<Type>) -> bool {
+    *left_type == Type::Boolean && *right_type == Type::Boolean
 }

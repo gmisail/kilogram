@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::expr_type::Type;
-use super::rules::{check_binary, check_unary};
+use super::rules::{check_binary, check_logical, check_unary};
 use crate::ast;
 
 pub struct Typechecker {
@@ -123,12 +123,14 @@ impl Typechecker {
                         ast::BinaryOperator::Add
                         | ast::BinaryOperator::Sub
                         | ast::BinaryOperator::Mult
-                        | ast::BinaryOperator::Div
-                        | ast::BinaryOperator::Greater
+                        | ast::BinaryOperator::Div => Ok(left_type),
+
+                        ast::BinaryOperator::Greater
                         | ast::BinaryOperator::GreaterEq
                         | ast::BinaryOperator::Less
-                        | ast::BinaryOperator::LessEq => Ok(left_type),
-                        ast::BinaryOperator::Equality | ast::BinaryOperator::NotEqual => {
+                        | ast::BinaryOperator::LessEq
+                        | ast::BinaryOperator::Equality
+                        | ast::BinaryOperator::NotEqual => {
                             Ok(self.primitives.get("bool").unwrap().clone())
                         }
                     }
@@ -136,8 +138,16 @@ impl Typechecker {
                     Err("Binary operator not compatible with types.".to_string())
                 }
             }
+            ast::Expression::Logical(left_expr, operator, right_expr) => {
+                let left_type = self.resolve_type(*left_expr)?;
+                let right_type = self.resolve_type(*right_expr)?;
 
-            ast::Expression::Logical(_, _, _) => todo!(),
+                if check_logical(&operator, left_type, right_type) {
+                    Ok(self.primitives.get("bool").unwrap().clone())
+                } else {
+                    Err("Logical operation must be between two boolean conditions.".to_string())
+                }
+            }
 
             ast::Expression::If(condition, then_expr, else_expr) => {
                 let condition_type = self.resolve_type(*condition)?;

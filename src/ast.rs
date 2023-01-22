@@ -66,8 +66,8 @@ impl Display for LogicalOperator {
             f,
             "{}",
             match self {
-                LogicalOperator::And => "&&",
-                LogicalOperator::Or => "||",
+                LogicalOperator::And => "and",
+                LogicalOperator::Or => "or"
             }
         )
     }
