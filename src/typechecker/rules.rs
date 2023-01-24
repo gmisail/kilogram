@@ -1,8 +1,7 @@
 use std::rc::Rc;
 
 use crate::ast::{BinaryOperator, LogicalOperator, UnaryOperator};
-
-use super::expr_type::Type;
+use super::datatype::Type;
 
 pub fn check_unary(operator: &UnaryOperator, value_type: Rc<Type>) -> bool {
     match operator {

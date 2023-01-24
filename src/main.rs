@@ -1,4 +1,5 @@
 use std::{fs::File, io::Read};
+use owo_colors::OwoColorize;
 
 use parser::parse;
 use typechecker::typechecker::Typechecker;
@@ -24,5 +25,10 @@ fn main() {
     let tree = parse(s).unwrap();
 
     let mut checker = Typechecker::new();
-    checker.resolve_type(tree).unwrap();
+    
+    // for each expression...
+    println!("{}", match checker.resolve_type(tree) {
+        Ok(_) => format!("{} Successful!", "[typechecker]".blue()),
+        Err(error) => format!("{} {}", "[typechecker]".red(), error)
+    })
 }
