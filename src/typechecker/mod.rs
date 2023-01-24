@@ -1,3 +1,4 @@
-pub mod expr_type;
 mod rules;
+
+pub mod datatype;
 pub mod typechecker;

@@ -1,6 +1,7 @@
 record Album
 	name: string,
-	artist: string
+	artist: string,
+	year: int
 end
 
 record FakeAlbum
@@ -13,7 +14,8 @@ let buz: bool = true
 let baz: string = "wahoo!"
 let taboo: Album = Album {
 	name: "TA300",
-	artist: "Denzel Curry"
+	artist: "Denzel Curry",
+	year: 2018
 }
 
 let is_odd: bool = if false then true else false 
@@ -23,7 +25,7 @@ let demo: (int) -> string = function(x: int): string
 end
 
 let get_localhost: (int) -> string = function(port: int): string 
-	demo(50)
+	demo(taboo.year)
 end
 
 bar

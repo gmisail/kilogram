@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::ast::{BinaryOperator, UnaryOperator, LogicalOperator};
+use crate::ast::{BinaryOperator, LogicalOperator, UnaryOperator};
 
 use super::expr_type::Type;
 

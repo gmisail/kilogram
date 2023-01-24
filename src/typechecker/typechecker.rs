@@ -1,8 +1,7 @@
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use super::expr_type::Type;
+use super::datatype::Type;
 use super::rules::{check_binary, check_logical, check_unary};
 use crate::ast;
 
@@ -204,16 +203,19 @@ impl Typechecker {
                             let resolved_type = self.resolve_type(*parameter.clone())?;
 
                             if *target_type != resolved_type {
-                                return Err(format!("Invalid parameter type, expected {} but got {}.", target_type, resolved_type));
+                                return Err(format!(
+                                    "Invalid parameter type, expected {} but got {}.",
+                                    target_type, resolved_type
+                                ));
                             }
-                        } 
+                        }
 
                         Ok(return_type.clone())
-                    },
-                    
-                    _ => Err("Cannot call non-function.".to_string())
+                    }
+
+                    _ => Err("Cannot call non-function.".to_string()),
                 }
-            },
+            }
 
             ast::Expression::RecordInstance(name, fields) => {
                 let record_type = self.get_record(&name)?;
@@ -234,7 +236,17 @@ impl Typechecker {
                 self.resolve_type(*body)
             }
 
-            ast::Expression::Get(field, parent) => todo!(),
+            ast::Expression::Get(field, parent) => match self.resolve_type(*parent)?.borrow() {
+                Type::Record(name, fields) => match fields.get(&field) {
+                    Some(field_type) => Ok(field_type.clone()),
+                    None => Err(format!(
+                        "Can't find field {} in record of type {}",
+                        field, name
+                    )),
+                },
+
+                invalid_type => Err(format!("Can't access fields from type {}.", invalid_type)),
+            },
         }
     }
 }
