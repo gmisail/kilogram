@@ -58,10 +58,17 @@ impl Typechecker {
     }
 
     // Add a variable to the type-checking context.
-    fn add_variable(&mut self, var_name: String, var_type: Rc<Type>) -> Result<(), String> {
+    fn add_variable(&mut self, var_name: &String, var_type: Rc<Type>) -> Result<(), String> {
         match self.variables.insert(var_name.clone(), var_type) {
             Some(_) => Err(format!("Variable '{}' already defined.", var_name)),
             None => Ok(()),
+        }
+    }
+
+    fn remove_variable(&mut self, var_name: String) -> Result<(), String> {
+        match self.variables.remove(&var_name) {
+            None => Err(format!("Can't remove variable '{}' since it is not defined.", var_name)),
+            Some(_) => Ok(())
         }
     }
 
@@ -172,7 +179,7 @@ impl Typechecker {
                 let value_type = self.resolve_type(*var_value)?;
 
                 if *var_type == *value_type {
-                    self.add_variable(var_name, var_type)?;
+                    self.add_variable(&var_name, var_type)?;
                     self.resolve_type(*body)
                 } else {
                     Err(format!("Can't define variables with incompatible types! Variable is defined as type {}, but you're assigning it to a value of type {}.", *var_type, *value_type))
@@ -180,16 +187,26 @@ impl Typechecker {
             }
 
             ast::Expression::Function(_, ast_return_type, ast_argument_types, body) => {
+                let mut argument_types = vec![];
+
+                // Resolve types & add parameters to scope.
+                for (arg_name, arg_ast_type) in &ast_argument_types {
+                    let arg_type = self.from_ast_type(&arg_ast_type)?;
+
+                    argument_types.push(arg_type.clone());
+
+                    self.add_variable(arg_name, arg_type)?;
+                }
+
                 let body_type = self.resolve_type(*body)?;
                 let return_type = self.from_ast_type(&ast_return_type)?;
 
+                // Since the expression has been evaluated, pop parameters from scope.
+                for (arg_name, _) in ast_argument_types {
+                    self.remove_variable(arg_name)?;
+                }
+
                 if *body_type == *return_type {
-                    let mut argument_types = vec![];
-
-                    for (_, arg_type) in ast_argument_types {
-                        argument_types.push(self.from_ast_type(&arg_type)?);
-                    }
-
                     Ok(Rc::new(Type::Function(argument_types, return_type)))
                 } else {
                     Err("Function return type and actual type returned do not match.".to_string())

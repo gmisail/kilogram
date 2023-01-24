@@ -1,4 +1,4 @@
-use std::{fs::File, io::Read};
+use std::{fs::File, io::Read, time::Instant};
 use owo_colors::OwoColorize;
 
 use parser::parse;
@@ -23,7 +23,6 @@ fn main() {
     }
 
     let tree = parse(s).unwrap();
-
     let mut checker = Typechecker::new();
     
     // for each expression...

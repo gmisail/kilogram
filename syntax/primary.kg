@@ -18,14 +18,8 @@ let taboo: Album = Album {
 	year: 2018
 }
 
-let is_odd: bool = if false then true else false 
-
-let demo: (int) -> string = function(x: int): string 
-	if 10 > 5 and 43.1 == 43.1 then "hello" else "world"
-end
-
-let get_localhost: (int) -> string = function(port: int): string 
-	demo(taboo.year)
+let get_service: (int) -> string = function(port: int): string 
+	if port == 22 then "ssh" else "unknown"	
 end
 
 bar
