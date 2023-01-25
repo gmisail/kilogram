@@ -1,17 +1,19 @@
 use owo_colors::OwoColorize;
 use std::{fs::File, io::Read};
 
-use parser::parse;
-use typechecker::Typechecker;
-
 pub mod ast;
 pub mod parser;
 pub mod scanner;
 pub mod token;
 pub mod typechecker;
+pub mod compiler;
+
+use parser::parse;
+use typechecker::Typechecker;
+use compiler::Compiler;
 
 fn main() {
-    let mut file = match File::open("./syntax/primary.kg") {
+    let mut file = match File::open("./syntax/hello_world.kg") {
         Err(e) => panic!("couldn't open file: {}", e),
         Ok(file) => file,
     };
@@ -28,9 +30,12 @@ fn main() {
     // for each expression...
     println!(
         "{}",
-        match checker.resolve_type(tree) {
+        match checker.resolve_type(&tree) {
             Ok(_) => format!("{} Successful!", "[typechecker]".blue()),
             Err(error) => format!("{} {}", "[typechecker]".red(), error),
         }
-    )
+    );
+
+    let compiler = Compiler::new(); 
+    println!("{}", compiler.compile_expression(&tree));
 }

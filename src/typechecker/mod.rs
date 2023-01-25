@@ -2,13 +2,14 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-mod datatype;
 mod error;
 mod rules;
+mod datatype;
 
-use crate::ast;
 use datatype::Type;
 use rules::{check_binary, check_logical, check_unary};
+use crate::ast;
+
 
 pub struct Typechecker {
     primitives: HashMap<&'static str, Rc<Type>>,
@@ -107,17 +108,17 @@ impl Typechecker {
         }
     }
 
-    pub fn resolve_type(&mut self, expression: ast::Expression) -> Result<Rc<Type>, String> {
+    pub fn resolve_type(&mut self, expression: &ast::Expression) -> Result<Rc<Type>, String> {
         match expression {
             ast::Expression::Integer(_) => Ok(self.primitives.get("int").unwrap().clone()),
             ast::Expression::Float(_) => Ok(self.primitives.get("float").unwrap().clone()),
             ast::Expression::Str(_) => Ok(self.primitives.get("string").unwrap().clone()),
             ast::Expression::Boolean(_) => Ok(self.primitives.get("bool").unwrap().clone()),
-            ast::Expression::Group(inner) => self.resolve_type(*inner),
+            ast::Expression::Group(inner) => self.resolve_type(inner),
             ast::Expression::Variable(name) => self.get_variable(&name),
 
             ast::Expression::Unary(expr, operator) => {
-                let expr_type = self.resolve_type(*expr)?;
+                let expr_type = self.resolve_type(expr)?;
 
                 if check_unary(&operator, expr_type.clone()) {
                     Ok(expr_type)
@@ -129,8 +130,8 @@ impl Typechecker {
                 }
             }
             ast::Expression::Binary(left_expr, operator, right_expr) => {
-                let left_type = self.resolve_type(*left_expr)?;
-                let right_type = self.resolve_type(*right_expr)?;
+                let left_type = self.resolve_type(left_expr)?;
+                let right_type = self.resolve_type(right_expr)?;
 
                 if check_binary(&operator, left_type.clone(), right_type) {
                     // Type of binary operation depends on the operator.
@@ -154,8 +155,8 @@ impl Typechecker {
                 }
             }
             ast::Expression::Logical(left_expr, operator, right_expr) => {
-                let left_type = self.resolve_type(*left_expr)?;
-                let right_type = self.resolve_type(*right_expr)?;
+                let left_type = self.resolve_type(left_expr)?;
+                let right_type = self.resolve_type(right_expr)?;
 
                 if check_logical(&operator, left_type, right_type) {
                     Ok(self.primitives.get("bool").unwrap().clone())
@@ -165,11 +166,11 @@ impl Typechecker {
             }
 
             ast::Expression::If(condition, then_expr, else_expr) => {
-                let condition_type = self.resolve_type(*condition)?;
+                let condition_type = self.resolve_type(condition)?;
 
                 if *condition_type == Type::Boolean {
-                    let then_type = self.resolve_type(*then_expr)?;
-                    let else_type = self.resolve_type(*else_expr)?;
+                    let then_type = self.resolve_type(then_expr)?;
+                    let else_type = self.resolve_type(else_expr)?;
 
                     if *then_type == *else_type {
                         Ok(then_type)
@@ -183,11 +184,11 @@ impl Typechecker {
 
             ast::Expression::Let(var_name, var_ast_type, var_value, body) => {
                 let var_type = self.from_ast_type(&var_ast_type)?;
-                let value_type = self.resolve_type(*var_value)?;
+                let value_type = self.resolve_type(var_value)?;
 
                 if *var_type == *value_type {
                     self.add_variable(&var_name, var_type)?;
-                    self.resolve_type(*body)
+                    self.resolve_type(body)
                 } else {
                     Err(format!("Can't define variables with incompatible types! Variable is defined as type {}, but you're assigning it to a value of type {}.", *var_type, *value_type))
                 }
@@ -197,7 +198,7 @@ impl Typechecker {
                 let mut argument_types = vec![];
 
                 // Resolve types & add parameters to scope.
-                for (arg_name, arg_ast_type) in &ast_argument_types {
+                for (arg_name, arg_ast_type) in ast_argument_types {
                     let arg_type = self.from_ast_type(arg_ast_type)?;
 
                     argument_types.push(arg_type.clone());
@@ -205,12 +206,12 @@ impl Typechecker {
                     self.add_variable(arg_name, arg_type)?;
                 }
 
-                let body_type = self.resolve_type(*body)?;
+                let body_type = self.resolve_type(body)?;
                 let return_type = self.from_ast_type(&ast_return_type)?;
 
                 // Since the expression has been evaluated, pop parameters from scope.
                 for (arg_name, _) in ast_argument_types {
-                    self.remove_variable(arg_name)?;
+                    self.remove_variable(arg_name.clone())?;
                 }
 
                 if *body_type == *return_type {
@@ -221,11 +222,11 @@ impl Typechecker {
             }
             ast::Expression::FunctionCall(parent, parameters) => {
                 // Verify that the parameter & argument types match.
-                match self.resolve_type(*parent)?.borrow() {
+                match self.resolve_type(parent)?.borrow() {
                     Type::Function(arguments, return_type) => {
                         // Check that the types of the expressions match the expected type.
                         for (target_type, parameter) in arguments.iter().zip(parameters) {
-                            let resolved_type = self.resolve_type(*parameter.clone())?;
+                            let resolved_type = self.resolve_type(parameter)?;
 
                             if *target_type != resolved_type {
                                 return Err(format!(
@@ -247,10 +248,10 @@ impl Typechecker {
                 let mut field_types = HashMap::new();
 
                 for (field_name, field_ast_type) in fields {
-                    field_types.insert(field_name, self.resolve_type(*field_ast_type)?);
+                    field_types.insert(field_name.clone(), self.resolve_type(field_ast_type)?);
                 }
 
-                if Type::Record(name, field_types) == *record_type {
+                if Type::Record(name.clone(), field_types) == *record_type {
                     Ok(record_type)
                 } else {
                     Err("Records don't match.".to_string())
@@ -258,11 +259,11 @@ impl Typechecker {
             }
             ast::Expression::RecordDeclaration(name, fields, body) => {
                 self.add_record(&name, &fields)?;
-                self.resolve_type(*body)
+                self.resolve_type(body)
             }
 
-            ast::Expression::Get(field, parent) => match self.resolve_type(*parent)?.borrow() {
-                Type::Record(name, fields) => match fields.get(&field) {
+            ast::Expression::Get(field, parent) => match self.resolve_type(parent)?.borrow() {
+                Type::Record(name, fields) => match fields.get(field) {
                     Some(field_type) => Ok(field_type.clone()),
                     None => Err(format!(
                         "Can't find field {} in record of type {}",
@@ -278,6 +279,6 @@ impl Typechecker {
 
 impl Default for Typechecker {
     fn default() -> Self {
-        Self::new()
+        Self::new() 
     }
 }
