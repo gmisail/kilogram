@@ -4,12 +4,11 @@ use std::rc::Rc;
 
 mod error;
 mod rules;
-mod datatype;
+pub mod datatype;
 
 use datatype::Type;
 use rules::{check_binary, check_logical, check_unary};
 use crate::ast;
-
 
 pub struct Typechecker {
     primitives: HashMap<&'static str, Rc<Type>>,

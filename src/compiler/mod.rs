@@ -1,21 +1,31 @@
-use crate::ast::{Expression, self};
+use std::collections::HashMap;
 
-use self::emitter::{emit_unary, emit_binary};
+use crate::ast::{self, Expression};
+
+use self::{
+    emitter::{emit_binary, emit_unary},
+    generator::FunctionGenerator,
+};
 
 mod emitter;
+mod generator;
 
 pub struct Compiler {
-    
+    function: FunctionGenerator,
+    function_header: Vec<(String, ast::Type, Box<Expression>)>,
 }
 
 // TODO: create a table of symbols so we don't need to make new strings every time
 
 impl Compiler {
     pub fn new() -> Self {
-        Compiler {  }
-    } 
+        Compiler {
+            function: FunctionGenerator::new(),
+            function_header: Vec::new(),
+        }
+    }
 
-    pub fn compile_expression(&self, expression: &Expression) -> String {
+    pub fn compile_expression(&mut self, expression: &Expression) -> String {
         match expression {
             Expression::Integer(value) => format!("{}", value),
             Expression::Float(value) => format!("{}", value),
@@ -28,7 +38,7 @@ impl Compiler {
             Expression::Unary(expression, operation) => {
                 let unary_symbol = match operation {
                     ast::UnaryOperator::Minus => "-".to_string(),
-                    ast::UnaryOperator::Bang => "!".to_string()
+                    ast::UnaryOperator::Bang => "!".to_string(),
                 };
 
                 emit_unary(unary_symbol, self.compile_expression(expression))
@@ -47,31 +57,52 @@ impl Compiler {
                     ast::BinaryOperator::LessEq => "<=".to_string(),
                 };
 
-                emit_binary(self.compile_expression(left), binary_symbol, self.compile_expression(right))
-            },
-            Expression::Logical(left, operation, right) => { 
+                emit_binary(
+                    self.compile_expression(left),
+                    binary_symbol,
+                    self.compile_expression(right),
+                )
+            }
+            Expression::Logical(left, operation, right) => {
                 let logical_symbol = match operation {
                     ast::LogicalOperator::And => "&&",
-                    ast::LogicalOperator::Or => "||"
-                }; 
+                    ast::LogicalOperator::Or => "||",
+                };
 
-                emit_binary(self.compile_expression(left), logical_symbol.to_string(), self.compile_expression(right))
-            },
+                emit_binary(
+                    self.compile_expression(left),
+                    logical_symbol.to_string(),
+                    self.compile_expression(right),
+                )
+            }
 
-            Expression::If(if_expr, then_expr, else_expr) => format!(
-                "(If, condition: {}, then: {}, else: {})",
-                if_expr, then_expr, else_expr
-            ),
+            Expression::If(if_expr, then_expr, else_expr) => {
+                format!(
+                    "{} ? {} : {}",
+                    self.compile_expression(if_expr),
+                    self.compile_expression(then_expr),
+                    self.compile_expression(else_expr)
+                )
+            }
 
-            Expression::Let(name, var_type, value, body) => format!(
-                "(Let, name: '{}', type: {}, value: {}, body: {})",
-                name, var_type, value, body
-            ),
+            Expression::Let(name, var_type, value, body) => {
+                // Get type of variable
+                // Find C equivalent
+                // Compile value expression
+                // <TYPE> <name> = <expression>
 
-            Expression::Function(name, func_type, _, value) => format!(
-                "(Function, name: '{}', type: {}, value: {})",
-                name, func_type, value
-            ),
+                "".to_string()
+            }
+
+            Expression::Function(_, func_type, arg_types, value) => {
+                // Generate fresh name.
+                let fresh_name = self.function.generate();
+
+                self.function_header
+                    .push((fresh_name.clone(), func_type.clone(), value.clone()));
+
+                format!("void ({}*)(int, int)", fresh_name)
+            }
 
             Expression::Get(name, expr) => format!("(Get, name: '{}', parent: {})", name, expr),
 
@@ -111,7 +142,7 @@ impl Compiler {
                     name,
                     field_list.join(", ")
                 )
-            }        
+            }
         }
     }
 }

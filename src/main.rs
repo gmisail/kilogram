@@ -36,6 +36,6 @@ fn main() {
         }
     );
 
-    let compiler = Compiler::new(); 
+    let mut compiler = Compiler::new(); 
     println!("{}", compiler.compile_expression(&tree));
 }
