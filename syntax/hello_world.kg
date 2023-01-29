@@ -1,3 +1,12 @@
-function(x: int, y: int): int
-	x + y
+record Coins
+	pennies: int,
+	nickels: int,
+	dimes: int,
+	quarters: int
+end
+
+function(x: float): (int) -> bool
+	function(y: int): bool
+		true	
+	end
 end

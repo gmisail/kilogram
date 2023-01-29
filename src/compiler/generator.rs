@@ -1,3 +1,7 @@
+/*
+ * Generates unique function names.
+ * */
+
 pub struct FunctionGenerator {
     index: usize
 }

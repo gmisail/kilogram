@@ -12,8 +12,8 @@ use crate::ast;
 
 pub struct Typechecker {
     primitives: HashMap<&'static str, Rc<Type>>,
-    variables: HashMap<String, Rc<Type>>,
-    records: HashMap<String, Rc<Type>>,
+    scoped_variables: HashMap<String, Rc<Type>>,
+    pub records: HashMap<String, Rc<Type>>,
 }
 
 impl Typechecker {
@@ -26,13 +26,13 @@ impl Typechecker {
 
         Typechecker {
             primitives,
-            variables: HashMap::new(),
+            scoped_variables: HashMap::new(),
             records: HashMap::new(),
         }
     }
 
     pub fn get_variable(&self, name: &String) -> Result<Rc<Type>, String> {
-        match self.variables.get(name) {
+        match self.scoped_variables.get(name) {
             Some(var_type) => Ok(var_type.clone()),
             None => Err(format!("Can't find variable with name '{}'", name)),
         }
@@ -63,14 +63,14 @@ impl Typechecker {
 
     // Add a variable to the type-checking context.
     fn add_variable(&mut self, var_name: &String, var_type: Rc<Type>) -> Result<(), String> {
-        match self.variables.insert(var_name.clone(), var_type) {
+        match self.scoped_variables.insert(var_name.clone(), var_type) {
             Some(_) => Err(format!("Variable '{}' already defined.", var_name)),
             None => Ok(()),
         }
     }
 
     fn remove_variable(&mut self, var_name: String) -> Result<(), String> {
-        match self.variables.remove(&var_name) {
+        match self.scoped_variables.remove(&var_name) {
             None => Err(format!(
                 "Can't remove variable '{}' since it is not defined.",
                 var_name

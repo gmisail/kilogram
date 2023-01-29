@@ -19,23 +19,31 @@ fn main() {
     };
 
     let mut s = String::new();
-    match file.read_to_string(&mut s) {
-        Err(why) => panic!("couldn't read: {}", why),
-        Ok(_) => println!("opened file",),
-    }
+    println!("{}", match file.read_to_string(&mut s) {
+        Ok(_) => format!("{} Successful.", "[file]".blue()),
+        Err(error) => format!("{} {}", "[file]".red(), error),
+    });
 
-    let tree = parse(s).unwrap();
+    let tree = match parse(s) {
+        Ok(root) => {
+            println!("{}", format!("{} Successful.", "[parser]".blue()));
+
+            root
+        },
+        Err(error) => panic!("{} {}", "[parser]".red(), error),
+    };
+
     let mut checker = Typechecker::new();
 
     // for each expression...
     println!(
         "{}",
         match checker.resolve_type(&tree) {
-            Ok(_) => format!("{} Successful!", "[typechecker]".blue()),
+            Ok(_) => format!("{} Successful.", "[typechecker]".blue()),
             Err(error) => format!("{} {}", "[typechecker]".red(), error),
         }
     );
 
-    let mut compiler = Compiler::new(); 
-    println!("{}", compiler.compile_expression(&tree));
+    let mut compiler = Compiler::new(checker.records); 
+    println!("{}", compiler.compile(&tree));
 }
