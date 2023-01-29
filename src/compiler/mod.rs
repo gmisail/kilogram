@@ -1,11 +1,14 @@
-use std::{collections::HashMap, borrow::Borrow};
 use std::rc::Rc;
+use std::{borrow::Borrow, collections::HashMap};
 
-use crate::{ast::{self, Expression}, typechecker::datatype};
+use crate::{
+    ast::{self, Expression},
+    typechecker::datatype,
+};
 
 use self::emitter::emit_function_call;
 use self::{
-    emitter::{emit_binary, emit_unary, emit_struct},
+    emitter::{emit_binary, emit_struct, emit_unary},
     generator::FunctionGenerator,
 };
 
@@ -15,8 +18,8 @@ mod resolver;
 
 pub struct Compiler {
     function: FunctionGenerator,
-    function_header: Vec<(String, String, Box<Expression>)>,
-    record_types: HashMap<String, Rc<datatype::Type>>
+    function_header: Vec<(String, String, String)>,
+    record_types: HashMap<String, Rc<datatype::Type>>,
 }
 
 // TODO: create a table of symbols so we don't need to make new strings every time
@@ -26,7 +29,7 @@ impl Compiler {
         Compiler {
             function: FunctionGenerator::new(),
             function_header: Vec::new(),
-            record_types
+            record_types,
         }
     }
 
@@ -38,14 +41,14 @@ impl Compiler {
             let record_fields = match record_type.borrow() {
                 datatype::Type::Record(_, fields) => {
                     let test: Vec<(String, String)> = fields
-                                .iter()
-                                .map(|(field_name, _)| (field_name.clone(), "int".to_string()))
-                                .collect();
+                        .iter()
+                        .map(|(field_name, _)| (field_name.clone(), "int".to_string()))
+                        .collect();
 
                     emit_struct(name.clone(), test)
                 }
 
-                _ => panic!()
+                _ => panic!(),
             };
 
             buffer.push_str(&record_fields);
@@ -58,9 +61,12 @@ impl Compiler {
     fn generate_function_header(&mut self) -> String {
         let mut buffer = String::new();
 
-        let body: Vec<String> = self.function_header
+        let body: Vec<String> = self
+            .function_header
             .iter()
-            .map(|(func_name, func_type, func_body)| self.compile_expression(func_body))
+            .map(|(func_name, func_type, func_body)| {
+                format!("{} {} (){{ return {}; }}", func_type, func_name, func_body)
+            })
             .collect();
 
         buffer.push_str(body.join("\n").as_str());
@@ -72,7 +78,7 @@ impl Compiler {
         let mut buffer = String::new();
 
         let root_expr = self.compile_expression(expression);
-        
+
         buffer.push_str("// Record header\n");
         buffer.push_str(&self.generate_record_header());
         buffer.push_str("\n\n// Function header\n");
@@ -149,33 +155,42 @@ impl Compiler {
                 // Compile value expression
                 // <TYPE> <name> = <expression>
 
-                "".to_string()
+                format!(
+                    "{} {} = {};",
+                    resolver::get_native_type(var_type),
+                    name,
+                    self.compile_expression(value)
+                )
             }
 
             Expression::Function(_, func_type, arg_types, value) => {
                 // Generate fresh name.
                 let fresh_name = self.function.generate();
-                
-                self.function_header
-                    .push((fresh_name.clone(), resolver::get_native_type(func_type), value.clone()));
+                let func_body = self.compile_expression(value);
+
+                self.function_header.push((
+                    fresh_name.clone(),
+                    resolver::get_native_type(func_type),
+                    func_body,
+                ));
 
                 // All user-declared functions are a pointer to a function in the function header.
-                emit_function_call(fresh_name, true)
+                fresh_name
             }
 
             Expression::Get(name, expr) => format!("(Get, name: '{}', parent: {})", name, expr),
 
             Expression::FunctionCall(name, arguments) => {
-                let argument_list: Vec<String> =
-                    arguments.iter().map(|arg| arg.to_string()).collect();
+                let argument_list: Vec<String> = arguments
+                    .iter()
+                    .map(|arg| self.compile_expression(arg))
+                    .collect();
 
-                format!(
-                    "(FunctionCall, name: {}, arguments: [{}])",
-                    name,
-                    argument_list.join(", ")
-                )
+                let function = self.compile_expression(name);
+
+                emit_function_call(function, &argument_list, false)
             }
-            
+
             // Just ignore record declarations, already handled in the record header.
             Expression::RecordDeclaration(_, _, body) => self.compile_expression(body),
 

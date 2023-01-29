@@ -5,8 +5,8 @@ record Coins
 	quarters: int
 end
 
-function(x: float): (int) -> bool
-	function(y: int): bool
-		true	
-	end
+let show_bool: (int) -> bool = 
+function(y: int): bool
+	true	
 end
+show_bool(10)
