@@ -2,13 +2,13 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+pub mod datatype;
 mod error;
 mod rules;
-pub mod datatype;
 
+use crate::ast;
 use datatype::Type;
 use rules::{check_binary, check_logical, check_unary};
-use crate::ast;
 
 pub struct Typechecker {
     primitives: HashMap<&'static str, Rc<Type>>,
@@ -278,6 +278,6 @@ impl Typechecker {
 
 impl Default for Typechecker {
     fn default() -> Self {
-        Self::new() 
+        Self::new()
     }
 }

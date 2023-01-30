@@ -1,12 +1,13 @@
 use std::rc::Rc;
 use std::{borrow::Borrow, collections::HashMap};
 
+use crate::ast::{BinaryOperator, LogicalOperator, Type, UnaryOperator};
 use crate::{
     ast::{self, Expression},
     typechecker::datatype,
 };
 
-use self::emitter::emit_function_call;
+use self::emitter::{emit_function_call, emit_if};
 use self::{
     emitter::{emit_binary, emit_struct, emit_unary},
     generator::FunctionGenerator,
@@ -37,6 +38,8 @@ impl Compiler {
     fn generate_record_header(&self) -> String {
         let mut buffer = String::new();
 
+        // TODO: have forward declarations before defining records
+
         for (name, record_type) in self.record_types.borrow() {
             let record_fields = match record_type.borrow() {
                 datatype::Type::Record(_, fields) => {
@@ -61,12 +64,15 @@ impl Compiler {
     fn generate_function_header(&mut self) -> String {
         let mut buffer = String::new();
 
+        // TODO: have forward declarations before defining functions
+        // TODO: implement functions that return function pointers
+
         let body: Vec<String> = self
             .function_header
             .iter()
             .map(|(func_name, func_type, func_args, func_body)| {
                 format!(
-                    "{} {} ({}){{ {} }}",
+                    "{} {} ({}){{\n{}\n}}",
                     func_type,
                     func_name,
                     func_args
@@ -99,6 +105,140 @@ impl Compiler {
         buffer
     }
 
+    fn compile_unary(&mut self, expression: &Expression, operation: &UnaryOperator) -> String {
+        let unary_symbol = match operation {
+            ast::UnaryOperator::Minus => "-".to_string(),
+            ast::UnaryOperator::Bang => "!".to_string(),
+        };
+
+        emit_unary(unary_symbol, self.compile_expression(expression))
+    }
+
+    fn compile_binary(
+        &mut self,
+        left: &Expression,
+        right: &Expression,
+        operation: &BinaryOperator,
+    ) -> String {
+        let binary_symbol = match operation {
+            ast::BinaryOperator::Add => "+".to_string(),
+            ast::BinaryOperator::Sub => "-".to_string(),
+            ast::BinaryOperator::Mult => "*".to_string(),
+            ast::BinaryOperator::Div => "/".to_string(),
+            ast::BinaryOperator::Equality => "==".to_string(),
+            ast::BinaryOperator::NotEqual => "!=".to_string(),
+            ast::BinaryOperator::Greater => ">".to_string(),
+            ast::BinaryOperator::GreaterEq => ">=".to_string(),
+            ast::BinaryOperator::Less => "<".to_string(),
+            ast::BinaryOperator::LessEq => "<=".to_string(),
+        };
+
+        emit_binary(
+            self.compile_expression(left),
+            binary_symbol,
+            self.compile_expression(right),
+        )
+    }
+
+    fn compile_logical(
+        &mut self,
+        left: &Expression,
+        right: &Expression,
+        operation: &LogicalOperator,
+    ) -> String {
+        let logical_symbol = match operation {
+            ast::LogicalOperator::And => "&&",
+            ast::LogicalOperator::Or => "||",
+        };
+
+        emit_binary(
+            self.compile_expression(left),
+            logical_symbol.to_string(),
+            self.compile_expression(right),
+        )
+    }
+
+    fn compile_let(
+        &mut self,
+        name: &String,
+        var_type: &Type,
+        value: &Box<Expression>,
+        body: &Box<Expression>,
+    ) -> String {
+        // Is the last node not a declaration? Terminate it.
+        let is_leaf = match body.borrow() {
+            Expression::Let(_, _, _, _) => false,
+            _ => true,
+        };
+
+        let is_func = match value.borrow() {
+            Expression::Function(_, _, _, _) => true,
+            _ => false,
+        };
+
+        if is_func {
+            format!(
+                "{} = {};\n{}{}{}",
+                resolver::get_function_pointer(name.clone(), var_type),
+                self.compile_expression(value),
+                if is_leaf { "return " } else { "" },
+                self.compile_expression(body),
+                if is_leaf { ";" } else { "" }
+            )
+        } else {
+            format!(
+                "{} {} = {};\n{}{}{}",
+                resolver::get_native_type(var_type),
+                name,
+                self.compile_expression(value),
+                if is_leaf { "return " } else { "" },
+                self.compile_expression(body),
+                if is_leaf { ";" } else { "" }
+            )
+        }
+    }
+
+    fn compile_function(
+        &mut self,
+        func_type: &Type,
+        arg_types: &Vec<(String, Type)>,
+        value: &Box<Expression>,
+    ) -> String {
+        // Generate fresh name.
+        let fresh_name = self.function.generate();
+        let is_leaf = match value.borrow() {
+            Expression::Let(_, _, _, _) => false,
+            _ => true,
+        };
+
+        let func_body = format!(
+            "{}{}{}",
+            if is_leaf { "return " } else { "" },
+            self.compile_expression(value),
+            if is_leaf { ";" } else { "" }
+        );
+
+        let arguments = arg_types
+            .iter()
+            .map(|(arg_name, arg_type)| {
+                (
+                    arg_name.clone(),
+                    resolver::get_native_type(arg_type.borrow()),
+                )
+            })
+            .collect();
+
+        self.function_header.push((
+            fresh_name.clone(),
+            resolver::get_native_type(func_type),
+            arguments,
+            func_body,
+        ));
+
+        // All user-declared functions are a pointer to a function in the function header.
+        fresh_name
+    }
+
     pub fn compile_expression(&mut self, expression: &Expression) -> String {
         match expression {
             Expression::Integer(value) => format!("{}", value),
@@ -107,115 +247,28 @@ impl Compiler {
             Expression::Boolean(value) => format!("{}", value),
             Expression::Variable(name) => format!("{}", name),
 
-            Expression::Group(expression) => format!("({})", self.compile_expression(expression)),
+            Expression::Group(expr) => format!("({})", self.compile_expression(expr)),
 
-            Expression::Unary(expression, operation) => {
-                let unary_symbol = match operation {
-                    ast::UnaryOperator::Minus => "-".to_string(),
-                    ast::UnaryOperator::Bang => "!".to_string(),
-                };
-
-                emit_unary(unary_symbol, self.compile_expression(expression))
-            }
+            Expression::Unary(expr, operation) => self.compile_unary(expr, operation),
             Expression::Binary(left, operation, right) => {
-                let binary_symbol = match operation {
-                    ast::BinaryOperator::Add => "+".to_string(),
-                    ast::BinaryOperator::Sub => "-".to_string(),
-                    ast::BinaryOperator::Mult => "*".to_string(),
-                    ast::BinaryOperator::Div => "/".to_string(),
-                    ast::BinaryOperator::Equality => "==".to_string(),
-                    ast::BinaryOperator::NotEqual => "!=".to_string(),
-                    ast::BinaryOperator::Greater => ">".to_string(),
-                    ast::BinaryOperator::GreaterEq => ">=".to_string(),
-                    ast::BinaryOperator::Less => "<".to_string(),
-                    ast::BinaryOperator::LessEq => "<=".to_string(),
-                };
-
-                emit_binary(
-                    self.compile_expression(left),
-                    binary_symbol,
-                    self.compile_expression(right),
-                )
+                self.compile_binary(left, right, operation)
             }
             Expression::Logical(left, operation, right) => {
-                let logical_symbol = match operation {
-                    ast::LogicalOperator::And => "&&",
-                    ast::LogicalOperator::Or => "||",
-                };
-
-                emit_binary(
-                    self.compile_expression(left),
-                    logical_symbol.to_string(),
-                    self.compile_expression(right),
-                )
+                self.compile_logical(left, right, operation)
             }
 
-            Expression::If(if_expr, then_expr, else_expr) => {
-                format!(
-                    "{} ? {} : {}",
-                    self.compile_expression(if_expr),
-                    self.compile_expression(then_expr),
-                    self.compile_expression(else_expr)
-                )
-            }
+            Expression::If(if_expr, then_expr, else_expr) => emit_if(
+                self.compile_expression(if_expr),
+                self.compile_expression(then_expr),
+                self.compile_expression(else_expr),
+            ),
 
             Expression::Let(name, var_type, value, body) => {
-                // Is the last node not a declaration? Terminate it.
-                let is_leaf = match body.borrow() {
-                    Expression::Let(_, _, _, _) => false,
-                    _ => true,
-                };
-
-                let is_func = match value.borrow() {
-                    Expression::Function(_, _, _, _) => true,
-                    _ => false,
-                };
-
-                if is_func {
-                    format!(
-                        "{} = {};\n {}{}{}",
-                        resolver::get_function_pointer(name.clone(), var_type),
-                        self.compile_expression(value),
-                        if is_leaf { "return " } else { "" },
-                        self.compile_expression(body),
-                        if is_leaf { ";" } else { "" }
-                    )
-                } else {
-                    format!(
-                        "{} {} = {};\n {}{}{}",
-                        resolver::get_native_type(var_type),
-                        name,
-                        self.compile_expression(value),
-                        if is_leaf { "return " } else { "" },
-                        self.compile_expression(body),
-                        if is_leaf { ";" } else { "" }
-                    )
-                }
+                self.compile_let(name, var_type, value, body)
             }
 
             Expression::Function(_, func_type, arg_types, value) => {
-                // Generate fresh name.
-                let fresh_name = self.function.generate();
-                let func_body = self.compile_expression(value);
-                let arguments = arg_types
-                    .iter()
-                    .map(|(arg_name, arg_type)| {
-                        (
-                            arg_name.clone(),
-                            resolver::get_native_type(arg_type.borrow()),
-                        )
-                    })
-                    .collect();
-
-                self.function_header.push((
-                    fresh_name.clone(),
-                    resolver::get_native_type(func_type),
-                    arguments,
-                    func_body,
-                ));
-
-                // All user-declared functions are a pointer to a function in the function header.
-                fresh_name
+                self.compile_function(func_type, arg_types, value)
             }
 
             Expression::Get(name, expr) => format!("(Get, name: '{}', parent: {})", name, expr),
