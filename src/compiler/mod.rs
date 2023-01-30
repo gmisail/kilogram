@@ -18,7 +18,7 @@ mod resolver;
 
 pub struct Compiler {
     function: FunctionGenerator,
-    function_header: Vec<(String, String, String)>,
+    function_header: Vec<(String, String, Vec<(String, String)>, String)>,
     record_types: HashMap<String, Rc<datatype::Type>>,
 }
 
@@ -64,8 +64,18 @@ impl Compiler {
         let body: Vec<String> = self
             .function_header
             .iter()
-            .map(|(func_name, func_type, func_body)| {
-                format!("{} {} (){{ return {}; }}", func_type, func_name, func_body)
+            .map(|(func_name, func_type, func_args, func_body)| {
+                format!(
+                    "{} {} ({}){{ {} }}",
+                    func_type,
+                    func_name,
+                    func_args
+                        .iter()
+                        .map(|(arg_name, arg_type)| format!("{} {}", arg_type, arg_name))
+                        .collect::<Vec<String>>()
+                        .join(", "),
+                    func_body
+                )
             })
             .collect();
 
@@ -81,7 +91,7 @@ impl Compiler {
 
         buffer.push_str("// Record header\n");
         buffer.push_str(&self.generate_record_header());
-        buffer.push_str("\n\n// Function header\n");
+        buffer.push_str("\n// Function header\n");
         buffer.push_str(&self.generate_function_header());
         buffer.push_str("\n\n// Program\n");
         buffer.push_str(&root_expr);
@@ -150,27 +160,57 @@ impl Compiler {
             }
 
             Expression::Let(name, var_type, value, body) => {
-                // Get type of variable
-                // Find C equivalent
-                // Compile value expression
-                // <TYPE> <name> = <expression>
+                // Is the last node not a declaration? Terminate it.
+                let is_leaf = match body.borrow() {
+                    Expression::Let(_, _, _, _) => false,
+                    _ => true,
+                };
 
-                format!(
-                    "{} {} = {};",
-                    resolver::get_native_type(var_type),
-                    name,
-                    self.compile_expression(value)
-                )
+                let is_func = match value.borrow() {
+                    Expression::Function(_, _, _, _) => true,
+                    _ => false,
+                };
+
+                if is_func {
+                    format!(
+                        "{} = {};\n {}{}{}",
+                        resolver::get_function_pointer(name.clone(), var_type),
+                        self.compile_expression(value),
+                        if is_leaf { "return " } else { "" },
+                        self.compile_expression(body),
+                        if is_leaf { ";" } else { "" }
+                    )
+                } else {
+                    format!(
+                        "{} {} = {};\n {}{}{}",
+                        resolver::get_native_type(var_type),
+                        name,
+                        self.compile_expression(value),
+                        if is_leaf { "return " } else { "" },
+                        self.compile_expression(body),
+                        if is_leaf { ";" } else { "" }
+                    )
+                }
             }
 
             Expression::Function(_, func_type, arg_types, value) => {
                 // Generate fresh name.
                 let fresh_name = self.function.generate();
                 let func_body = self.compile_expression(value);
+                let arguments = arg_types
+                    .iter()
+                    .map(|(arg_name, arg_type)| {
+                        (
+                            arg_name.clone(),
+                            resolver::get_native_type(arg_type.borrow()),
+                        )
+                    })
+                    .collect();
 
                 self.function_header.push((
                     fresh_name.clone(),
                     resolver::get_native_type(func_type),
+                    arguments,
                     func_body,
                 ));
 

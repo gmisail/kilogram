@@ -1,12 +1,27 @@
-record Coins
-	pennies: int,
-	nickels: int,
-	dimes: int,
-	quarters: int
+let sum: (int, int) -> int = 
+function(x: int, y: int): int
+	let z: int = x * 2
+	let h: int = y * 3
+	z + h
 end
 
-let show_bool: (int) -> bool = 
-function(y: int): bool
-	true	
+let get_odd: (int, int) -> int = 
+function(a: int, b: int): int
+	let res: int = 2 * a + b
+	res
 end
-show_bool(10)
+
+let summed_odd: (int, int) -> int =
+function(a: int, b: int): int
+	let odd: int = get_odd(a, b)
+	sum(odd, odd)
+end
+
+let nested: (int) -> (int) -> float = 
+function(x : int): (int) -> float
+	function(z: int): float
+		3.14
+	end
+end
+
+summed_odd(50, 10)
