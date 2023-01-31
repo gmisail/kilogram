@@ -1,3 +1,14 @@
+record Movie
+	title: string,
+	director: string,
+	awards: int
+end
+
+record Album
+	title: string,
+	artist: string
+end
+
 let sum: (int, int) -> int = 
 function(x: int, y: int): int
 	let z: int = x * 2
@@ -22,6 +33,14 @@ function(x : int): (int) -> float
 	function(z: int): float
 		3.14
 	end
+end
+
+let make_tpab: (string) -> Album =
+function(name: string): Album
+	Album {
+		title: "To Pimp a Butterfly",
+		artist: "Kendrick Lamar"
+	}
 end
 
 summed_odd(50, 10)

@@ -23,9 +23,16 @@ pub fn get_function_pointer(name: String, internal_type: &Type) -> String {
     }
 }
 
+fn get_builtin(type_name: &String) -> String {
+    match type_name.as_str() {
+        "int" | "float" | "bool" | "string" => type_name.clone(),
+        _ => format!("{}*", type_name),
+    }
+}
+
 pub fn get_native_type(internal_type: &Type) -> String {
     match internal_type {
-        Type::Base(name) => name.clone(),
+        Type::Base(name) => get_builtin(name),
         Type::Generic(_, _) => "TODO".to_string(),
         Type::Function(arguments, return_type) => "FUNC".to_string(),
     }

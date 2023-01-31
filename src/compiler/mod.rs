@@ -42,19 +42,43 @@ impl Compiler {
 
         for (name, record_type) in self.record_types.borrow() {
             let record_fields = match record_type.borrow() {
-                datatype::Type::Record(_, fields) => {
-                    let test: Vec<(String, String)> = fields
-                        .iter()
-                        .map(|(field_name, _)| (field_name.clone(), "int".to_string()))
-                        .collect();
-
-                    emit_struct(name.clone(), test)
-                }
+                datatype::Type::Record(_, fields) => fields,
 
                 _ => panic!(),
             };
 
-            buffer.push_str(&record_fields);
+            // Define the record as a C struct.
+            let struct_def = emit_struct(
+                name.clone(),
+                record_fields
+                    .iter()
+                    .map(|(field_name, _)| (field_name.clone(), "int".to_string()))
+                    .collect(),
+            );
+
+            buffer.push_str(&struct_def);
+
+            // Declare a constructor for the record.
+            buffer.push_str(
+                format!(
+                    "\n{}* _create_{}({}){{\n",
+                    name,
+                    name,
+                    record_fields
+                        .iter()
+                        .map(|(field_name, _)| format!("{} {}", "int".to_string(), field_name))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+                .as_str(),
+            );
+            buffer.push_str(format!("{}* tmp = malloc(sizeof({}));\n", name, name).as_str());
+
+            for (field_name, _) in record_fields {
+                buffer.push_str(format!("(*tmp).{} = {};\n", field_name, field_name).as_str());
+            }
+
+            buffer.push_str("return tmp;\n}\n");
         }
 
         buffer
@@ -239,6 +263,44 @@ impl Compiler {
         fresh_name
     }
 
+    fn compile_function_call(
+        &mut self,
+        name: &Expression,
+        arguments: &Vec<Box<Expression>>,
+    ) -> String {
+        let argument_list: Vec<String> = arguments
+            .iter()
+            .map(|arg| self.compile_expression(arg))
+            .collect();
+
+        let function = self.compile_expression(name);
+
+        emit_function_call(function, &argument_list, false)
+    }
+
+    fn compile_record_instance(
+        &mut self,
+        name: &String,
+        fields: &Vec<(String, Box<Expression>)>,
+    ) -> String {
+        let mut buffer = String::new();
+
+        buffer.push_str(format!("_create_{}(", name).as_str());
+
+        buffer.push_str(
+            fields
+                .iter()
+                .map(|(_, field_value)| self.compile_expression(field_value))
+                .collect::<Vec<String>>()
+                .join(", ")
+                .as_str(),
+        );
+
+        buffer.push_str(")");
+
+        buffer
+    }
+
     pub fn compile_expression(&mut self, expression: &Expression) -> String {
         match expression {
             Expression::Integer(value) => format!("{}", value),
@@ -274,31 +336,13 @@ impl Compiler {
             Expression::Get(name, expr) => format!("(Get, name: '{}', parent: {})", name, expr),
 
             Expression::FunctionCall(name, arguments) => {
-                let argument_list: Vec<String> = arguments
-                    .iter()
-                    .map(|arg| self.compile_expression(arg))
-                    .collect();
-
-                let function = self.compile_expression(name);
-
-                emit_function_call(function, &argument_list, false)
+                self.compile_function_call(name, arguments)
             }
 
             // Just ignore record declarations, already handled in the record header.
             Expression::RecordDeclaration(_, _, body) => self.compile_expression(body),
 
-            Expression::RecordInstance(name, fields) => {
-                let field_list: Vec<String> = fields
-                    .iter()
-                    .map(|(field_name, field_value)| format!("({}: {})", field_name, field_value))
-                    .collect();
-
-                format!(
-                    "(RecordInstance, name: {}, fields: [{}])",
-                    name,
-                    field_list.join(", ")
-                )
-            }
+            Expression::RecordInstance(name, fields) => self.compile_record_instance(name, fields),
         }
     }
 }
