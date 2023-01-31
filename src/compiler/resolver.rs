@@ -33,7 +33,11 @@ fn get_builtin(type_name: &String) -> String {
 pub fn get_native_type(internal_type: &Type) -> String {
     match internal_type {
         Type::Base(name) => get_builtin(name),
-        Type::Generic(_, _) => "TODO".to_string(),
-        Type::Function(arguments, return_type) => "FUNC".to_string(),
+
+        // TODO: add generics
+        Type::Generic(_, _) => panic!("Not yet supported."),
+
+        // TODO: handle this instead of panic-ing; this should never happen.
+        Type::Function(_, _) => panic!(),
     }
 }

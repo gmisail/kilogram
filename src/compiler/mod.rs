@@ -19,7 +19,7 @@ mod resolver;
 
 pub struct Compiler {
     function: FunctionGenerator,
-    function_header: Vec<(String, String, Vec<(String, String)>, String)>,
+    function_header: Vec<(String, Type, Vec<(String, String)>, String)>,
     record_types: HashMap<String, Rc<datatype::Type>>,
 }
 
@@ -31,6 +31,14 @@ impl Compiler {
             function: FunctionGenerator::new(),
             function_header: Vec::new(),
             record_types,
+        }
+    }
+
+    // Wrapper over the resolver module
+    fn resolve_type(&self, var_name: &String, var_type: &Type) -> String {
+        match var_type {
+            Type::Function(_, _) => resolver::get_function_pointer(var_name.into(), var_type),
+            _ => format!("{} {}", resolver::get_native_type(var_type), var_name),
         }
     }
 
@@ -95,17 +103,37 @@ impl Compiler {
             .function_header
             .iter()
             .map(|(func_name, func_type, func_args, func_body)| {
-                format!(
-                    "{} {} ({}){{\n{}\n}}",
-                    func_type,
-                    func_name,
-                    func_args
-                        .iter()
-                        .map(|(arg_name, arg_type)| format!("{} {}", arg_type, arg_name))
-                        .collect::<Vec<String>>()
-                        .join(", "),
-                    func_body
-                )
+                let args = func_args
+                    .iter()
+                    .map(|(arg_name, arg_type)| format!("{} {}", arg_type, arg_name))
+                    .collect::<Vec<String>>()
+                    .join(", ");
+
+                match func_type.borrow() {
+                    Type::Function(base_func_args, _) => {
+                        let func_pointer = format!(
+                            "(*{}({}))",
+                            func_name,
+                            base_func_args
+                                .iter()
+                                .map(|t| resolver::get_native_type(t))
+                                .collect::<Vec<String>>()
+                                .join(", ")
+                        );
+                        format!(
+                            "{} {{\n{}\n}}",
+                            self.resolve_type(&func_pointer, func_type),
+                            func_body
+                        )
+                    }
+                    _ => format!(
+                        "{} {} ({}){{\n{}\n}}",
+                        self.resolve_type(func_name, func_type),
+                        func_name,
+                        args,
+                        func_body
+                    ),
+                }
             })
             .collect();
 
@@ -195,31 +223,14 @@ impl Compiler {
             _ => true,
         };
 
-        let is_func = match value.borrow() {
-            Expression::Function(_, _, _, _) => true,
-            _ => false,
-        };
-
-        if is_func {
-            format!(
-                "{} = {};\n{}{}{}",
-                resolver::get_function_pointer(name.clone(), var_type),
-                self.compile_expression(value),
-                if is_leaf { "return " } else { "" },
-                self.compile_expression(body),
-                if is_leaf { ";" } else { "" }
-            )
-        } else {
-            format!(
-                "{} {} = {};\n{}{}{}",
-                resolver::get_native_type(var_type),
-                name,
-                self.compile_expression(value),
-                if is_leaf { "return " } else { "" },
-                self.compile_expression(body),
-                if is_leaf { ";" } else { "" }
-            )
-        }
+        format!(
+            "{} = {};\n{}{}{}",
+            self.resolve_type(name, var_type),
+            self.compile_expression(value),
+            if is_leaf { "return " } else { "" },
+            self.compile_expression(body),
+            if is_leaf { ";" } else { "" }
+        )
     }
 
     fn compile_function(
@@ -247,17 +258,13 @@ impl Compiler {
             .map(|(arg_name, arg_type)| {
                 (
                     arg_name.clone(),
-                    resolver::get_native_type(arg_type.borrow()),
+                    self.resolve_type(arg_name, arg_type.borrow()),
                 )
             })
             .collect();
 
-        self.function_header.push((
-            fresh_name.clone(),
-            resolver::get_native_type(func_type),
-            arguments,
-            func_body,
-        ));
+        self.function_header
+            .push((fresh_name.clone(), func_type.clone(), arguments, func_body));
 
         // All user-declared functions are a pointer to a function in the function header.
         fresh_name
