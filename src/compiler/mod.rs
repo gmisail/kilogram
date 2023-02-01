@@ -105,7 +105,7 @@ impl Compiler {
             .map(|(func_name, func_type, func_args, func_body)| {
                 let args = func_args
                     .iter()
-                    .map(|(arg_name, arg_type)| arg_type.clone())
+                    .map(|(_, arg_type)| arg_type.clone())
                     .collect::<Vec<String>>()
                     .join(", ");
 
@@ -152,7 +152,15 @@ impl Compiler {
         buffer.push_str("\n// Function header\n");
         buffer.push_str(&self.generate_function_header());
         buffer.push_str("\n\n// Program\n");
+
+        // Inject the source into the main function
+        buffer.push_str("int main(int argc, char** argv){\n");
+
+        // Inject any Kilogram-specific C code here.
         buffer.push_str(&root_expr);
+
+        // Destructors
+        buffer.push_str("\n}");
 
         buffer
     }
@@ -217,7 +225,7 @@ impl Compiler {
         value: &Box<Expression>,
         body: &Box<Expression>,
     ) -> String {
-        // Is the last node not a declaration? Terminate it.
+        // Is the last node not a declaration? Return it.
         let is_leaf = match body.borrow() {
             Expression::Let(_, _, _, _) => false,
             _ => true,
@@ -233,6 +241,12 @@ impl Compiler {
         )
     }
 
+    /// Define the lambda under a unique name and returns a pointer
+    /// to it.
+    ///
+    /// * `func_type`:
+    /// * `arg_types`:
+    /// * `value`:
     fn compile_function(
         &mut self,
         func_type: &Type,
@@ -270,6 +284,10 @@ impl Compiler {
         fresh_name
     }
 
+    /// Generates a function call given a function name and arguments.
+    ///
+    /// * `name`:
+    /// * `arguments`:
     fn compile_function_call(
         &mut self,
         name: &Expression,
@@ -308,6 +326,9 @@ impl Compiler {
         buffer
     }
 
+    /// Compiles an expression.
+    ///
+    /// * `expression`:
     pub fn compile_expression(&mut self, expression: &Expression) -> String {
         match expression {
             Expression::Integer(value) => format!("{}", value),
