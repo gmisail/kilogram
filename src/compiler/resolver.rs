@@ -37,7 +37,6 @@ pub fn get_native_type(internal_type: &Type) -> String {
         // TODO: add generics
         Type::Generic(_, _) => panic!("Not yet supported."),
 
-        // TODO: handle this instead of panic-ing; this should never happen.
-        Type::Function(_, _) => panic!(),
+        Type::Function(_, _) => get_function_pointer("".to_string(), internal_type) 
     }
 }

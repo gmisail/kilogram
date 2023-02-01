@@ -28,11 +28,9 @@ function(a: int, b: int): int
 	sum(odd, odd)
 end
 
-let nested: (int) -> (int) -> float = 
-function(x : int): (int) -> float
-	function(z: int): float
-		3.14
-	end
+let map: ((Album) -> string, (string, string) -> Album) -> string =
+function(callback: (Album) -> string, other_callback: (string, string) -> Album): string
+	"hello"
 end
 
 let make_tpab: (string) -> Album =

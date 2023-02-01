@@ -105,7 +105,7 @@ impl Compiler {
             .map(|(func_name, func_type, func_args, func_body)| {
                 let args = func_args
                     .iter()
-                    .map(|(arg_name, arg_type)| format!("{} {}", arg_type, arg_name))
+                    .map(|(arg_name, arg_type)| arg_type.clone())
                     .collect::<Vec<String>>()
                     .join(", ");
 
@@ -120,6 +120,7 @@ impl Compiler {
                                 .collect::<Vec<String>>()
                                 .join(", ")
                         );
+
                         format!(
                             "{} {{\n{}\n}}",
                             self.resolve_type(&func_pointer, func_type),
@@ -127,9 +128,8 @@ impl Compiler {
                         )
                     }
                     _ => format!(
-                        "{} {} ({}){{\n{}\n}}",
+                        "{} ({}){{\n{}\n}}",
                         self.resolve_type(func_name, func_type),
-                        func_name,
                         args,
                         func_body
                     ),
