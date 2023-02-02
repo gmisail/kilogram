@@ -49,6 +49,7 @@ pub enum TokenKind {
     And,
     Or,
     End,
+    Recursive,
 
     Eof,
 }
@@ -110,6 +111,7 @@ impl Display for TokenKind {
                 TokenKind::Function => "'function'",
                 TokenKind::If => "'if'",
                 TokenKind::Or => "'or'",
+                TokenKind::Recursive => "'rec'",
                 TokenKind::Eof => "<EOF>",
             }
         )
