@@ -181,7 +181,7 @@ impl Typechecker {
                 }
             }
 
-            ast::Expression::Let(var_name, var_ast_type, var_value, body) => {
+            ast::Expression::Let(var_name, var_ast_type, var_value, body, _) => {
                 let var_type = self.from_ast_type(&var_ast_type)?;
                 let value_type = self.resolve_type(var_value)?;
 

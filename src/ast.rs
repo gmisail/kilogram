@@ -131,7 +131,7 @@ pub enum Expression {
     If(Box<Expression>, Box<Expression>, Box<Expression>),
 
     // Declarations
-    Let(String, Type, Box<Expression>, Box<Expression>),
+    Let(String, Type, Box<Expression>, Box<Expression>, bool),
     Function(String, Type, Vec<(String, Type)>, Box<Expression>),
 }
 
@@ -163,9 +163,9 @@ impl Display for Expression {
                 if_expr, then_expr, else_expr
             ),
 
-            Expression::Let(name, var_type, value, body) => format!(
-                "(Let, name: '{}', type: {}, value: {}, body: {})",
-                name, var_type, value, body
+            Expression::Let(name, var_type, value, body, is_recursive) => format!(
+                "(Let, name: '{}', type: {}, value: {}, body: {}, is_recursive: {})",
+                name, var_type, value, body, is_recursive
             ),
 
             Expression::Function(name, func_type, _, value) => format!(

@@ -623,7 +623,14 @@ impl Parser {
         if self.match_token(&TokenKind::Let) {
             self.advance_token();
 
-            // let <name> : <type> = <value>
+            let mut is_recursive = false;
+
+            // let <rec?> <name> : <type> = <value>
+            
+            if self.match_token(&TokenKind::Recursive) {
+                is_recursive = true;
+                self.advance_token();
+            }
 
             let name_token = self.expect_token(&TokenKind::Identifier("".to_string()))?;
             let variable_name = match name_token {
@@ -653,6 +660,7 @@ impl Parser {
                 variable_type,
                 Box::new(variable_value),
                 Box::new(variable_body),
+                is_recursive
             ))
         } else {
             self.parse_if_expression()

@@ -227,7 +227,7 @@ impl Compiler {
     ) -> String {
         // Is the last node not a declaration? Return it.
         let is_leaf = match body.borrow() {
-            Expression::Let(_, _, _, _) => false,
+            Expression::Let(..) => false,
             _ => true,
         };
 
@@ -256,7 +256,7 @@ impl Compiler {
         // Generate fresh name.
         let fresh_name = self.function.generate();
         let is_leaf = match value.borrow() {
-            Expression::Let(_, _, _, _) => false,
+            Expression::Let(_, _, _, _, _) => false,
             _ => true,
         };
 
@@ -353,7 +353,7 @@ impl Compiler {
                 self.compile_expression(else_expr),
             ),
 
-            Expression::Let(name, var_type, value, body) => {
+            Expression::Let(name, var_type, value, body, _) => {
                 self.compile_let(name, var_type, value, body)
             }
 
