@@ -655,6 +655,10 @@ impl Parser {
             let variable_value = self.parse_expression()?;
             let variable_body = self.parse_expression()?;
 
+            if !matches!(variable_value, ast::Expression::Function(..)) {
+                return Err(format!("Expected value of variable '{variable_name}' to be a function since it was marked as recursive."));
+            }
+
             Ok(ast::Expression::Let(
                 variable_name,
                 variable_type,
