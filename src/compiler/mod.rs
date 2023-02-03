@@ -333,7 +333,7 @@ impl Compiler {
         match expression {
             Expression::Integer(value) => format!("{}", value),
             Expression::Float(value) => format!("{}", value),
-            Expression::Str(value) => format!("\"{}\"", value),
+            Expression::Str(value) => format!("string_create(\"{}\")", value),
             Expression::Boolean(value) => format!("{}", value),
             Expression::Variable(name) => format!("{}", name),
 

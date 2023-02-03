@@ -1,0 +1,10 @@
+#ifndef K_FUNCTION
+#define K_FUNCTION
+
+typedef struct {
+	// Function pointer to the function's implementation.
+	void* body;
+} Function;
+
+#endif
+

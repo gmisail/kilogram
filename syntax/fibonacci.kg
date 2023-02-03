@@ -1,4 +1,5 @@
 let rec fibonacci: (int) -> int = function(i: int): int
 	if i < 2 then i else fibonacci(i - 1) + fibonacci(i - 2)
 end
+
 fibonacci(5)

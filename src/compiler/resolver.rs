@@ -25,7 +25,8 @@ pub fn get_function_pointer(name: String, internal_type: &Type) -> String {
 
 fn get_builtin(type_name: &String) -> String {
     match type_name.as_str() {
-        "int" | "float" | "bool" | "string" => type_name.clone(),
+        "int" | "float" | "bool" => type_name.clone(),
+        "string" => "KiloString*".to_string(),
         _ => format!("{}*", type_name),
     }
 }
