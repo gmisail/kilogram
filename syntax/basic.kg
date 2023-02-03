@@ -1,0 +1,6 @@
+let show_message: (string) -> string =
+function(message: string): string
+	"Hello world!"
+end
+
+show_message("from me")

@@ -688,21 +688,15 @@ pub fn parse(input: String) -> Result<ast::Expression, &'static str> {
     let mut expressions = vec![];
 
     while !context.is_at_end() {
-        println!(
-            "{}",
-            match context.parse_expression() {
-                Ok(node) => {
-                    let str = format!("{}", node);
-                    expressions.push(node);
-
-                    str
-                }
-                Err(e) => {
-                    context.advance_token();
-                    e
-                }
+        match context.parse_expression() {
+            Ok(node) => {
+                expressions.push(node);
             }
-        );
+            Err(e) => {
+                context.advance_token();
+                println!("{}", e);
+            }
+        }
     }
 
     Ok(expressions.get(0).unwrap().clone())

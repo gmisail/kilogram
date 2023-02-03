@@ -181,12 +181,21 @@ impl Typechecker {
                 }
             }
 
-            ast::Expression::Let(var_name, var_ast_type, var_value, body, _) => {
+            ast::Expression::Let(var_name, var_ast_type, var_value, body, is_recursive) => {
                 let var_type = self.from_ast_type(&var_ast_type)?;
+
+                if *is_recursive {
+                    self.add_variable(&var_name, var_type.clone())?;
+                }
+
                 let value_type = self.resolve_type(var_value)?;
 
                 if *var_type == *value_type {
-                    self.add_variable(&var_name, var_type)?;
+                    // If recursive, the definition has already been added.
+                    if !is_recursive { 
+                        self.add_variable(&var_name, var_type)?;
+                    }
+
                     self.resolve_type(body)
                 } else {
                     Err(format!("Can't define variables with incompatible types! Variable is defined as type {}, but you're assigning it to a value of type {}.", *var_type, *value_type))

@@ -13,7 +13,7 @@ use parser::parse;
 use typechecker::Typechecker;
 
 fn main() {
-    let mut file = match File::open("./syntax/fibonacci.kg") {
+    let mut file = match File::open("./syntax/basic.kg") {
         Err(e) => panic!("couldn't open file: {}", e),
         Ok(file) => file,
     };

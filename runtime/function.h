@@ -4,6 +4,9 @@
 typedef struct {
 	// Function pointer to the function's implementation.
 	void* body;
+
+	// Structure of variables captured by the function.
+	void* captured;
 } Function;
 
 #endif
