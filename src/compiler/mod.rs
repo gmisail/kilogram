@@ -102,7 +102,7 @@ impl Compiler {
         let body: Vec<String> = self
             .function_header
             .iter()
-            .map(|(func_name, func_type, func_args, func_body)| {
+           .map(|(func_name, func_type, func_args, func_body)| {
                 let args = func_args
                     .iter()
                     .map(|(_, arg_type)| arg_type.clone())
@@ -146,6 +146,9 @@ impl Compiler {
         let mut buffer = String::new();
 
         let root_expr = self.compile_expression(expression);
+
+        buffer.push_str("#include<stdio.h>\n");
+        buffer.push_str("#include<stdlib.h>\n");
 
         buffer.push_str("// Record header\n");
         buffer.push_str(&self.generate_record_header());
