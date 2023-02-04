@@ -8,14 +8,16 @@ use crate::{
 };
 
 use self::emitter::{emit_function_call, emit_if};
+use self::builder::StructBuilder;
 use self::{
-    emitter::{emit_binary, emit_struct, emit_unary},
+    emitter::{emit_binary, emit_unary},
     generator::FunctionGenerator,
 };
 
 mod emitter;
 mod generator;
 mod resolver;
+mod builder;
 
 pub struct Compiler {
     function: FunctionGenerator,
@@ -56,37 +58,14 @@ impl Compiler {
             };
 
             // Define the record as a C struct.
-            let struct_def = emit_struct(
-                name.clone(),
-                record_fields
-                    .iter()
-                    .map(|(field_name, _)| (field_name.clone(), "int".to_string()))
-                    .collect(),
-            );
+            let mut record_struct = StructBuilder::new(name.clone());
 
-            buffer.push_str(&struct_def);
-
-            // Declare a constructor for the record.
-            buffer.push_str(
-                format!(
-                    "\n{}* _create_{}({}){{\n",
-                    name,
-                    name,
-                    record_fields
-                        .iter()
-                        .map(|(field_name, _)| format!("{} {}", "int".to_string(), field_name))
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                )
-                .as_str(),
-            );
-            buffer.push_str(format!("{}* tmp = malloc(sizeof({}));\n", name, name).as_str());
-
-            for (field_name, _) in record_fields {
-                buffer.push_str(format!("(*tmp).{} = {};\n", field_name, field_name).as_str());
+            for (field_name, _field_type) in record_fields {
+                record_struct.field(field_name.clone(), "int".to_string());
             }
 
-            buffer.push_str("return tmp;\n}\n");
+            buffer.push_str(&record_struct.build());
+            buffer.push_str(&record_struct.build_constructor());
         }
 
         buffer
@@ -98,46 +77,48 @@ impl Compiler {
 
         // TODO: have forward declarations before defining functions
         // TODO: implement functions that return function pointers
+        // TODO: generate struct for function callback
+        
+        for (func_name, func_type, func_args, func_body) in &self.function_header {
+            let args = func_args
+                .iter()
+                .map(|(_, arg_type)| arg_type.clone())
+                .collect::<Vec<String>>()
+                .join(", ");
 
-        let body: Vec<String> = self
-            .function_header
-            .iter()
-            .map(|(func_name, func_type, func_args, func_body)| {
-                let args = func_args
-                    .iter()
-                    .map(|(_, arg_type)| arg_type.clone())
-                    .collect::<Vec<String>>()
-                    .join(", ");
+            let func_env = StructBuilder::new(format!("{}_env", func_name));
 
-                match func_type.borrow() {
-                    Type::Function(base_func_args, _) => {
-                        let func_pointer = format!(
-                            "(*{}({}))",
-                            func_name,
-                            base_func_args
-                                .iter()
-                                .map(|t| resolver::get_native_type(t))
-                                .collect::<Vec<String>>()
-                                .join(", ")
-                        );
+            let result = match func_type.borrow() {
+                Type::Function(base_func_args, _) => {
+                    let func_pointer = format!(
+                        "(*{}({}))",
+                        func_name,
+                        base_func_args
+                            .iter()
+                            .map(|t| resolver::get_native_type(t))
+                            .collect::<Vec<String>>()
+                            .join(", ")
+                    );
 
-                        format!(
-                            "{} {{\n{}\n}}",
-                            self.resolve_type(&func_pointer, func_type),
-                            func_body
-                        )
-                    }
-                    _ => format!(
-                        "{} ({}){{\n{}\n}}",
-                        self.resolve_type(func_name, func_type),
-                        args,
+                    format!(
+                        "{} {{\n{}\n}}",
+                        self.resolve_type(&func_pointer, func_type),
                         func_body
-                    ),
+                    )
                 }
-            })
-            .collect();
+                _ => format!(
+                    "{} ({}){{\n{}\n}}",
+                    self.resolve_type(func_name, func_type),
+                    args,
+                    func_body
+                ),
+            };
 
-        buffer.push_str(body.join("\n").as_str());
+            buffer.push_str(&func_env.build());
+            buffer.push('\n');
+            buffer.push_str(&result);
+            buffer.push('\n');
+        }
 
         buffer
     }

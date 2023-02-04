@@ -7,7 +7,9 @@ typedef struct {
 
 	// Structure of variables captured by the function.
 	void* captured;
-} Function;
+} KiloFunction;
+
+KiloFunction* function_create(void*, void*);
 
 #endif
 
