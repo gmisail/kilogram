@@ -7,17 +7,17 @@ use crate::{
     typechecker::datatype,
 };
 
-use self::emitter::{emit_function_call, emit_if};
 use self::builder::StructBuilder;
+use self::emitter::{emit_function_call, emit_if};
 use self::{
     emitter::{emit_binary, emit_unary},
     generator::FunctionGenerator,
 };
 
+mod builder;
 mod emitter;
 mod generator;
 mod resolver;
-mod builder;
 
 pub struct Compiler {
     function: FunctionGenerator,
@@ -78,7 +78,7 @@ impl Compiler {
         // TODO: have forward declarations before defining functions
         // TODO: implement functions that return function pointers
         // TODO: generate struct for function callback
-        
+
         for (func_name, func_type, func_args, func_body) in &self.function_header {
             let args = func_args
                 .iter()
@@ -127,6 +127,9 @@ impl Compiler {
         let mut buffer = String::new();
 
         let root_expr = self.compile_expression(expression);
+
+        buffer.push_str("#include<stdio.h>\n");
+        buffer.push_str("#include<stdlib.h>\n");
 
         buffer.push_str("// Record header\n");
         buffer.push_str(&self.generate_record_header());
