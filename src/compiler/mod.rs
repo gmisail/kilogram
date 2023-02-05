@@ -39,7 +39,7 @@ impl Compiler {
     // Wrapper over the resolver module
     fn resolve_type(&self, var_name: &String, var_type: &Type) -> String {
         match var_type {
-            Type::Function(_, _) => resolver::get_function_pointer(var_name.into(), var_type),
+            Type::Function(_, _) => format!("KiloFunction* {}", var_name),
             _ => format!("{} {}", resolver::get_native_type(var_type), var_name),
         }
     }
@@ -265,7 +265,7 @@ impl Compiler {
             .push((fresh_name.clone(), func_type.clone(), arguments, func_body));
 
         // All user-declared functions are a pointer to a function in the function header.
-        fresh_name
+        format!("function_create({}, NULL)", fresh_name)
     }
 
     /// Generates a function call given a function name and arguments.
