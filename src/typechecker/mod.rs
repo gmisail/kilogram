@@ -5,6 +5,7 @@ use std::rc::Rc;
 pub mod datatype;
 mod error;
 mod rules;
+mod typetree;
 
 use crate::ast;
 use datatype::Type;
@@ -192,7 +193,7 @@ impl Typechecker {
 
                 if *var_type == *value_type {
                     // If recursive, the definition has already been added.
-                    if !is_recursive { 
+                    if !is_recursive {
                         self.add_variable(&var_name, var_type)?;
                     }
 
