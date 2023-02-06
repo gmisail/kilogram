@@ -131,11 +131,11 @@ impl Compiler {
         buffer.push_str("#include<stdio.h>\n");
         buffer.push_str("#include<stdlib.h>\n");
 
-        buffer.push_str("// Record header\n");
+        buffer.push_str("\n// Record header\n");
         buffer.push_str(&self.generate_record_header());
         buffer.push_str("\n// Function header\n");
         buffer.push_str(&self.generate_function_header());
-        buffer.push_str("\n\n// Program\n");
+        buffer.push_str("\n// Program\n");
 
         // Inject the source into the main function
         buffer.push_str("int main(int argc, char** argv){\n");
@@ -281,6 +281,11 @@ impl Compiler {
             .iter()
             .map(|arg| self.compile_expression(arg))
             .collect();
+
+        let is_local = match name {
+            Expression::Variable(_) => true,
+            _ => panic!("Do not support calling non-variables yet"),
+        };
 
         let function = self.compile_expression(name);
 
