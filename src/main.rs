@@ -7,6 +7,7 @@ pub mod parser;
 pub mod scanner;
 pub mod token;
 pub mod typechecker;
+pub mod typed;
 
 use compiler::Compiler;
 use parser::parse;

@@ -1,16 +1,20 @@
 use std::rc::Rc;
 
-use super::datatype::Type;
-use crate::ast::{BinaryOperator, LogicalOperator, UnaryOperator};
+use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
+use crate::typed::data_type::DataType;
 
-pub fn check_unary(operator: &UnaryOperator, value_type: Rc<Type>) -> bool {
+pub fn check_unary(operator: &UnaryOperator, value_type: Rc<DataType>) -> bool {
     match operator {
-        UnaryOperator::Bang => *value_type == Type::Boolean,
-        UnaryOperator::Minus => matches!(*value_type, Type::Integer | Type::Float),
+        UnaryOperator::Bang => *value_type == DataType::Boolean,
+        UnaryOperator::Minus => matches!(*value_type, DataType::Integer | DataType::Float),
     }
 }
 
-pub fn check_binary(operator: &BinaryOperator, left_type: Rc<Type>, right_type: Rc<Type>) -> bool {
+pub fn check_binary(
+    operator: &BinaryOperator,
+    left_type: Rc<DataType>,
+    right_type: Rc<DataType>,
+) -> bool {
     match operator {
         // TODO: revise this such that we can work with floats + integers
         &BinaryOperator::Add
@@ -21,12 +25,16 @@ pub fn check_binary(operator: &BinaryOperator, left_type: Rc<Type>, right_type: 
         | &BinaryOperator::GreaterEq
         | &BinaryOperator::Less
         | &BinaryOperator::LessEq => {
-            *left_type == *right_type && matches!(*left_type, Type::Integer | Type::Float)
+            *left_type == *right_type && matches!(*left_type, DataType::Integer | DataType::Float)
         }
         &BinaryOperator::Equality | &BinaryOperator::NotEqual => *left_type == *right_type,
     }
 }
 
-pub fn check_logical(_: &LogicalOperator, left_type: Rc<Type>, right_type: Rc<Type>) -> bool {
-    *left_type == Type::Boolean && *right_type == Type::Boolean
+pub fn check_logical(
+    _: &LogicalOperator,
+    left_type: Rc<DataType>,
+    right_type: Rc<DataType>,
+) -> bool {
+    *left_type == DataType::Boolean && *right_type == DataType::Boolean
 }

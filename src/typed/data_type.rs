@@ -2,7 +2,7 @@ use std::fmt::Display;
 use std::{collections::HashMap, rc::Rc};
 
 #[derive(Clone)]
-pub enum Type {
+pub enum DataType {
     Integer,
     Float,
     Str,
@@ -10,18 +10,18 @@ pub enum Type {
 
     // Only allow one allocation per type and simply create copies
     // of that immutable memory address.
-    Function(Vec<Rc<Type>>, Rc<Type>),
-    Record(String, HashMap<String, Rc<Type>>),
+    Function(Vec<Rc<DataType>>, Rc<DataType>),
+    Record(String, HashMap<String, Rc<DataType>>),
 }
 
-impl PartialEq for Type {
+impl PartialEq for DataType {
     // Check if two types are equivalent.
     fn eq(&self, other: &Self) -> bool {
         match self {
             // If there are subfields (i.e. functions & records) then we
             // must check to see if they're *all* equal.
-            Type::Function(arguments, return_type) => match other {
-                Type::Function(other_arguments, other_return_type) => {
+            DataType::Function(arguments, return_type) => match other {
+                DataType::Function(other_arguments, other_return_type) => {
                     // Function types are equivalent under the following conditions:
                     //  1. same # of arguments
                     //  2. return types are equal
@@ -38,11 +38,11 @@ impl PartialEq for Type {
                 _ => false,
             },
 
-            Type::Record(_, fields) => match other {
+            DataType::Record(_, fields) => match other {
                 // Equal if fields is a subset of other_fields. Record 'B' can be used in place of record 'A'
                 // as long as 'B' has all of the fields in 'A'. However, that is not to say that they are
                 // equivalent; that is only true iff all fields in 'A' are in 'B' and vice-versa.
-                Type::Record(_, other_fields) => {
+                DataType::Record(_, other_fields) => {
                     fields.len() <= other_fields.len()
                         && fields.keys().all(|field_name| {
                             other_fields.contains_key(field_name)
@@ -60,18 +60,18 @@ impl PartialEq for Type {
     }
 }
 
-impl Display for Type {
+impl Display for DataType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "{}",
             match self {
-                Type::Integer => "int".to_string(),
-                Type::Float => "float".to_string(),
-                Type::Boolean => "bool".to_string(),
-                Type::Str => "string".to_string(),
+                DataType::Integer => "int".to_string(),
+                DataType::Float => "float".to_string(),
+                DataType::Boolean => "bool".to_string(),
+                DataType::Str => "string".to_string(),
 
-                Type::Function(argument_types, return_type) => {
+                DataType::Function(argument_types, return_type) => {
                     let arg_type_list: Vec<String> = argument_types
                         .iter()
                         .map(|arg| (*arg).to_string())
@@ -80,7 +80,7 @@ impl Display for Type {
                     format!("({}) -> {}", arg_type_list.join(", "), *return_type)
                 }
 
-                Type::Record(name, field_types) => {
+                DataType::Record(name, field_types) => {
                     let field_type_list: Vec<String> = field_types
                         .values()
                         .map(|field_type| (*field_type).to_string())

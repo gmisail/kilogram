@@ -1,29 +1,28 @@
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub mod datatype;
 mod error;
 mod rules;
-mod typetree;
 
-use crate::ast;
-use datatype::Type;
+use crate::ast::operator::BinaryOperator;
+use crate::ast::untyped_node::UntypedNode;
+use crate::typed::data_type::DataType;
+use crate::{ast::ast_type::AstType, typed::typed_node::TypedNode};
 use rules::{check_binary, check_logical, check_unary};
 
 pub struct Typechecker {
-    primitives: HashMap<&'static str, Rc<Type>>,
-    scoped_variables: HashMap<String, Rc<Type>>,
-    pub records: HashMap<String, Rc<Type>>,
+    primitives: HashMap<&'static str, Rc<DataType>>,
+    scoped_variables: HashMap<String, Rc<DataType>>,
+    pub records: HashMap<String, Rc<DataType>>,
 }
 
 impl Typechecker {
     pub fn new() -> Self {
         let mut primitives = HashMap::new();
-        primitives.insert("int", Rc::new(Type::Integer));
-        primitives.insert("float", Rc::new(Type::Float));
-        primitives.insert("bool", Rc::new(Type::Boolean));
-        primitives.insert("string", Rc::new(Type::Str));
+        primitives.insert("int", Rc::new(DataType::Integer));
+        primitives.insert("float", Rc::new(DataType::Float));
+        primitives.insert("bool", Rc::new(DataType::Boolean));
+        primitives.insert("string", Rc::new(DataType::Str));
 
         Typechecker {
             primitives,
@@ -32,14 +31,14 @@ impl Typechecker {
         }
     }
 
-    pub fn get_variable(&self, name: &String) -> Result<Rc<Type>, String> {
+    pub fn get_variable(&self, name: &String) -> Result<Rc<DataType>, String> {
         match self.scoped_variables.get(name) {
             Some(var_type) => Ok(var_type.clone()),
             None => Err(format!("Can't find variable with name '{}'", name)),
         }
     }
 
-    pub fn get_record(&self, name: &String) -> Result<Rc<Type>, String> {
+    pub fn get_record(&self, name: &String) -> Result<Rc<DataType>, String> {
         match self.records.get(name) {
             Some(record_type) => Ok(record_type.clone()),
             None => Err(format!("Can't find record with name '{}'", name)),
@@ -47,7 +46,7 @@ impl Typechecker {
     }
 
     // Creates an internal Record type based off of its AST representation.
-    fn add_record(&mut self, name: &String, fields: &[(String, ast::Type)]) -> Result<(), String> {
+    fn add_record(&mut self, name: &String, fields: &[(String, AstType)]) -> Result<(), String> {
         let record_types = fields
             .iter()
             .map(|(name, type_decl)| (name.clone(), self.from_ast_type(type_decl).unwrap()))
@@ -55,7 +54,7 @@ impl Typechecker {
 
         match self.records.insert(
             name.clone(),
-            Rc::new(Type::Record(name.clone(), record_types)),
+            Rc::new(DataType::Record(name.clone(), record_types)),
         ) {
             Some(_) => Err(format!("Record '{}' already defined.", name)),
             None => Ok(()),
@@ -63,7 +62,7 @@ impl Typechecker {
     }
 
     // Add a variable to the type-checking context.
-    fn add_variable(&mut self, var_name: &String, var_type: Rc<Type>) -> Result<(), String> {
+    fn add_variable(&mut self, var_name: &String, var_type: Rc<DataType>) -> Result<(), String> {
         match self.scoped_variables.insert(var_name.clone(), var_type) {
             Some(_) => Err(format!("Variable '{}' already defined.", var_name)),
             None => Ok(()),
@@ -81,9 +80,9 @@ impl Typechecker {
     }
 
     // Converts an AST type (int, string, ...) into a actual type.
-    fn from_ast_type(&self, t: &ast::Type) -> Result<Rc<Type>, String> {
+    fn from_ast_type(&self, t: &AstType) -> Result<Rc<DataType>, String> {
         match t {
-            ast::Type::Base(name) => match name.as_str() {
+            AstType::Base(name) => match name.as_str() {
                 // TODO: make this into one rule for primitives
                 "int" => Ok(self.primitives.get("int").unwrap().clone()),
                 "float" => Ok(self.primitives.get("float").unwrap().clone()),
@@ -93,7 +92,7 @@ impl Typechecker {
                 _ => self.get_record(name),
             },
 
-            ast::Type::Function(ast_argument_types, ast_return_type) => {
+            AstType::Function(ast_argument_types, ast_return_type) => {
                 let mut argument_types = vec![];
 
                 for ast_argument in ast_argument_types {
@@ -102,26 +101,63 @@ impl Typechecker {
 
                 let return_type = self.from_ast_type(ast_return_type)?;
 
-                Ok(Rc::new(Type::Function(argument_types, return_type)))
+                Ok(Rc::new(DataType::Function(argument_types, return_type)))
             }
             _ => Err("Unable to convert type to internal type.".to_string()),
         }
     }
 
-    pub fn resolve_type(&mut self, expression: &ast::Expression) -> Result<Rc<Type>, String> {
-        match expression {
-            ast::Expression::Integer(_) => Ok(self.primitives.get("int").unwrap().clone()),
-            ast::Expression::Float(_) => Ok(self.primitives.get("float").unwrap().clone()),
-            ast::Expression::Str(_) => Ok(self.primitives.get("string").unwrap().clone()),
-            ast::Expression::Boolean(_) => Ok(self.primitives.get("bool").unwrap().clone()),
-            ast::Expression::Group(inner) => self.resolve_type(inner),
-            ast::Expression::Variable(name) => self.get_variable(&name),
+    fn resolve_primitive(&self, type_name: &str) -> Rc<DataType> {
+        self.primitives.get(type_name).unwrap().clone()
+    }
 
-            ast::Expression::Unary(expr, operator) => {
-                let expr_type = self.resolve_type(expr)?;
+    /// Resolves the type of an expression. Returns a typed AST.
+    pub fn resolve_type(
+        &mut self,
+        expression: &UntypedNode,
+    ) -> Result<(Rc<DataType>, TypedNode), String> {
+        match expression {
+            UntypedNode::Integer(val) => {
+                let int_type = self.resolve_primitive("int");
+
+                Ok((int_type.clone(), TypedNode::Integer(int_type, val.clone())))
+            }
+            UntypedNode::Float(val) => {
+                let float_type = self.resolve_primitive("float");
+
+                Ok((
+                    float_type.clone(),
+                    TypedNode::Float(float_type, val.clone()),
+                ))
+            }
+            UntypedNode::Str(val) => {
+                let str_type = self.resolve_primitive("string");
+
+                Ok((str_type.clone(), TypedNode::Str(str_type, val.clone())))
+            }
+            UntypedNode::Boolean(val) => {
+                let bool_type = self.resolve_primitive("bool");
+
+                Ok((
+                    bool_type.clone(),
+                    TypedNode::Boolean(bool_type, val.clone()),
+                ))
+            }
+            UntypedNode::Group(inner) => self.resolve_type(inner),
+            UntypedNode::Variable(name) => {
+                let var_type = self.get_variable(&name)?;
+
+                Ok((var_type, TypedNode::Variable(var_type, name.clone())))
+            }
+
+            UntypedNode::Unary(expr, operator) => {
+                let (expr_type, expr_node) = self.resolve_type(expr)?;
 
                 if check_unary(&operator, expr_type.clone()) {
-                    Ok(expr_type)
+                    Ok((
+                        expr_type,
+                        TypedNode::Unary(expr_type, Box::new(expr_node), operator.clone()),
+                    ))
                 } else {
                     Err(format!(
                         "Cannot apply unary operator {} to expression of type {}.",
@@ -129,51 +165,87 @@ impl Typechecker {
                     ))
                 }
             }
-            ast::Expression::Binary(left_expr, operator, right_expr) => {
-                let left_type = self.resolve_type(left_expr)?;
-                let right_type = self.resolve_type(right_expr)?;
+            UntypedNode::Binary(left_expr, operator, right_expr) => {
+                let (left_type, left_node) = self.resolve_type(left_expr)?;
+                let (right_type, right_node) = self.resolve_type(right_expr)?;
 
                 if check_binary(&operator, left_type.clone(), right_type) {
                     // Type of binary operation depends on the operator.
                     match operator {
-                        ast::BinaryOperator::Add
-                        | ast::BinaryOperator::Sub
-                        | ast::BinaryOperator::Mult
-                        | ast::BinaryOperator::Div => Ok(left_type),
+                        BinaryOperator::Add
+                        | BinaryOperator::Sub
+                        | BinaryOperator::Mult
+                        | BinaryOperator::Div => Ok((
+                            left_type,
+                            TypedNode::Binary(
+                                left_type,
+                                Box::new(left_node),
+                                operator.clone(),
+                                Box::new(right_node),
+                            ),
+                        )),
 
-                        ast::BinaryOperator::Greater
-                        | ast::BinaryOperator::GreaterEq
-                        | ast::BinaryOperator::Less
-                        | ast::BinaryOperator::LessEq
-                        | ast::BinaryOperator::Equality
-                        | ast::BinaryOperator::NotEqual => {
-                            Ok(self.primitives.get("bool").unwrap().clone())
+                        BinaryOperator::Greater
+                        | BinaryOperator::GreaterEq
+                        | BinaryOperator::Less
+                        | BinaryOperator::LessEq
+                        | BinaryOperator::Equality
+                        | BinaryOperator::NotEqual => {
+                            let bool_type = self.primitives.get("bool").unwrap().clone();
+
+                            Ok((
+                                bool_type,
+                                TypedNode::Binary(
+                                    bool_type,
+                                    Box::new(left_node),
+                                    operator.clone(),
+                                    Box::new(right_node),
+                                ),
+                            ))
                         }
                     }
                 } else {
                     Err("Binary operator not compatible with types.".to_string())
                 }
             }
-            ast::Expression::Logical(left_expr, operator, right_expr) => {
-                let left_type = self.resolve_type(left_expr)?;
-                let right_type = self.resolve_type(right_expr)?;
+            UntypedNode::Logical(left_expr, operator, right_expr) => {
+                let (left_type, left_node) = self.resolve_type(left_expr)?;
+                let (right_type, right_node) = self.resolve_type(right_expr)?;
 
                 if check_logical(&operator, left_type, right_type) {
-                    Ok(self.primitives.get("bool").unwrap().clone())
+                    let bool_type = self.primitives.get("bool").unwrap().clone();
+
+                    Ok((
+                        bool_type,
+                        TypedNode::Logical(
+                            bool_type,
+                            Box::new(left_node),
+                            operator.clone(),
+                            Box::new(right_node),
+                        ),
+                    ))
                 } else {
                     Err("Logical operation must be between two boolean conditions.".to_string())
                 }
             }
 
-            ast::Expression::If(condition, then_expr, else_expr) => {
-                let condition_type = self.resolve_type(condition)?;
+            UntypedNode::If(condition, then_expr, else_expr) => {
+                let (condition_type, condition_node) = self.resolve_type(condition)?;
 
-                if *condition_type == Type::Boolean {
-                    let then_type = self.resolve_type(then_expr)?;
-                    let else_type = self.resolve_type(else_expr)?;
+                if *condition_type == DataType::Boolean {
+                    let (then_type, then_node) = self.resolve_type(then_expr)?;
+                    let (else_type, else_node) = self.resolve_type(else_expr)?;
 
                     if *then_type == *else_type {
-                        Ok(then_type)
+                        Ok((
+                            then_type,
+                            TypedNode::If(
+                                then_type,
+                                Box::new(condition_node),
+                                Box::new(then_node),
+                                Box::new(else_node),
+                            ),
+                        ))
                     } else {
                         Err(format!("Branches in 'if' statement must have the same type! Got branches with type {} and {}.", *then_type, *else_type))
                     }
@@ -182,14 +254,14 @@ impl Typechecker {
                 }
             }
 
-            ast::Expression::Let(var_name, var_ast_type, var_value, body, is_recursive) => {
+            UntypedNode::Let(var_name, var_ast_type, var_value, body, is_recursive) => {
                 let var_type = self.from_ast_type(&var_ast_type)?;
 
                 if *is_recursive {
                     self.add_variable(&var_name, var_type.clone())?;
                 }
 
-                let value_type = self.resolve_type(var_value)?;
+                let (value_type, value_node) = self.resolve_type(var_value)?;
 
                 if *var_type == *value_type {
                     // If recursive, the definition has already been added.
@@ -197,25 +269,38 @@ impl Typechecker {
                         self.add_variable(&var_name, var_type)?;
                     }
 
-                    self.resolve_type(body)
+                    let (body_type, body_node) = self.resolve_type(body)?;
+
+                    Ok((
+                        body_type,
+                        TypedNode::Let(
+                            var_name.clone(),
+                            value_type,
+                            Box::new(value_node),
+                            Box::new(body_node),
+                            *is_recursive,
+                        ),
+                    ))
                 } else {
                     Err(format!("Can't define variables with incompatible types! Variable is defined as type {}, but you're assigning it to a value of type {}.", *var_type, *value_type))
                 }
             }
 
-            ast::Expression::Function(_, ast_return_type, ast_argument_types, body) => {
-                let mut argument_types = vec![];
+            UntypedNode::Function(_, ast_return_type, ast_argument_types, body) => {
+                let mut argument_types = Vec::new();
+                let mut typed_arguments = Vec::new();
 
                 // Resolve types & add parameters to scope.
                 for (arg_name, arg_ast_type) in ast_argument_types {
                     let arg_type = self.from_ast_type(arg_ast_type)?;
 
                     argument_types.push(arg_type.clone());
+                    typed_arguments.push((arg_name.clone(), arg_type));
 
                     self.add_variable(arg_name, arg_type)?;
                 }
 
-                let body_type = self.resolve_type(body)?;
+                let (body_type, body_node) = self.resolve_type(body)?;
                 let return_type = self.from_ast_type(&ast_return_type)?;
 
                 // Since the expression has been evaluated, pop parameters from scope.
@@ -224,18 +309,32 @@ impl Typechecker {
                 }
 
                 if *body_type == *return_type {
-                    Ok(Rc::new(Type::Function(argument_types, return_type)))
+                    let func_type = Rc::new(DataType::Function(argument_types, return_type));
+
+                    Ok((
+                        func_type,
+                        TypedNode::Function(
+                            func_type,
+                            return_type,
+                            typed_arguments,
+                            Box::new(body_node),
+                        ),
+                    ))
                 } else {
                     Err("Function return type and actual type returned do not match.".to_string())
                 }
             }
-            ast::Expression::FunctionCall(parent, parameters) => {
+            UntypedNode::FunctionCall(parent, parameters) => {
                 // Verify that the parameter & argument types match.
-                match self.resolve_type(parent)?.borrow() {
-                    Type::Function(arguments, return_type) => {
+                let (func_type, func_node) = self.resolve_type(parent)?;
+
+                match *func_type {
+                    DataType::Function(arguments, return_type) => {
+                        let typed_arguments = Vec::new();
+
                         // Check that the types of the expressions match the expected type.
                         for (target_type, parameter) in arguments.iter().zip(parameters) {
-                            let resolved_type = self.resolve_type(parameter)?;
+                            let (resolved_type, resolved_node) = self.resolve_type(parameter)?;
 
                             if *target_type != resolved_type {
                                 return Err(format!(
@@ -243,45 +342,65 @@ impl Typechecker {
                                     target_type, resolved_type
                                 ));
                             }
+
+                            typed_arguments.push(Box::new(resolved_node));
                         }
 
-                        Ok(return_type.clone())
+                        Ok((
+                            func_type,
+                            TypedNode::FunctionCall(
+                                func_type.clone(),
+                                Box::new(func_node),
+                                typed_arguments,
+                            ),
+                        ))
                     }
 
                     _ => Err("Cannot call non-function.".to_string()),
                 }
             }
 
-            ast::Expression::RecordInstance(name, fields) => {
+            UntypedNode::RecordInstance(name, fields) => {
                 let record_type = self.get_record(&name)?;
                 let mut field_types = HashMap::new();
+                let field_values = Vec::new();
 
                 for (field_name, field_ast_type) in fields {
-                    field_types.insert(field_name.clone(), self.resolve_type(field_ast_type)?);
+                    let (field_type, field_value) = self.resolve_type(field_ast_type)?;
+                    field_types.insert(field_name.clone(), field_type);
+                    field_values.push((field_name.clone(), Box::new(field_value)));
                 }
 
-                if Type::Record(name.clone(), field_types) == *record_type {
-                    Ok(record_type)
+                if DataType::Record(*name, field_types) == *record_type {
+                    Ok((record_type, TypedNode::RecordInstance(*name, field_values)))
                 } else {
                     Err("Records don't match.".to_string())
                 }
             }
-            ast::Expression::RecordDeclaration(name, fields, body) => {
+            UntypedNode::RecordDeclaration(name, fields, body) => {
                 self.add_record(&name, &fields)?;
                 self.resolve_type(body)
             }
 
-            ast::Expression::Get(field, parent) => match self.resolve_type(parent)?.borrow() {
-                Type::Record(name, fields) => match fields.get(field) {
-                    Some(field_type) => Ok(field_type.clone()),
-                    None => Err(format!(
-                        "Can't find field {} in record of type {}",
-                        field, name
-                    )),
-                },
+            UntypedNode::Get(field, parent) => {
+                let (get_type, get_node) = self.resolve_type(parent)?;
 
-                invalid_type => Err(format!("Can't access fields from type {}.", invalid_type)),
-            },
+                match *get_type {
+                    DataType::Record(name, fields) => match fields.get(field) {
+                        Some(field_type) => Ok((
+                            *field_type,
+                            TypedNode::Get(*field_type, name, Box::new(get_node)),
+                        )),
+
+                        None => Err(format!(
+                            "Can't find field {} in record of type {}",
+                            field, name
+                        )),
+                    },
+
+                    invalid_type => Err(format!("Can't access fields from type {}.", invalid_type)),
+                }
+            }
         }
     }
 }

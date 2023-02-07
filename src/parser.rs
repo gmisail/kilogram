@@ -626,7 +626,7 @@ impl Parser {
             let mut is_recursive = false;
 
             // let <rec?> <name> : <type> = <value>
-            
+
             if self.match_token(&TokenKind::Recursive) {
                 is_recursive = true;
                 self.advance_token();
@@ -657,7 +657,7 @@ impl Parser {
 
             let is_func = match variable_value {
                 ast::Expression::Function(..) => true,
-                _ => false
+                _ => false,
             };
 
             if is_recursive && !is_func {
@@ -669,7 +669,7 @@ impl Parser {
                 variable_type,
                 Box::new(variable_value),
                 Box::new(variable_body),
-                is_recursive
+                is_recursive,
             ))
         } else {
             self.parse_if_expression()
