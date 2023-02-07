@@ -2,11 +2,11 @@
  * Resolves C types from native Kilogram types
  * */
 
-use crate::ast::Type;
+use crate::ast::ast_type::AstType;
 
-pub fn get_function_pointer(name: String, internal_type: &Type) -> String {
+pub fn get_function_pointer(name: String, internal_type: &AstType) -> String {
     match internal_type {
-        Type::Function(arguments, return_type) => {
+        AstType::Function(arguments, return_type) => {
             let signature = format!(
                 "(*{})({})",
                 name,
@@ -31,13 +31,13 @@ fn get_builtin(type_name: &String) -> String {
     }
 }
 
-pub fn get_native_type(internal_type: &Type) -> String {
+pub fn get_native_type(internal_type: &AstType) -> String {
     match internal_type {
-        Type::Base(name) => get_builtin(name),
+        AstType::Base(name) => get_builtin(name),
 
         // TODO: add generics
-        Type::Generic(_, _) => panic!("Not yet supported."),
+        AstType::Generic(_, _) => panic!("Not yet supported."),
 
-        Type::Function(_, _) => "KiloFunction*".to_string(),
+        AstType::Function(_, _) => "KiloFunction*".to_string(),
     }
 }

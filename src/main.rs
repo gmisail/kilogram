@@ -38,16 +38,11 @@ fn main() {
     };
 
     let mut checker = Typechecker::new();
-
-    // for each expression...
-    println!(
-        "{}",
-        match checker.resolve_type(&tree) {
-            Ok(_) => format!("{} Successful.", "[typechecker]".blue()),
-            Err(error) => format!("{} {}", "[typechecker]".red(), error),
-        }
-    );
+    let typed_tree = match checker.resolve_type(&tree) {
+        Ok((_, tree)) => tree,
+        Err(error) => panic!("{}", error),
+    };
 
     let mut compiler = Compiler::new(checker.records);
-    println!("{}", compiler.compile(&tree));
+    println!("{}", compiler.compile(&typed_tree));
 }
