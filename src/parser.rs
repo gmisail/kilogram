@@ -1,7 +1,7 @@
-use crate::ast::Expression;
-use crate::ast::Type;
+use crate::ast::ast_type::AstType;
+use crate::ast::operator::*;
+use crate::ast::untyped_node::UntypedNode;
 
-use super::ast;
 use super::scanner;
 use super::token::{Token, TokenKind};
 
@@ -59,48 +59,48 @@ impl Parser {
         }
     }
 
-    fn parse_boolean(&mut self, value: bool) -> Result<Expression, String> {
+    fn parse_boolean(&mut self, value: bool) -> Result<UntypedNode, String> {
         self.advance_token();
-        Ok(Expression::Boolean(value))
+        Ok(UntypedNode::Boolean(value))
     }
 
-    fn parse_string(&mut self, value: String) -> Result<Expression, String> {
+    fn parse_string(&mut self, value: String) -> Result<UntypedNode, String> {
         self.advance_token();
-        Ok(Expression::Str(value))
+        Ok(UntypedNode::Str(value))
     }
 
-    fn parse_integer(&mut self, value: i32) -> Result<Expression, String> {
+    fn parse_integer(&mut self, value: i32) -> Result<UntypedNode, String> {
         self.advance_token();
-        Ok(Expression::Integer(value))
+        Ok(UntypedNode::Integer(value))
     }
 
-    fn parse_float(&mut self, value: f32) -> Result<Expression, String> {
+    fn parse_float(&mut self, value: f32) -> Result<UntypedNode, String> {
         self.advance_token();
-        Ok(Expression::Float(value))
+        Ok(UntypedNode::Float(value))
     }
 
-    fn parse_identifier(&mut self, name: String) -> Result<Expression, String> {
+    fn parse_identifier(&mut self, name: String) -> Result<UntypedNode, String> {
         // Consume the identifer token.
         self.advance_token();
 
         if self.match_token(&TokenKind::LeftBrace) {
             self.parse_record_instance(name)
         } else {
-            Ok(Expression::Variable(name))
+            Ok(UntypedNode::Variable(name))
         }
     }
 
-    fn parse_group(&mut self) -> Result<Expression, String> {
+    fn parse_group(&mut self) -> Result<UntypedNode, String> {
         self.advance_token();
 
         // ( inner_expr )
-        let inner_expr = Expression::Group(Box::new(self.parse_expression()?));
+        let inner_expr = UntypedNode::Group(Box::new(self.parse_expression()?));
         self.expect_token(&TokenKind::RightParen)?;
 
         Ok(inner_expr)
     }
 
-    fn parse_primary(&mut self) -> Result<Expression, String> {
+    fn parse_primary(&mut self) -> Result<UntypedNode, String> {
         match self.peek_token() {
             Some(t) => match &t.kind {
                 TokenKind::Boolean(value) => self.parse_boolean(*value),
@@ -110,18 +110,18 @@ impl Parser {
                 TokenKind::Identifier(name) => self.parse_identifier(name.clone()),
                 TokenKind::LeftParen => self.parse_group(),
                 _ => Err(format!(
-                    "Failed to parse expression beginning with token '{}'",
+                    "Failed to parse UntypedNode beginning with token '{}'",
                     t.kind
                 )),
             },
 
             None => Err(String::from(
-                "Failed to load token while parsing primary expression.",
+                "Failed to load token while parsing primary UntypedNode.",
             )),
         }
     }
 
-    fn parse_record_instance(&mut self, record_type: String) -> Result<Expression, String> {
+    fn parse_record_instance(&mut self, record_type: String) -> Result<UntypedNode, String> {
         let mut fields = vec![];
 
         // Consume the opening brace.
@@ -137,7 +137,7 @@ impl Parser {
                         _ => return Err(format!("Expected identifier, got {} instead.", t.kind)),
                     },
                     None => {
-                        return Err("Reached end of input while parsing expression.".to_string())
+                        return Err("Reached end of input while parsing UntypedNode.".to_string())
                     }
                 };
 
@@ -161,10 +161,10 @@ impl Parser {
             self.advance_token();
         }
 
-        Ok(ast::Expression::RecordInstance(record_type, fields))
+        Ok(UntypedNode::RecordInstance(record_type, fields))
     }
 
-    fn finish_function_call(&mut self, expr: Expression) -> Result<Expression, String> {
+    fn finish_function_call(&mut self, expr: UntypedNode) -> Result<UntypedNode, String> {
         let mut arguments = vec![];
 
         // If the next token is ')', then there are *no* arguments in
@@ -184,10 +184,10 @@ impl Parser {
 
         self.expect_token(&TokenKind::RightParen)?;
 
-        Ok(ast::Expression::FunctionCall(Box::new(expr), arguments))
+        Ok(UntypedNode::FunctionCall(Box::new(expr), arguments))
     }
 
-    fn parse_function_call(&mut self) -> Result<Expression, String> {
+    fn parse_function_call(&mut self) -> Result<UntypedNode, String> {
         let mut expr = self.parse_primary()?;
 
         loop {
@@ -209,7 +209,7 @@ impl Parser {
                     None => return Err("Expected identifier after '.', got nothing.".to_string()),
                 };
 
-                expr = Expression::Get(name.clone(), Box::new(expr));
+                expr = UntypedNode::Get(name.clone(), Box::new(expr));
             } else {
                 break;
             }
@@ -218,29 +218,29 @@ impl Parser {
         Ok(expr)
     }
 
-    fn parse_unary(&mut self) -> Result<Expression, String> {
+    fn parse_unary(&mut self) -> Result<UntypedNode, String> {
         // Is there a leading '-' or '!'?
         if self.match_token(&TokenKind::Sub) || self.match_token(&TokenKind::Bang) {
             let operator_kind = match self.peek_token() {
                 Some(t) => match &t.kind {
-                    TokenKind::Sub => ast::UnaryOperator::Minus,
-                    TokenKind::Bang => ast::UnaryOperator::Bang,
+                    TokenKind::Sub => UnaryOperator::Minus,
+                    TokenKind::Bang => UnaryOperator::Bang,
                     _ => {
                         return Err(
-                            "Cannot parse unary expression with unknown operator.".to_string()
+                            "Cannot parse unary UntypedNode with unknown operator.".to_string()
                         )
                     }
                 },
                 None => {
                     return Err(
-                        "Cannot parse unary expression, unable to find operator.".to_string()
+                        "Cannot parse unary UntypedNode, unable to find operator.".to_string()
                     )
                 }
             };
 
             self.advance_token();
 
-            Ok(ast::Expression::Unary(
+            Ok(UntypedNode::Unary(
                 Box::new(self.parse_primary()?),
                 operator_kind,
             ))
@@ -249,23 +249,23 @@ impl Parser {
         }
     }
 
-    fn parse_factor(&mut self) -> Result<Expression, String> {
+    fn parse_factor(&mut self) -> Result<UntypedNode, String> {
         let mut expr = self.parse_unary()?;
 
         while self.match_token(&TokenKind::Mult) || self.match_token(&TokenKind::Div) {
             let operator_kind = match self.peek_token() {
                 Some(t) => match &t.kind {
-                    TokenKind::Mult => ast::BinaryOperator::Mult,
-                    TokenKind::Div => ast::BinaryOperator::Div,
+                    TokenKind::Mult => BinaryOperator::Mult,
+                    TokenKind::Div => BinaryOperator::Div,
                     _ => {
                         return Err(
-                            "Cannot parse binary expression with unknown operator.".to_string()
+                            "Cannot parse binary UntypedNode with unknown operator.".to_string()
                         )
                     }
                 },
                 None => {
                     return Err(
-                        "Cannot parse binary expression, unable to find operator.".to_string()
+                        "Cannot parse binary UntypedNode, unable to find operator.".to_string()
                     )
                 }
             };
@@ -273,29 +273,29 @@ impl Parser {
             self.advance_token();
 
             let right_expr = self.parse_unary()?;
-            expr = ast::Expression::Binary(Box::new(expr), operator_kind, Box::new(right_expr));
+            expr = UntypedNode::Binary(Box::new(expr), operator_kind, Box::new(right_expr));
         }
 
         Ok(expr)
     }
 
-    fn parse_term(&mut self) -> Result<Expression, String> {
+    fn parse_term(&mut self) -> Result<UntypedNode, String> {
         let mut expr = self.parse_factor()?;
 
         while self.match_token(&TokenKind::Add) || self.match_token(&TokenKind::Sub) {
             let operator_kind = match self.peek_token() {
                 Some(t) => match &t.kind {
-                    TokenKind::Add => ast::BinaryOperator::Add,
-                    TokenKind::Sub => ast::BinaryOperator::Sub,
+                    TokenKind::Add => BinaryOperator::Add,
+                    TokenKind::Sub => BinaryOperator::Sub,
                     _ => {
                         return Err(
-                            "Cannot parse binary expression with unknown operator.".to_string()
+                            "Cannot parse binary UntypedNode with unknown operator.".to_string()
                         )
                     }
                 },
                 None => {
                     return Err(
-                        "Cannot parse binary expression, unable to find operator.".to_string()
+                        "Cannot parse binary UntypedNode, unable to find operator.".to_string()
                     )
                 }
             };
@@ -303,13 +303,13 @@ impl Parser {
             self.advance_token();
 
             let right_expr = self.parse_factor()?;
-            expr = ast::Expression::Binary(Box::new(expr), operator_kind, Box::new(right_expr));
+            expr = UntypedNode::Binary(Box::new(expr), operator_kind, Box::new(right_expr));
         }
 
         Ok(expr)
     }
 
-    fn parse_comparison(&mut self) -> Result<Expression, String> {
+    fn parse_comparison(&mut self) -> Result<UntypedNode, String> {
         let mut expr = self.parse_term()?;
 
         while self.match_token(&TokenKind::Greater)
@@ -319,10 +319,10 @@ impl Parser {
         {
             let operator = match self.peek_token() {
                 Some(t) => match &t.kind {
-                    TokenKind::Greater => ast::BinaryOperator::Greater,
-                    TokenKind::GreaterEq => ast::BinaryOperator::GreaterEq,
-                    TokenKind::Less => ast::BinaryOperator::Less,
-                    TokenKind::LessEq => ast::BinaryOperator::LessEq,
+                    TokenKind::Greater => BinaryOperator::Greater,
+                    TokenKind::GreaterEq => BinaryOperator::GreaterEq,
+                    TokenKind::Less => BinaryOperator::Less,
+                    TokenKind::LessEq => BinaryOperator::LessEq,
                     _ => return Err("Invalid operator".to_string()),
                 },
                 None => return Err("Unable to get operator from token.".to_string()),
@@ -331,29 +331,29 @@ impl Parser {
             self.advance_token();
 
             let right_expr = self.parse_term()?;
-            expr = ast::Expression::Binary(Box::new(expr), operator, Box::new(right_expr));
+            expr = UntypedNode::Binary(Box::new(expr), operator, Box::new(right_expr));
         }
 
         Ok(expr)
     }
 
-    fn parse_equality(&mut self) -> Result<Expression, String> {
+    fn parse_equality(&mut self) -> Result<UntypedNode, String> {
         let mut expr = self.parse_comparison()?;
 
         while self.match_token(&TokenKind::Equality) || self.match_token(&TokenKind::NotEqual) {
             let operator_kind = match self.peek_token() {
                 Some(t) => match &t.kind {
-                    TokenKind::Equality => ast::BinaryOperator::Equality,
-                    TokenKind::NotEqual => ast::BinaryOperator::NotEqual,
+                    TokenKind::Equality => BinaryOperator::Equality,
+                    TokenKind::NotEqual => BinaryOperator::NotEqual,
                     _ => {
                         return Err(
-                            "Cannot parse binary expression with unknown operator.".to_string()
+                            "Cannot parse binary UntypedNode with unknown operator.".to_string()
                         )
                     }
                 },
                 None => {
                     return Err(
-                        "Cannot parse binary expression, unable to find operator.".to_string()
+                        "Cannot parse binary UntypedNode, unable to find operator.".to_string()
                     )
                 }
             };
@@ -361,47 +361,39 @@ impl Parser {
             self.advance_token();
 
             let right_expr = self.parse_comparison()?;
-            expr = ast::Expression::Binary(Box::new(expr), operator_kind, Box::new(right_expr));
+            expr = UntypedNode::Binary(Box::new(expr), operator_kind, Box::new(right_expr));
         }
 
         Ok(expr)
     }
 
-    fn parse_logical_and(&mut self) -> Result<Expression, String> {
+    fn parse_logical_and(&mut self) -> Result<UntypedNode, String> {
         let mut expr = self.parse_equality()?;
 
         while self.match_token(&TokenKind::And) {
             self.advance_token();
 
             let right_expr = self.parse_equality()?;
-            expr = ast::Expression::Logical(
-                Box::new(expr),
-                ast::LogicalOperator::And,
-                Box::new(right_expr),
-            );
+            expr = UntypedNode::Logical(Box::new(expr), LogicalOperator::And, Box::new(right_expr));
         }
 
         Ok(expr)
     }
 
-    fn parse_logical_or(&mut self) -> Result<Expression, String> {
+    fn parse_logical_or(&mut self) -> Result<UntypedNode, String> {
         let mut expr = self.parse_logical_and()?;
 
         while self.match_token(&TokenKind::Or) {
             self.advance_token();
 
             let right_expr = self.parse_primary()?;
-            expr = ast::Expression::Logical(
-                Box::new(expr),
-                ast::LogicalOperator::Or,
-                Box::new(right_expr),
-            );
+            expr = UntypedNode::Logical(Box::new(expr), LogicalOperator::Or, Box::new(right_expr));
         }
 
         Ok(expr)
     }
 
-    fn parse_function_type(&mut self) -> Result<Type, String> {
+    fn parse_function_type(&mut self) -> Result<AstType, String> {
         self.advance_token();
 
         let mut arguments = vec![];
@@ -411,7 +403,7 @@ impl Parser {
                 arguments.push(Box::new(self.parse_type()?));
 
                 if self.match_token(&TokenKind::Comma) {
-                    // Consume a comma after a type, implies there are multiple.
+                    // Consume a comma after a AstType, implies there are multiple.
                     self.advance_token();
                 } else {
                     // Not a comma? Then we must be done.
@@ -429,10 +421,10 @@ impl Parser {
 
         let return_type = self.parse_type()?;
 
-        Ok(ast::Type::Function(arguments, Box::new(return_type)))
+        Ok(AstType::Function(arguments, Box::new(return_type)))
     }
 
-    fn parse_type(&mut self) -> Result<Type, String> {
+    fn parse_type(&mut self) -> Result<AstType, String> {
         if self.match_token(&TokenKind::LeftParen) {
             return self.parse_function_type();
         }
@@ -440,11 +432,11 @@ impl Parser {
         let base_type = match self.peek_token() {
             Some(t) => match &t.kind {
                 TokenKind::Identifier(name) => name.clone(),
-                _ => return Err(format!("Expected an type name, got {} instead.", t.kind)),
+                _ => return Err(format!("Expected an AstType name, got {} instead.", t.kind)),
             },
             None => {
                 return Err(
-                    "Expected type name, instead we reached the end of the file.".to_string(),
+                    "Expected AstType name, instead we reached the end of the file.".to_string(),
                 )
             }
         };
@@ -458,13 +450,13 @@ impl Parser {
 
             self.expect_token(&TokenKind::RightParen)?;
 
-            Ok(ast::Type::Generic(base_type, Box::new(sub_type)))
+            Ok(AstType::Generic(base_type, Box::new(sub_type)))
         } else {
-            Ok(ast::Type::Base(base_type))
+            Ok(AstType::Base(base_type))
         }
     }
 
-    fn parse_function_expression(&mut self) -> Result<Expression, String> {
+    fn parse_function_expression(&mut self) -> Result<UntypedNode, String> {
         if self.match_token(&TokenKind::Function) {
             // Consume 'function' keyword.
             self.advance_token();
@@ -485,7 +477,9 @@ impl Parser {
                             }
                         },
                         None => {
-                            return Err("Reached end of input while parsing expression.".to_string())
+                            return Err(
+                                "Reached end of input while parsing UntypedNode.".to_string()
+                            )
                         }
                     };
 
@@ -495,7 +489,7 @@ impl Parser {
                     arguments.push((name, argument_type));
 
                     if self.match_token(&TokenKind::Comma) {
-                        // Consume a comma after a argument:type pair, implies there are multiple.
+                        // Consume a comma after a argument:AstType pair, implies there are multiple.
                         self.advance_token();
                     } else {
                         // Not a comma? Then we must be done.
@@ -516,7 +510,7 @@ impl Parser {
 
             self.expect_token(&TokenKind::End)?;
 
-            Ok(ast::Expression::Function(
+            Ok(UntypedNode::Function(
                 "anonymous".to_string(),
                 function_type,
                 arguments,
@@ -527,7 +521,7 @@ impl Parser {
         }
     }
 
-    fn parse_record_declaration(&mut self) -> Result<Expression, String> {
+    fn parse_record_declaration(&mut self) -> Result<UntypedNode, String> {
         if self.match_token(&TokenKind::Record) {
             self.advance_token();
 
@@ -558,7 +552,9 @@ impl Parser {
                             }
                         },
                         None => {
-                            return Err("Reached end of input while parsing expression.".to_string())
+                            return Err(
+                                "Reached end of input while parsing UntypedNode.".to_string()
+                            )
                         }
                     };
 
@@ -568,7 +564,7 @@ impl Parser {
                     fields.push((field_name, field_type));
 
                     if self.match_token(&TokenKind::Comma) {
-                        // Consume a comma after a field:type pair, implies there are multiple.
+                        // Consume a comma after a field:AstType pair, implies there are multiple.
                         self.advance_token();
                     } else {
                         // Not a comma? Then we must be done.
@@ -584,7 +580,7 @@ impl Parser {
 
             let body = self.parse_expression()?;
 
-            Ok(ast::Expression::RecordDeclaration(
+            Ok(UntypedNode::RecordDeclaration(
                 record_name,
                 fields,
                 Box::new(body),
@@ -594,7 +590,7 @@ impl Parser {
         }
     }
 
-    fn parse_if_expression(&mut self) -> Result<Expression, String> {
+    fn parse_if_expression(&mut self) -> Result<UntypedNode, String> {
         if self.match_token(&TokenKind::If) {
             // Consume 'if' token.
             self.advance_token();
@@ -609,7 +605,7 @@ impl Parser {
 
             let else_expression = self.parse_expression()?;
 
-            Ok(ast::Expression::If(
+            Ok(UntypedNode::If(
                 Box::new(if_condition),
                 Box::new(then_expression),
                 Box::new(else_expression),
@@ -619,13 +615,13 @@ impl Parser {
         }
     }
 
-    fn parse_let_expression(&mut self) -> Result<Expression, String> {
+    fn parse_let_expression(&mut self) -> Result<UntypedNode, String> {
         if self.match_token(&TokenKind::Let) {
             self.advance_token();
 
             let mut is_recursive = false;
 
-            // let <rec?> <name> : <type> = <value>
+            // let <rec?> <name> : <AstType> = <value>
 
             if self.match_token(&TokenKind::Recursive) {
                 is_recursive = true;
@@ -656,7 +652,7 @@ impl Parser {
             let variable_body = self.parse_expression()?;
 
             let is_func = match variable_value {
-                ast::Expression::Function(..) => true,
+                UntypedNode::Function(..) => true,
                 _ => false,
             };
 
@@ -664,7 +660,7 @@ impl Parser {
                 return Err(format!("Expected value of variable '{variable_name}' to be a function since it was marked as recursive."));
             }
 
-            Ok(ast::Expression::Let(
+            Ok(UntypedNode::Let(
                 variable_name,
                 variable_type,
                 Box::new(variable_value),
@@ -676,12 +672,12 @@ impl Parser {
         }
     }
 
-    fn parse_expression(&mut self) -> Result<Expression, String> {
+    fn parse_expression(&mut self) -> Result<UntypedNode, String> {
         self.parse_let_expression()
     }
 }
 
-pub fn parse(input: String) -> Result<ast::Expression, &'static str> {
+pub fn parse(input: String) -> Result<UntypedNode, &'static str> {
     let tokens = scanner::scan(input)?;
     let mut context = Parser { current: 0, tokens };
 
