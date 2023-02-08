@@ -39,50 +39,44 @@ pub enum UntypedNode {
 impl Display for UntypedNode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value: String = match self {
-            UntypedNode::Integer(value) => format!("(Integer, value: '{}')", value),
-            UntypedNode::Float(value) => format!("(Float, value: '{}')", value),
-            UntypedNode::Str(value) => format!("(String, value: '{}')", value),
-            UntypedNode::Boolean(value) => format!("(Boolean, value: '{}')", value),
-            UntypedNode::Variable(name) => format!("(Variable, name: '{}')", name),
+            UntypedNode::Integer(value) => format!("(Integer, value: '{value}')"),
+            UntypedNode::Float(value) => format!("(Float, value: '{value}')"),
+            UntypedNode::Str(value) => format!("(String, value: '{value}')"),
+            UntypedNode::Boolean(value) => format!("(Boolean, value: '{value}')"),
+            UntypedNode::Variable(name) => format!("(Variable, name: '{name}')"),
 
-            UntypedNode::Group(UntypedNode) => format!("(Group, value: {})", UntypedNode),
+            UntypedNode::Group(expr) => format!("(Group, value: {expr})"),
 
-            UntypedNode::Unary(UntypedNode, operation) => {
-                format!("(Unary, operation: {}, value: {})", operation, UntypedNode)
+            UntypedNode::Unary(expr, operation) => {
+                format!("(Unary, operation: {operation}, value: {expr})")
             }
             UntypedNode::Binary(left, operation, right) => format!(
-                "(Binary, operation: {}, left: {}, right: {})",
-                operation, left, right
+                "(Binary, operation: {operation}, left: {left}, right: {right})"
             ),
             UntypedNode::Logical(left, operation, right) => format!(
-                "(Logical, operation: {}, left: {}, right: {})",
-                operation, left, right
+                "(Logical, operation: {operation}, left: {left}, right: {right})"
             ),
 
             UntypedNode::If(if_expr, then_expr, else_expr) => format!(
-                "(If, condition: {}, then: {}, else: {})",
-                if_expr, then_expr, else_expr
+                "(If, condition: {if_expr}, then: {then_expr}, else: {else_expr})"
             ),
 
-            UntypedNode::Let(name, var_AstType, value, body, is_recursive) => format!(
-                "(Let, name: '{}', type: {}, value: {}, body: {}, is_recursive: {})",
-                name, var_AstType, value, body, is_recursive
+            UntypedNode::Let(name, ast_type, value, body, is_recursive) => format!(
+                "(Let, name: '{name}', type: {ast_type}, value: {value}, body: {body}, is_recursive: {is_recursive})"
             ),
 
-            UntypedNode::Function(name, func_AstType, _, value) => format!(
-                "(Function, name: '{}', type: {}, value: {})",
-                name, func_AstType, value
+            UntypedNode::Function(name, ast_type, _, value) => format!(
+                "(Function, name: '{name}', type: {ast_type}, value: {value})"
             ),
 
-            UntypedNode::Get(name, expr) => format!("(Get, name: '{}', parent: {})", name, expr),
+            UntypedNode::Get(name, expr) => format!("(Get, name: '{name}', parent: {expr})"),
 
             UntypedNode::FunctionCall(name, arguments) => {
                 let argument_list: Vec<String> =
                     arguments.iter().map(|arg| arg.to_string()).collect();
 
                 format!(
-                    "(FunctionCall, name: {}, arguments: [{}])",
-                    name,
+                    "(FunctionCall, name: {name}, arguments: [{}])",
                     argument_list.join(", ")
                 )
             }
@@ -94,10 +88,8 @@ impl Display for UntypedNode {
                     .collect();
 
                 format!(
-                    "(RecordDeclaration, name: {}, fields: [{}], body: {})",
-                    name,
+                    "(RecordDeclaration, name: {name}, fields: [{}], body: {body})",
                     field_list.join(", "),
-                    body
                 )
             }
 
@@ -108,8 +100,7 @@ impl Display for UntypedNode {
                     .collect();
 
                 format!(
-                    "(RecordInstance, name: {}, fields: [{}])",
-                    name,
+                    "(RecordInstance, name: {name}, fields: [{}])",
                     field_list.join(", ")
                 )
             }

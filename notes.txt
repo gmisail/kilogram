@@ -18,6 +18,14 @@ an argument to a function that returns a function pointer (write tests for this 
 	let rec pi: float = pi + 1 <-- what does this even mean
 	```
 
+- Switch from String to Rc<str>
+	- we're never mutating strings, might as well save some memory by only pointing to one memory location
+
+- Use UntypeNode and TypedNode to represent types
+	- A TypedNode is the same as an UntypedNode but also contains type information about that node
+	- Saves us some steps during the compilation phase
+	- Also ensures that we only work with DataType's as opposed to both DataType's and AstType's 
+
 # Long Term
 
 - Add external function definitions

@@ -2,42 +2,37 @@
  * Resolves C types from native Kilogram types
  * */
 
-use crate::ast::ast_type::AstType;
+use std::rc::Rc;
 
-pub fn get_function_pointer(name: String, internal_type: &AstType) -> String {
-    match internal_type {
-        AstType::Function(arguments, return_type) => {
+use crate::typed::data_type::DataType;
+
+pub fn get_function_pointer(name: String, internal_type: Rc<DataType>) -> String {
+    match &*internal_type {
+        DataType::Function(arguments, return_type) => {
             let signature = format!(
                 "(*{})({})",
                 name,
                 arguments
                     .iter()
-                    .map(|arg_type| get_native_type(arg_type))
+                    .map(|arg_type| get_native_type(arg_type.clone()))
                     .collect::<Vec<String>>()
                     .join(", ")
             );
 
-            get_function_pointer(signature, return_type)
+            get_function_pointer(signature, return_type.clone())
         }
         _ => format!("{} {}", get_native_type(internal_type), name),
     }
 }
 
-fn get_builtin(type_name: &String) -> String {
-    match type_name.as_str() {
-        "int" | "float" | "bool" => type_name.clone(),
-        "string" => "KiloString*".to_string(),
-        _ => format!("{}*", type_name),
-    }
-}
+pub fn get_native_type(internal_type: Rc<DataType>) -> String {
+    match &*internal_type {
+        DataType::Integer => "int".to_string(),
+        DataType::Float => "float".to_string(),
+        DataType::Str => "KiloString*".to_string(),
+        DataType::Boolean => "bool".to_string(),
 
-pub fn get_native_type(internal_type: &AstType) -> String {
-    match internal_type {
-        AstType::Base(name) => get_builtin(name),
-
-        // TODO: add generics
-        AstType::Generic(_, _) => panic!("Not yet supported."),
-
-        AstType::Function(_, _) => "KiloFunction*".to_string(),
+        DataType::Function(_, _) => "KiloFunction*".to_string(),
+        DataType::Record(name, _) => format!("{}*", name),
     }
 }

@@ -34,14 +34,14 @@ impl Typechecker {
     pub fn get_variable(&self, name: &String) -> Result<Rc<DataType>, String> {
         match self.scoped_variables.get(name) {
             Some(var_type) => Ok(var_type.clone()),
-            None => Err(format!("Can't find variable with name '{}'", name)),
+            None => Err(format!("Can't find variable with name '{name}'")),
         }
     }
 
     pub fn get_record(&self, name: &String) -> Result<Rc<DataType>, String> {
         match self.records.get(name) {
             Some(record_type) => Ok(record_type.clone()),
-            None => Err(format!("Can't find record with name '{}'", name)),
+            None => Err(format!("Can't find record with name '{name}'")),
         }
     }
 
@@ -56,7 +56,7 @@ impl Typechecker {
             name.clone(),
             Rc::new(DataType::Record(name.clone(), record_types)),
         ) {
-            Some(_) => Err(format!("Record '{}' already defined.", name)),
+            Some(_) => Err(format!("Record '{name}' already defined.")),
             None => Ok(()),
         }
     }
@@ -64,7 +64,7 @@ impl Typechecker {
     // Add a variable to the type-checking context.
     fn add_variable(&mut self, var_name: &String, var_type: Rc<DataType>) -> Result<(), String> {
         match self.scoped_variables.insert(var_name.clone(), var_type) {
-            Some(_) => Err(format!("Variable '{}' already defined.", var_name)),
+            Some(_) => Err(format!("Variable '{var_name}' already defined.")),
             None => Ok(()),
         }
     }
@@ -72,8 +72,7 @@ impl Typechecker {
     fn remove_variable(&mut self, var_name: String) -> Result<(), String> {
         match self.scoped_variables.remove(&var_name) {
             None => Err(format!(
-                "Can't remove variable '{}' since it is not defined.",
-                var_name
+                "Can't remove variable '{var_name}' since it is not defined."
             )),
             Some(_) => Ok(()),
         }
@@ -120,15 +119,12 @@ impl Typechecker {
             UntypedNode::Integer(val) => {
                 let int_type = self.resolve_primitive("int");
 
-                Ok((int_type.clone(), TypedNode::Integer(int_type, val.clone())))
+                Ok((int_type.clone(), TypedNode::Integer(int_type, *val)))
             }
             UntypedNode::Float(val) => {
                 let float_type = self.resolve_primitive("float");
 
-                Ok((
-                    float_type.clone(),
-                    TypedNode::Float(float_type, val.clone()),
-                ))
+                Ok((float_type.clone(), TypedNode::Float(float_type, *val)))
             }
             UntypedNode::Str(val) => {
                 let str_type = self.resolve_primitive("string");
@@ -138,30 +134,30 @@ impl Typechecker {
             UntypedNode::Boolean(val) => {
                 let bool_type = self.resolve_primitive("bool");
 
-                Ok((
-                    bool_type.clone(),
-                    TypedNode::Boolean(bool_type, val.clone()),
-                ))
+                Ok((bool_type.clone(), TypedNode::Boolean(bool_type, *val)))
             }
             UntypedNode::Group(inner) => self.resolve_type(inner),
             UntypedNode::Variable(name) => {
-                let var_type = self.get_variable(&name)?;
+                let var_type = self.get_variable(name)?;
 
-                Ok((var_type, TypedNode::Variable(var_type, name.clone())))
+                Ok((
+                    var_type.clone(),
+                    TypedNode::Variable(var_type, name.clone()),
+                ))
             }
 
             UntypedNode::Unary(expr, operator) => {
                 let (expr_type, expr_node) = self.resolve_type(expr)?;
 
-                if check_unary(&operator, expr_type.clone()) {
+                if check_unary(operator, expr_type.clone()) {
                     Ok((
-                        expr_type,
+                        expr_type.clone(),
                         TypedNode::Unary(expr_type, Box::new(expr_node), operator.clone()),
                     ))
                 } else {
                     Err(format!(
-                        "Cannot apply unary operator {} to expression of type {}.",
-                        operator, *expr_type
+                        "Cannot apply unary operator {operator} to expression of type {}.",
+                        *expr_type
                     ))
                 }
             }
@@ -169,14 +165,14 @@ impl Typechecker {
                 let (left_type, left_node) = self.resolve_type(left_expr)?;
                 let (right_type, right_node) = self.resolve_type(right_expr)?;
 
-                if check_binary(&operator, left_type.clone(), right_type) {
+                if check_binary(operator, left_type.clone(), right_type) {
                     // Type of binary operation depends on the operator.
                     match operator {
                         BinaryOperator::Add
                         | BinaryOperator::Sub
                         | BinaryOperator::Mult
                         | BinaryOperator::Div => Ok((
-                            left_type,
+                            left_type.clone(),
                             TypedNode::Binary(
                                 left_type,
                                 Box::new(left_node),
@@ -194,7 +190,7 @@ impl Typechecker {
                             let bool_type = self.primitives.get("bool").unwrap().clone();
 
                             Ok((
-                                bool_type,
+                                bool_type.clone(),
                                 TypedNode::Binary(
                                     bool_type,
                                     Box::new(left_node),
@@ -212,11 +208,11 @@ impl Typechecker {
                 let (left_type, left_node) = self.resolve_type(left_expr)?;
                 let (right_type, right_node) = self.resolve_type(right_expr)?;
 
-                if check_logical(&operator, left_type, right_type) {
+                if check_logical(operator, left_type, right_type) {
                     let bool_type = self.primitives.get("bool").unwrap().clone();
 
                     Ok((
-                        bool_type,
+                        bool_type.clone(),
                         TypedNode::Logical(
                             bool_type,
                             Box::new(left_node),
@@ -238,7 +234,7 @@ impl Typechecker {
 
                     if *then_type == *else_type {
                         Ok((
-                            then_type,
+                            then_type.clone(),
                             TypedNode::If(
                                 then_type,
                                 Box::new(condition_node),
@@ -255,10 +251,10 @@ impl Typechecker {
             }
 
             UntypedNode::Let(var_name, var_ast_type, var_value, body, is_recursive) => {
-                let var_type = self.from_ast_type(&var_ast_type)?;
+                let var_type = self.from_ast_type(var_ast_type)?;
 
                 if *is_recursive {
-                    self.add_variable(&var_name, var_type.clone())?;
+                    self.add_variable(var_name, var_type.clone())?;
                 }
 
                 let (value_type, value_node) = self.resolve_type(var_value)?;
@@ -266,7 +262,7 @@ impl Typechecker {
                 if *var_type == *value_type {
                     // If recursive, the definition has already been added.
                     if !is_recursive {
-                        self.add_variable(&var_name, var_type)?;
+                        self.add_variable(var_name, var_type)?;
                     }
 
                     let (body_type, body_node) = self.resolve_type(body)?;
@@ -295,13 +291,13 @@ impl Typechecker {
                     let arg_type = self.from_ast_type(arg_ast_type)?;
 
                     argument_types.push(arg_type.clone());
-                    typed_arguments.push((arg_name.clone(), arg_type));
+                    typed_arguments.push((arg_name.clone(), arg_type.clone()));
 
                     self.add_variable(arg_name, arg_type)?;
                 }
 
                 let (body_type, body_node) = self.resolve_type(body)?;
-                let return_type = self.from_ast_type(&ast_return_type)?;
+                let return_type = self.from_ast_type(ast_return_type)?;
 
                 // Since the expression has been evaluated, pop parameters from scope.
                 for (arg_name, _) in ast_argument_types {
@@ -309,10 +305,11 @@ impl Typechecker {
                 }
 
                 if *body_type == *return_type {
-                    let func_type = Rc::new(DataType::Function(argument_types, return_type));
+                    let func_type =
+                        Rc::new(DataType::Function(argument_types, return_type.clone()));
 
                     Ok((
-                        func_type,
+                        func_type.clone(),
                         TypedNode::Function(
                             func_type,
                             return_type,
@@ -328,9 +325,9 @@ impl Typechecker {
                 // Verify that the parameter & argument types match.
                 let (func_type, func_node) = self.resolve_type(parent)?;
 
-                match *func_type {
-                    DataType::Function(arguments, return_type) => {
-                        let typed_arguments = Vec::new();
+                match &*func_type {
+                    DataType::Function(arguments, _) => {
+                        let mut typed_arguments = Vec::new();
 
                         // Check that the types of the expressions match the expected type.
                         for (target_type, parameter) in arguments.iter().zip(parameters) {
@@ -338,8 +335,7 @@ impl Typechecker {
 
                             if *target_type != resolved_type {
                                 return Err(format!(
-                                    "Invalid parameter type, expected {} but got {}.",
-                                    target_type, resolved_type
+                                    "Invalid parameter type, expected {target_type} but got {resolved_type}."
                                 ));
                             }
 
@@ -347,9 +343,9 @@ impl Typechecker {
                         }
 
                         Ok((
-                            func_type,
+                            func_type.clone(),
                             TypedNode::FunctionCall(
-                                func_type.clone(),
+                                func_type,
                                 Box::new(func_node),
                                 typed_arguments,
                             ),
@@ -361,9 +357,9 @@ impl Typechecker {
             }
 
             UntypedNode::RecordInstance(name, fields) => {
-                let record_type = self.get_record(&name)?;
+                let record_type = self.get_record(name)?;
                 let mut field_types = HashMap::new();
-                let field_values = Vec::new();
+                let mut field_values = Vec::new();
 
                 for (field_name, field_ast_type) in fields {
                     let (field_type, field_value) = self.resolve_type(field_ast_type)?;
@@ -371,34 +367,34 @@ impl Typechecker {
                     field_values.push((field_name.clone(), Box::new(field_value)));
                 }
 
-                if DataType::Record(*name, field_types) == *record_type {
-                    Ok((record_type, TypedNode::RecordInstance(*name, field_values)))
+                if DataType::Record(name.clone(), field_types) == *record_type {
+                    Ok((
+                        record_type,
+                        TypedNode::RecordInstance(name.clone(), field_values),
+                    ))
                 } else {
                     Err("Records don't match.".to_string())
                 }
             }
             UntypedNode::RecordDeclaration(name, fields, body) => {
-                self.add_record(&name, &fields)?;
+                self.add_record(name, fields)?;
                 self.resolve_type(body)
             }
 
             UntypedNode::Get(field, parent) => {
                 let (get_type, get_node) = self.resolve_type(parent)?;
 
-                match *get_type {
+                match &*get_type {
                     DataType::Record(name, fields) => match fields.get(field) {
                         Some(field_type) => Ok((
-                            *field_type,
-                            TypedNode::Get(*field_type, name, Box::new(get_node)),
+                            field_type.clone(),
+                            TypedNode::Get(field_type.clone(), name.clone(), Box::new(get_node)),
                         )),
 
-                        None => Err(format!(
-                            "Can't find field {} in record of type {}",
-                            field, name
-                        )),
+                        None => Err(format!("Can't find field {field} in record of type {name}")),
                     },
 
-                    invalid_type => Err(format!("Can't access fields from type {}.", invalid_type)),
+                    invalid_type => Err(format!("Can't access fields from type {invalid_type}.")),
                 }
             }
         }

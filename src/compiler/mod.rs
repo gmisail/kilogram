@@ -1,11 +1,9 @@
+use std::collections::HashMap;
 use std::rc::Rc;
-use std::{borrow::Borrow, collections::HashMap};
 
-use crate::ast::{BinaryOperator, LogicalOperator, Type, UnaryOperator};
-use crate::{
-    ast::{self, Expression},
-    typechecker::datatype,
-};
+use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
+use crate::typed::data_type::DataType;
+use crate::typed::typed_node::TypedNode;
 
 use self::builder::StructBuilder;
 use self::emitter::{emit_function_call, emit_if};
@@ -21,14 +19,14 @@ mod resolver;
 
 pub struct Compiler {
     function: FunctionGenerator,
-    function_header: Vec<(String, Type, Vec<(String, String)>, String)>,
-    record_types: HashMap<String, Rc<datatype::Type>>,
+    function_header: Vec<(String, Rc<DataType>, Vec<(String, String)>, String)>,
+    record_types: HashMap<String, Rc<DataType>>,
 }
 
 // TODO: create a table of symbols so we don't need to make new strings every time
 
 impl Compiler {
-    pub fn new(record_types: HashMap<String, Rc<datatype::Type>>) -> Self {
+    pub fn new(record_types: HashMap<String, Rc<DataType>>) -> Self {
         Compiler {
             function: FunctionGenerator::new(),
             function_header: Vec::new(),
@@ -37,9 +35,9 @@ impl Compiler {
     }
 
     // Wrapper over the resolver module
-    fn resolve_type(&self, var_name: &String, var_type: &Type) -> String {
-        match var_type {
-            Type::Function(_, _) => format!("KiloFunction* {}", var_name),
+    fn resolve_type(&self, var_name: &String, var_type: Rc<DataType>) -> String {
+        match *var_type {
+            DataType::Function(_, _) => format!("KiloFunction* {}", var_name),
             _ => format!("{} {}", resolver::get_native_type(var_type), var_name),
         }
     }
@@ -50,9 +48,9 @@ impl Compiler {
 
         // TODO: have forward declarations before defining records
 
-        for (name, record_type) in self.record_types.borrow() {
-            let record_fields = match record_type.borrow() {
-                datatype::Type::Record(_, fields) => fields,
+        for (name, record_type) in &self.record_types {
+            let record_fields = match &**record_type {
+                DataType::Record(_, fields) => fields,
 
                 _ => panic!(),
             };
@@ -88,27 +86,27 @@ impl Compiler {
 
             let func_env = StructBuilder::new(format!("{}_env", func_name));
 
-            let result = match func_type.borrow() {
-                Type::Function(base_func_args, _) => {
+            let result = match &**func_type {
+                DataType::Function(base_func_args, _) => {
                     let func_pointer = format!(
                         "(*{}({}))",
                         func_name,
                         base_func_args
                             .iter()
-                            .map(|t| resolver::get_native_type(t))
+                            .map(|t| resolver::get_native_type(t.clone()))
                             .collect::<Vec<String>>()
                             .join(", ")
                     );
 
                     format!(
                         "{} {{\n{}\n}}",
-                        self.resolve_type(&func_pointer, func_type),
+                        self.resolve_type(&func_pointer, func_type.clone()),
                         func_body
                     )
                 }
                 _ => format!(
                     "{} ({}){{\n{}\n}}",
-                    self.resolve_type(func_name, func_type),
+                    self.resolve_type(func_name, func_type.clone()),
                     args,
                     func_body
                 ),
@@ -123,7 +121,7 @@ impl Compiler {
         buffer
     }
 
-    pub fn compile(&mut self, expression: &Expression) -> String {
+    pub fn compile(&mut self, expression: &TypedNode) -> String {
         let mut buffer = String::new();
 
         let root_expr = self.compile_expression(expression);
@@ -149,10 +147,10 @@ impl Compiler {
         buffer
     }
 
-    fn compile_unary(&mut self, expression: &Expression, operation: &UnaryOperator) -> String {
+    fn compile_unary(&mut self, expression: &TypedNode, operation: &UnaryOperator) -> String {
         let unary_symbol = match operation {
-            ast::UnaryOperator::Minus => "-".to_string(),
-            ast::UnaryOperator::Bang => "!".to_string(),
+            UnaryOperator::Minus => "-".to_string(),
+            UnaryOperator::Bang => "!".to_string(),
         };
 
         emit_unary(unary_symbol, self.compile_expression(expression))
@@ -160,21 +158,21 @@ impl Compiler {
 
     fn compile_binary(
         &mut self,
-        left: &Expression,
-        right: &Expression,
+        left: &TypedNode,
+        right: &TypedNode,
         operation: &BinaryOperator,
     ) -> String {
         let binary_symbol = match operation {
-            ast::BinaryOperator::Add => "+".to_string(),
-            ast::BinaryOperator::Sub => "-".to_string(),
-            ast::BinaryOperator::Mult => "*".to_string(),
-            ast::BinaryOperator::Div => "/".to_string(),
-            ast::BinaryOperator::Equality => "==".to_string(),
-            ast::BinaryOperator::NotEqual => "!=".to_string(),
-            ast::BinaryOperator::Greater => ">".to_string(),
-            ast::BinaryOperator::GreaterEq => ">=".to_string(),
-            ast::BinaryOperator::Less => "<".to_string(),
-            ast::BinaryOperator::LessEq => "<=".to_string(),
+            BinaryOperator::Add => "+".to_string(),
+            BinaryOperator::Sub => "-".to_string(),
+            BinaryOperator::Mult => "*".to_string(),
+            BinaryOperator::Div => "/".to_string(),
+            BinaryOperator::Equality => "==".to_string(),
+            BinaryOperator::NotEqual => "!=".to_string(),
+            BinaryOperator::Greater => ">".to_string(),
+            BinaryOperator::GreaterEq => ">=".to_string(),
+            BinaryOperator::Less => "<".to_string(),
+            BinaryOperator::LessEq => "<=".to_string(),
         };
 
         emit_binary(
@@ -186,13 +184,13 @@ impl Compiler {
 
     fn compile_logical(
         &mut self,
-        left: &Expression,
-        right: &Expression,
+        left: &TypedNode,
+        right: &TypedNode,
         operation: &LogicalOperator,
     ) -> String {
         let logical_symbol = match operation {
-            ast::LogicalOperator::And => "&&",
-            ast::LogicalOperator::Or => "||",
+            LogicalOperator::And => "&&",
+            LogicalOperator::Or => "||",
         };
 
         emit_binary(
@@ -205,19 +203,19 @@ impl Compiler {
     fn compile_let(
         &mut self,
         name: &String,
-        var_type: &Type,
-        value: &Box<Expression>,
-        body: &Box<Expression>,
+        var_type: &Rc<DataType>,
+        value: &Box<TypedNode>,
+        body: &Box<TypedNode>,
     ) -> String {
         // Is the last node not a declaration? Return it.
-        let is_leaf = match body.borrow() {
-            Expression::Let(..) => false,
+        let is_leaf = match **body {
+            TypedNode::Let(..) => false,
             _ => true,
         };
 
         format!(
             "{} = {};\n{}{}{}",
-            self.resolve_type(name, var_type),
+            self.resolve_type(name, var_type.clone()),
             self.compile_expression(value),
             if is_leaf { "return " } else { "" },
             self.compile_expression(body),
@@ -233,14 +231,14 @@ impl Compiler {
     /// * `value`:
     fn compile_function(
         &mut self,
-        func_type: &Type,
-        arg_types: &Vec<(String, Type)>,
-        value: &Box<Expression>,
+        func_type: &Rc<DataType>,
+        arg_types: &Vec<(String, Rc<DataType>)>,
+        value: &Box<TypedNode>,
     ) -> String {
         // Generate fresh name.
         let fresh_name = self.function.generate();
-        let is_leaf = match value.borrow() {
-            Expression::Let(_, _, _, _, _) => false,
+        let is_leaf = match **value {
+            TypedNode::Let(..) => false,
             _ => true,
         };
 
@@ -256,7 +254,7 @@ impl Compiler {
             .map(|(arg_name, arg_type)| {
                 (
                     arg_name.clone(),
-                    self.resolve_type(arg_name, arg_type.borrow()),
+                    self.resolve_type(arg_name, arg_type.clone()),
                 )
             })
             .collect();
@@ -274,16 +272,16 @@ impl Compiler {
     /// * `arguments`:
     fn compile_function_call(
         &mut self,
-        name: &Expression,
-        arguments: &Vec<Box<Expression>>,
+        name: &TypedNode,
+        arguments: &Vec<Box<TypedNode>>,
     ) -> String {
         let argument_list: Vec<String> = arguments
             .iter()
             .map(|arg| self.compile_expression(arg))
             .collect();
 
-        let is_local = match name {
-            Expression::Variable(_) => true,
+        let _is_local = match name {
+            TypedNode::Variable(_, _) => true,
             _ => panic!("Do not support calling non-variables yet"),
         };
 
@@ -295,7 +293,7 @@ impl Compiler {
     fn compile_record_instance(
         &mut self,
         name: &String,
-        fields: &Vec<(String, Box<Expression>)>,
+        fields: &Vec<(String, Box<TypedNode>)>,
     ) -> String {
         let mut buffer = String::new();
 
@@ -318,48 +316,48 @@ impl Compiler {
     /// Compiles an expression.
     ///
     /// * `expression`:
-    pub fn compile_expression(&mut self, expression: &Expression) -> String {
+    pub fn compile_expression(&mut self, expression: &TypedNode) -> String {
         match expression {
-            Expression::Integer(value) => format!("{}", value),
-            Expression::Float(value) => format!("{}", value),
-            Expression::Str(value) => format!("string_create(\"{}\")", value),
-            Expression::Boolean(value) => format!("{}", value),
-            Expression::Variable(name) => format!("{}", name),
+            TypedNode::Integer(_, value) => format!("{}", value),
+            TypedNode::Float(_, value) => format!("{}", value),
+            TypedNode::Str(_, value) => format!("string_create(\"{}\")", value),
+            TypedNode::Boolean(_, value) => format!("{}", value),
+            TypedNode::Variable(_, name) => format!("{}", name),
 
-            Expression::Group(expr) => format!("({})", self.compile_expression(expr)),
+            TypedNode::Group(_, expr) => format!("({})", self.compile_expression(expr)),
 
-            Expression::Unary(expr, operation) => self.compile_unary(expr, operation),
-            Expression::Binary(left, operation, right) => {
+            TypedNode::Unary(_, expr, operation) => self.compile_unary(expr, operation),
+            TypedNode::Binary(_, left, operation, right) => {
                 self.compile_binary(left, right, operation)
             }
-            Expression::Logical(left, operation, right) => {
+            TypedNode::Logical(_, left, operation, right) => {
                 self.compile_logical(left, right, operation)
             }
 
-            Expression::If(if_expr, then_expr, else_expr) => emit_if(
+            TypedNode::If(_, if_expr, then_expr, else_expr) => emit_if(
                 self.compile_expression(if_expr),
                 self.compile_expression(then_expr),
                 self.compile_expression(else_expr),
             ),
 
-            Expression::Let(name, var_type, value, body, _) => {
+            TypedNode::Let(name, var_type, value, body, _) => {
                 self.compile_let(name, var_type, value, body)
             }
 
-            Expression::Function(_, func_type, arg_types, value) => {
+            TypedNode::Function(_, func_type, arg_types, value) => {
                 self.compile_function(func_type, arg_types, value)
             }
 
-            Expression::Get(name, expr) => format!("(Get, name: '{}', parent: {})", name, expr),
+            TypedNode::Get(_, _, _) => "GET TODO".to_string(),
 
-            Expression::FunctionCall(name, arguments) => {
+            TypedNode::FunctionCall(_, name, arguments) => {
                 self.compile_function_call(name, arguments)
             }
 
             // Just ignore record declarations, already handled in the record header.
-            Expression::RecordDeclaration(_, _, body) => self.compile_expression(body),
+            TypedNode::RecordDeclaration(_, _, body) => self.compile_expression(body),
 
-            Expression::RecordInstance(name, fields) => self.compile_record_instance(name, fields),
+            TypedNode::RecordInstance(name, fields) => self.compile_record_instance(name, fields),
         }
     }
 }
