@@ -49,7 +49,7 @@ impl Typechecker {
     fn add_record(&mut self, name: &String, fields: &[(String, AstType)]) -> Result<(), String> {
         let record_types = fields
             .iter()
-            .map(|(name, type_decl)| (name.clone(), self.from_ast_type(type_decl).unwrap()))
+            .map(|(name, type_decl)| (name.clone(), self.convert_ast_type(type_decl).unwrap()))
             .collect();
 
         match self.records.insert(
@@ -79,7 +79,7 @@ impl Typechecker {
     }
 
     // Converts an AST type (int, string, ...) into a actual type.
-    fn from_ast_type(&self, t: &AstType) -> Result<Rc<DataType>, String> {
+    fn convert_ast_type(&self, t: &AstType) -> Result<Rc<DataType>, String> {
         match t {
             AstType::Base(name) => match name.as_str() {
                 // TODO: make this into one rule for primitives
@@ -95,10 +95,10 @@ impl Typechecker {
                 let mut argument_types = vec![];
 
                 for ast_argument in ast_argument_types {
-                    argument_types.push(self.from_ast_type(ast_argument)?);
+                    argument_types.push(self.convert_ast_type(ast_argument)?);
                 }
 
-                let return_type = self.from_ast_type(ast_return_type)?;
+                let return_type = self.convert_ast_type(ast_return_type)?;
 
                 Ok(Rc::new(DataType::Function(argument_types, return_type)))
             }
@@ -251,7 +251,7 @@ impl Typechecker {
             }
 
             UntypedNode::Let(var_name, var_ast_type, var_value, body, is_recursive) => {
-                let var_type = self.from_ast_type(var_ast_type)?;
+                let var_type = self.convert_ast_type(var_ast_type)?;
 
                 if *is_recursive {
                     self.add_variable(var_name, var_type.clone())?;
@@ -288,7 +288,7 @@ impl Typechecker {
 
                 // Resolve types & add parameters to scope.
                 for (arg_name, arg_ast_type) in ast_argument_types {
-                    let arg_type = self.from_ast_type(arg_ast_type)?;
+                    let arg_type = self.convert_ast_type(arg_ast_type)?;
 
                     argument_types.push(arg_type.clone());
                     typed_arguments.push((arg_name.clone(), arg_type.clone()));
@@ -297,7 +297,7 @@ impl Typechecker {
                 }
 
                 let (body_type, body_node) = self.resolve_type(body)?;
-                let return_type = self.from_ast_type(ast_return_type)?;
+                let return_type = self.convert_ast_type(ast_return_type)?;
 
                 // Since the expression has been evaluated, pop parameters from scope.
                 for (arg_name, _) in ast_argument_types {
@@ -326,7 +326,7 @@ impl Typechecker {
                 let (func_type, func_node) = self.resolve_type(parent)?;
 
                 match &*func_type {
-                    DataType::Function(arguments, _) => {
+                    DataType::Function(arguments, return_type) => {
                         let mut typed_arguments = Vec::new();
 
                         // Check that the types of the expressions match the expected type.
@@ -339,13 +339,13 @@ impl Typechecker {
                                 ));
                             }
 
-                            typed_arguments.push(Box::new(resolved_node));
+                            typed_arguments.push(resolved_node);
                         }
 
                         Ok((
-                            func_type.clone(),
+                            return_type.clone(),
                             TypedNode::FunctionCall(
-                                func_type,
+                                return_type.clone(),
                                 Box::new(func_node),
                                 typed_arguments,
                             ),
@@ -364,7 +364,7 @@ impl Typechecker {
                 for (field_name, field_ast_type) in fields {
                     let (field_type, field_value) = self.resolve_type(field_ast_type)?;
                     field_types.insert(field_name.clone(), field_type);
-                    field_values.push((field_name.clone(), Box::new(field_value)));
+                    field_values.push((field_name.clone(), field_value));
                 }
 
                 if DataType::Record(name.clone(), field_types) == *record_type {

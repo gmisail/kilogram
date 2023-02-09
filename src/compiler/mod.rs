@@ -17,9 +17,16 @@ mod emitter;
 mod generator;
 mod resolver;
 
+struct FunctionDefinition {
+    name: String,
+    data_type: Rc<DataType>,
+    arguments: Vec<(String, String)>,
+    body: String,
+}
+
 pub struct Compiler {
     function: FunctionGenerator,
-    function_header: Vec<(String, Rc<DataType>, Vec<(String, String)>, String)>,
+    function_header: Vec<FunctionDefinition>,
     record_types: HashMap<String, Rc<DataType>>,
 }
 
@@ -37,8 +44,8 @@ impl Compiler {
     // Wrapper over the resolver module
     fn resolve_type(&self, var_name: &String, var_type: Rc<DataType>) -> String {
         match *var_type {
-            DataType::Function(_, _) => format!("KiloFunction* {}", var_name),
-            _ => format!("{} {}", resolver::get_native_type(var_type), var_name),
+            DataType::Function(_, _) => format!("KiloFunction* {var_name}"),
+            _ => format!("{} {var_name}", resolver::get_native_type(var_type)),
         }
     }
 
@@ -58,7 +65,7 @@ impl Compiler {
             // Define the record as a C struct.
             let mut record_struct = StructBuilder::new(name.clone());
 
-            for (field_name, _field_type) in record_fields {
+            for field_name in record_fields.keys() {
                 record_struct.field(field_name.clone(), "int".to_string());
             }
 
@@ -77,44 +84,25 @@ impl Compiler {
         // TODO: implement functions that return function pointers
         // TODO: generate struct for function callback
 
-        for (func_name, func_type, func_args, func_body) in &self.function_header {
-            let args = func_args
+        for def in &self.function_header {
+            let args = def
+                .arguments
                 .iter()
                 .map(|(_, arg_type)| arg_type.clone())
                 .collect::<Vec<String>>()
                 .join(", ");
 
-            let func_env = StructBuilder::new(format!("{}_env", func_name));
-
-            let result = match &**func_type {
-                DataType::Function(base_func_args, _) => {
-                    let func_pointer = format!(
-                        "(*{}({}))",
-                        func_name,
-                        base_func_args
-                            .iter()
-                            .map(|t| resolver::get_native_type(t.clone()))
-                            .collect::<Vec<String>>()
-                            .join(", ")
-                    );
-
-                    format!(
-                        "{} {{\n{}\n}}",
-                        self.resolve_type(&func_pointer, func_type.clone()),
-                        func_body
-                    )
-                }
-                _ => format!(
-                    "{} ({}){{\n{}\n}}",
-                    self.resolve_type(func_name, func_type.clone()),
-                    args,
-                    func_body
-                ),
-            };
+            let func_env = StructBuilder::new(format!("{}_env", def.name));
+            let func_buffer = format!(
+                "{} ({}){{\n{}\n}}",
+                self.resolve_type(&def.name, def.data_type.clone()),
+                args,
+                def.body
+            );
 
             buffer.push_str(&func_env.build());
             buffer.push('\n');
-            buffer.push_str(&result);
+            buffer.push_str(&func_buffer);
             buffer.push('\n');
         }
 
@@ -204,14 +192,11 @@ impl Compiler {
         &mut self,
         name: &String,
         var_type: &Rc<DataType>,
-        value: &Box<TypedNode>,
-        body: &Box<TypedNode>,
+        value: &TypedNode,
+        body: &TypedNode,
     ) -> String {
-        // Is the last node not a declaration? Return it.
-        let is_leaf = match **body {
-            TypedNode::Let(..) => false,
-            _ => true,
-        };
+        // Is the last node not a declaration? Return its value.
+        let is_leaf = !(matches!(*body, TypedNode::Let(..)));
 
         format!(
             "{} = {};\n{}{}{}",
@@ -232,15 +217,12 @@ impl Compiler {
     fn compile_function(
         &mut self,
         func_type: &Rc<DataType>,
-        arg_types: &Vec<(String, Rc<DataType>)>,
-        value: &Box<TypedNode>,
+        arg_types: &[(String, Rc<DataType>)],
+        value: &TypedNode,
     ) -> String {
         // Generate fresh name.
         let fresh_name = self.function.generate();
-        let is_leaf = match **value {
-            TypedNode::Let(..) => false,
-            _ => true,
-        };
+        let is_leaf = !matches!(*value, TypedNode::Let(..));
 
         let func_body = format!(
             "{}{}{}",
@@ -259,45 +241,46 @@ impl Compiler {
             })
             .collect();
 
-        self.function_header
-            .push((fresh_name.clone(), func_type.clone(), arguments, func_body));
+        self.function_header.push(FunctionDefinition {
+            name: fresh_name.clone(),
+            data_type: func_type.clone(),
+            arguments,
+            body: func_body,
+        });
 
         // All user-declared functions are a pointer to a function in the function header.
-        format!("function_create({}, NULL)", fresh_name)
+        format!("function_create({fresh_name}, NULL)")
     }
 
     /// Generates a function call given a function name and arguments.
     ///
     /// * `name`:
     /// * `arguments`:
-    fn compile_function_call(
-        &mut self,
-        name: &TypedNode,
-        arguments: &Vec<Box<TypedNode>>,
-    ) -> String {
+    fn compile_function_call(&mut self, name: &TypedNode, arguments: &[TypedNode]) -> String {
         let argument_list: Vec<String> = arguments
             .iter()
             .map(|arg| self.compile_expression(arg))
             .collect();
 
-        let _is_local = match name {
-            TypedNode::Variable(_, _) => true,
+        let base_type = match name {
+            TypedNode::Variable(func_type, ..) => func_type,
             _ => panic!("Do not support calling non-variables yet"),
         };
 
+        let func_type = resolver::get_function_pointer("".to_string(), base_type.clone());
         let function = self.compile_expression(name);
 
-        emit_function_call(function, &argument_list, false)
+        format!(
+            "(({func_type}) {}->body)({})",
+            function,
+            argument_list.join(", ")
+        )
     }
 
-    fn compile_record_instance(
-        &mut self,
-        name: &String,
-        fields: &Vec<(String, Box<TypedNode>)>,
-    ) -> String {
+    fn compile_record_instance(&mut self, name: &String, fields: &[(String, TypedNode)]) -> String {
         let mut buffer = String::new();
 
-        buffer.push_str(format!("_create_{}(", name).as_str());
+        buffer.push_str(format!("_create_{name}(").as_str());
 
         buffer.push_str(
             fields
@@ -308,7 +291,7 @@ impl Compiler {
                 .as_str(),
         );
 
-        buffer.push_str(")");
+        buffer.push(')');
 
         buffer
     }
@@ -318,11 +301,11 @@ impl Compiler {
     /// * `expression`:
     pub fn compile_expression(&mut self, expression: &TypedNode) -> String {
         match expression {
-            TypedNode::Integer(_, value) => format!("{}", value),
-            TypedNode::Float(_, value) => format!("{}", value),
-            TypedNode::Str(_, value) => format!("string_create(\"{}\")", value),
-            TypedNode::Boolean(_, value) => format!("{}", value),
-            TypedNode::Variable(_, name) => format!("{}", name),
+            TypedNode::Integer(_, value) => format!("{value}"),
+            TypedNode::Float(_, value) => format!("{value}"),
+            TypedNode::Str(_, value) => format!("string_create(\"{value}\")"),
+            TypedNode::Boolean(_, value) => format!("{value}"),
+            TypedNode::Variable(_, name) => name.clone(),
 
             TypedNode::Group(_, expr) => format!("({})", self.compile_expression(expr)),
 

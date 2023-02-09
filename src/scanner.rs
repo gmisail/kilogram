@@ -164,7 +164,7 @@ impl Scanner for ScannerContext {
                 _ => 0,
             };
 
-            let full_str = format!("{}.{}", integer, fraction);
+            let full_str = format!("{integer}.{fraction}");
             let full_val = full_str.parse().unwrap();
 
             Ok(Token {

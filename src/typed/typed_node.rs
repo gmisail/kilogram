@@ -18,9 +18,9 @@ pub enum TypedNode {
     Get(Rc<DataType>, String, Box<TypedNode>),
 
     RecordDeclaration(String, Vec<(String, Rc<DataType>)>, Box<TypedNode>),
-    RecordInstance(String, Vec<(String, Box<TypedNode>)>),
+    RecordInstance(String, Vec<(String, TypedNode)>),
 
-    FunctionCall(Rc<DataType>, Box<TypedNode>, Vec<Box<TypedNode>>),
+    FunctionCall(Rc<DataType>, Box<TypedNode>, Vec<TypedNode>),
 
     Unary(Rc<DataType>, Box<TypedNode>, UnaryOperator),
     Binary(Rc<DataType>, Box<TypedNode>, BinaryOperator, Box<TypedNode>),

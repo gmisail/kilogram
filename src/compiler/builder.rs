@@ -3,12 +3,6 @@ pub struct StructBuilder {
     fields: Vec<(String, String)>,
 }
 
-pub struct FunctionBuilder {
-    name: String,
-    return_type: String,
-    parameters: Vec<(String, String)>,
-}
-
 impl StructBuilder {
     pub fn new(name: String) -> Self {
         StructBuilder {
@@ -27,7 +21,7 @@ impl StructBuilder {
         let body: Vec<String> = self
             .fields
             .iter()
-            .map(|(field_name, field_type)| format!("{} {};", field_type, field_name))
+            .map(|(field_name, field_type)| format!("{field_type} {field_name};"))
             .collect();
 
         format!(
@@ -47,7 +41,7 @@ impl StructBuilder {
                 self.name,
                 self.fields
                     .iter()
-                    .map(|(field_name, _)| format!("{} {}", "int".to_string(), field_name))
+                    .map(|(field_name, _)| format!("{} {}", "int", field_name))
                     .collect::<Vec<String>>()
                     .join(", ")
             )
@@ -57,7 +51,7 @@ impl StructBuilder {
         buffer.push_str(format!("{}* tmp = malloc(sizeof({}));\n", self.name, self.name).as_str());
 
         for (field_name, _) in &self.fields {
-            buffer.push_str(format!("(*tmp).{} = {};\n", field_name, field_name).as_str());
+            buffer.push_str(format!("(*tmp).{field_name} = {field_name};\n").as_str());
         }
 
         buffer.push_str("return tmp;\n}\n");

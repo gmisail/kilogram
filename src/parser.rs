@@ -53,8 +53,7 @@ impl Parser {
             };
 
             Err(format!(
-                "Expected token with kind '{}', got '{}' instead.",
-                kind, actual_kind
+                "Expected token with kind '{kind}', got '{actual_kind}' instead."
             ))
         }
     }
@@ -144,7 +143,7 @@ impl Parser {
                 self.expect_token(&TokenKind::Colon)?;
 
                 let value = self.parse_expression()?;
-                fields.push((name, Box::new(value)));
+                fields.push((name, value));
 
                 if self.match_token(&TokenKind::Comma) {
                     // Consume a comma after a key:value pair, implies there are multiple.
@@ -171,7 +170,7 @@ impl Parser {
         // this function call.
         if !self.match_token(&TokenKind::RightParen) {
             loop {
-                arguments.push(Box::new(self.parse_expression()?));
+                arguments.push(self.parse_expression()?);
 
                 if !self.match_token(&TokenKind::Comma) {
                     break;
@@ -651,10 +650,7 @@ impl Parser {
             let variable_value = self.parse_expression()?;
             let variable_body = self.parse_expression()?;
 
-            let is_func = match variable_value {
-                UntypedNode::Function(..) => true,
-                _ => false,
-            };
+            let is_func = matches!(variable_value, UntypedNode::Function(..));
 
             if is_recursive && !is_func {
                 return Err(format!("Expected value of variable '{variable_name}' to be a function since it was marked as recursive."));
@@ -690,7 +686,7 @@ pub fn parse(input: String) -> Result<UntypedNode, &'static str> {
             }
             Err(e) => {
                 context.advance_token();
-                println!("{}", e);
+                println!("{e}");
             }
         }
     }

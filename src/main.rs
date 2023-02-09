@@ -15,7 +15,7 @@ use typechecker::Typechecker;
 
 fn main() {
     let mut file = match File::open("./syntax/basic.kg") {
-        Err(e) => panic!("couldn't open file: {}", e),
+        Err(e) => panic!("couldn't open file: {e}"),
         Ok(file) => file,
     };
 
@@ -24,23 +24,23 @@ fn main() {
         "{}",
         match file.read_to_string(&mut s) {
             Ok(_) => format!("{} Successful.", "[file]".blue()),
-            Err(error) => format!("{} {}", "[file]".red(), error),
+            Err(error) => format!("{} {error}", "[file]".red()),
         }
     );
 
     let tree = match parse(s) {
         Ok(root) => {
-            println!("{}", format!("{} Successful.", "[parser]".blue()));
+            println!("{} Successful.", "[parser]".blue());
 
             root
         }
-        Err(error) => panic!("{} {}", "[parser]".red(), error),
+        Err(error) => panic!("{} {error}", "[parser]".red()),
     };
 
     let mut checker = Typechecker::new();
     let typed_tree = match checker.resolve_type(&tree) {
         Ok((_, tree)) => tree,
-        Err(error) => panic!("{}", error),
+        Err(error) => panic!("{error}"),
     };
 
     let mut compiler = Compiler::new(checker.records);

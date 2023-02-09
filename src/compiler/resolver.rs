@@ -9,19 +9,19 @@ use crate::typed::data_type::DataType;
 pub fn get_function_pointer(name: String, internal_type: Rc<DataType>) -> String {
     match &*internal_type {
         DataType::Function(arguments, return_type) => {
-            let signature = format!(
-                "(*{})({})",
-                name,
-                arguments
-                    .iter()
-                    .map(|arg_type| get_native_type(arg_type.clone()))
-                    .collect::<Vec<String>>()
-                    .join(", ")
-            );
+            let arg_types = arguments
+                .iter()
+                .map(|arg| get_native_type(arg.clone()))
+                .collect::<Vec<String>>()
+                .join(", ");
 
-            get_function_pointer(signature, return_type.clone())
+            format!(
+                "{} (*)({})",
+                get_native_type(return_type.clone()),
+                arg_types
+            )
         }
-        _ => format!("{} {}", get_native_type(internal_type), name),
+        _ => format!("{} {name}", get_native_type(internal_type)),
     }
 }
 
@@ -33,6 +33,6 @@ pub fn get_native_type(internal_type: Rc<DataType>) -> String {
         DataType::Boolean => "bool".to_string(),
 
         DataType::Function(_, _) => "KiloFunction*".to_string(),
-        DataType::Record(name, _) => format!("{}*", name),
+        DataType::Record(name, _) => format!("{name}*"),
     }
 }

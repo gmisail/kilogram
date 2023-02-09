@@ -7,4 +7,13 @@ function(message: string): string
 	"Hello world!"
 end
 
-show_message("from me")
+let increment_by: (int) -> (int) -> int =
+function(x: int): (int) -> int
+	function(y: int): int
+		5 + y
+	end
+end
+
+let five_inc: (int) -> int = increment_by(5)
+
+five_inc(10)

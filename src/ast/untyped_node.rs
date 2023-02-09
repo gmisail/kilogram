@@ -18,9 +18,9 @@ pub enum UntypedNode {
     Get(String, Box<UntypedNode>),
 
     RecordDeclaration(String, Vec<(String, AstType)>, Box<UntypedNode>),
-    RecordInstance(String, Vec<(String, Box<UntypedNode>)>),
+    RecordInstance(String, Vec<(String, UntypedNode)>),
 
-    FunctionCall(Box<UntypedNode>, Vec<Box<UntypedNode>>),
+    FunctionCall(Box<UntypedNode>, Vec<UntypedNode>),
 
     // Operators
     Unary(Box<UntypedNode>, UnaryOperator),
@@ -84,7 +84,7 @@ impl Display for UntypedNode {
             UntypedNode::RecordDeclaration(name, fields, body) => {
                 let field_list: Vec<String> = fields
                     .iter()
-                    .map(|(field_name, field_type)| format!("({}: {})", field_name, field_type))
+                    .map(|(field_name, field_type)| format!("({field_name}: {field_type})"))
                     .collect();
 
                 format!(
@@ -96,7 +96,7 @@ impl Display for UntypedNode {
             UntypedNode::RecordInstance(name, fields) => {
                 let field_list: Vec<String> = fields
                     .iter()
-                    .map(|(field_name, field_value)| format!("({}: {})", field_name, field_value))
+                    .map(|(field_name, field_value)| format!("({field_name}: {field_value})"))
                     .collect();
 
                 format!(
@@ -106,6 +106,6 @@ impl Display for UntypedNode {
             }
         };
 
-        write!(f, "{}", value)
+        write!(f, "{value}")
     }
 }
