@@ -4,9 +4,10 @@ use std::rc::Rc;
 use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
 use crate::typed::data_type::DataType;
 use crate::typed::typed_node::TypedNode;
+use crate::compiler::free::find_free;
 
 use self::builder::StructBuilder;
-use self::emitter::{emit_function_call, emit_if};
+use self::emitter::emit_if;
 use self::{
     emitter::{emit_binary, emit_unary},
     generator::FunctionGenerator,
@@ -16,6 +17,7 @@ mod builder;
 mod emitter;
 mod generator;
 mod resolver;
+mod free;
 
 struct FunctionDefinition {
     name: String,
@@ -65,8 +67,8 @@ impl Compiler {
             // Define the record as a C struct.
             let mut record_struct = StructBuilder::new(name.clone());
 
-            for field_name in record_fields.keys() {
-                record_struct.field(field_name.clone(), "int".to_string());
+            for (field_name, field_type) in record_fields {
+                record_struct.field(field_name.clone(), resolver::get_native_type(field_type.clone()));
             }
 
             buffer.push_str(&record_struct.build());
@@ -196,7 +198,7 @@ impl Compiler {
         body: &TypedNode,
     ) -> String {
         // Is the last node not a declaration? Return its value.
-        let is_leaf = !(matches!(*body, TypedNode::Let(..)));
+        let is_leaf = !matches!(*body, TypedNode::Let(..));
 
         format!(
             "{} = {};\n{}{}{}",
@@ -219,6 +221,7 @@ impl Compiler {
         func_type: &Rc<DataType>,
         arg_types: &[(String, Rc<DataType>)],
         value: &TypedNode,
+        free_vars: HashMap<String, Rc<DataType>>
     ) -> String {
         // Generate fresh name.
         let fresh_name = self.function.generate();
@@ -229,6 +232,15 @@ impl Compiler {
             if is_leaf { "return " } else { "" },
             self.compile_expression(value),
             if is_leaf { ";" } else { "" }
+        );
+
+
+        println!("=== FREE ({fresh_name}) ===");
+        println!("{}", free_vars
+            .iter()
+            .map(|(var_name, var_type)| format!("{var_name} -> {}", resolver::get_native_type(var_type.clone())))
+            .collect::<Vec<String>>()
+            .join(",\n")
         );
 
         let arguments = arg_types
@@ -328,7 +340,8 @@ impl Compiler {
             }
 
             TypedNode::Function(_, func_type, arg_types, value) => {
-                self.compile_function(func_type, arg_types, value)
+                let free_vars = find_free(expression); 
+                self.compile_function(func_type, arg_types, value, free_vars)
             }
 
             TypedNode::Get(_, _, _) => "GET TODO".to_string(),

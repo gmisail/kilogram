@@ -10,7 +10,7 @@ end
 let increment_by: (int) -> (int) -> int =
 function(x: int): (int) -> int
 	function(y: int): int
-		5 + y
+		x + y
 	end
 end
 
