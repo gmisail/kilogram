@@ -24,6 +24,7 @@ struct FunctionDefinition {
     data_type: Rc<DataType>,
     arguments: Vec<(String, String)>,
     body: String,
+    captures: HashMap<String, Rc<DataType>>
 }
 
 pub struct Compiler {
@@ -94,7 +95,12 @@ impl Compiler {
                 .collect::<Vec<String>>()
                 .join(", ");
 
-            let func_env = StructBuilder::new(format!("{}_env", def.name));
+            let mut func_env = StructBuilder::new(format!("{}_env", def.name));
+
+            for (field_name, field_type) in &def.captures {
+                func_env.field(field_name.clone(), resolver::get_native_type(field_type.clone()));
+            }
+
             let func_buffer = format!(
                 "{} ({}){{\n{}\n}}",
                 self.resolve_type(&def.name, def.data_type.clone()),
@@ -103,6 +109,7 @@ impl Compiler {
             );
 
             buffer.push_str(&func_env.build());
+            buffer.push_str(&func_env.build_constructor());
             buffer.push('\n');
             buffer.push_str(&func_buffer);
             buffer.push('\n');
@@ -234,15 +241,6 @@ impl Compiler {
             if is_leaf { ";" } else { "" }
         );
 
-
-        println!("=== FREE ({fresh_name}) ===");
-        println!("{}", free_vars
-            .iter()
-            .map(|(var_name, var_type)| format!("{var_name} -> {}", resolver::get_native_type(var_type.clone())))
-            .collect::<Vec<String>>()
-            .join(",\n")
-        );
-
         let arguments = arg_types
             .iter()
             .map(|(arg_name, arg_type)| {
@@ -253,15 +251,23 @@ impl Compiler {
             })
             .collect();
 
+        let create_env = format!("_create_{fresh_name}_env({})", free_vars
+            .keys()
+            .cloned()
+            .collect::<Vec<String>>()
+            .join(",")
+        );
+
         self.function_header.push(FunctionDefinition {
             name: fresh_name.clone(),
             data_type: func_type.clone(),
             arguments,
             body: func_body,
+            captures: free_vars
         });
 
         // All user-declared functions are a pointer to a function in the function header.
-        format!("function_create({fresh_name}, NULL)")
+        format!("function_create({fresh_name}, {create_env})")
     }
 
     /// Generates a function call given a function name and arguments.

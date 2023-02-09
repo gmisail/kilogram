@@ -1,3 +1,5 @@
+use super::resolver;
+
 pub struct StructBuilder {
     name: String,
     fields: Vec<(String, String)>,
@@ -41,7 +43,7 @@ impl StructBuilder {
                 self.name,
                 self.fields
                     .iter()
-                    .map(|(field_name, _)| format!("{} {}", "int", field_name))
+                    .map(|(field_name, field_type)| format!("{field_type} {field_name}"))
                     .collect::<Vec<String>>()
                     .join(", ")
             )
