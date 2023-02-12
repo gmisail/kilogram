@@ -24,13 +24,13 @@ struct FunctionDefinition {
     data_type: Rc<DataType>,
     arguments: Vec<(String, String)>,
     body: String,
-    captures: HashMap<String, Rc<DataType>>
+    captures: HashMap<String, Rc<DataType>>,
 }
 
 pub struct Compiler {
     function: FunctionGenerator,
     function_header: Vec<FunctionDefinition>,
-    record_types: HashMap<String, Rc<DataType>>,
+    record_types: HashMap<String, Rc<DataType>>
 }
 
 // TODO: create a table of symbols so we don't need to make new strings every time
@@ -40,7 +40,7 @@ impl Compiler {
         Compiler {
             function: FunctionGenerator::new(),
             function_header: Vec::new(),
-            record_types,
+            record_types
         }
     }
 
@@ -88,23 +88,33 @@ impl Compiler {
         // TODO: generate struct for function callback
 
         for def in &self.function_header {
-            let args = def
+            let mut args = def
                 .arguments
                 .iter()
                 .map(|(_, arg_type)| arg_type.clone())
-                .collect::<Vec<String>>()
-                .join(", ");
+                .collect::<Vec<String>>();
 
+            args.push(format!("{}_env* env", def.name));
+            let arg_buffer = args.join(", ");
+            
             let mut func_env = StructBuilder::new(format!("{}_env", def.name));
 
             for (field_name, field_type) in &def.captures {
                 func_env.field(field_name.clone(), resolver::get_native_type(field_type.clone()));
             }
 
+            // Brings variables from environment back into scope.
+            let hydrate_env = def.captures
+                .iter()
+                .map(|(env_name, env_type)| format!("{} {env_name} = env->{env_name};", resolver::get_native_type(env_type.clone())))
+                .collect::<Vec<String>>()
+                .join("\n");
+
             let func_buffer = format!(
-                "{} ({}){{\n{}\n}}",
+                "{} ({}){{\n{}\n{}\n}}",
                 self.resolve_type(&def.name, def.data_type.clone()),
-                args,
+                arg_buffer,
+                hydrate_env,
                 def.body
             );
 
@@ -289,9 +299,8 @@ impl Compiler {
         let function = self.compile_expression(name);
 
         format!(
-            "(({func_type}) {}->body)({})",
-            function,
-            argument_list.join(", ")
+            "(({func_type}) {function}->body)({}, {function}->env)",
+            argument_list.join(", "),
         )
     }
 

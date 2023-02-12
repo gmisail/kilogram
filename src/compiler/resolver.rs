@@ -9,16 +9,19 @@ use crate::typed::data_type::DataType;
 pub fn get_function_pointer(name: String, internal_type: Rc<DataType>) -> String {
     match &*internal_type {
         DataType::Function(arguments, return_type) => {
-            let arg_types = arguments
+            let mut arg_types = arguments 
                 .iter()
                 .map(|arg| get_native_type(arg.clone()))
-                .collect::<Vec<String>>()
-                .join(", ");
+                .collect::<Vec<String>>();
+            
+            // If a function includes an environment variable, expect a void* representing the
+            // environment object.
+            arg_types.push("void*".to_string());
 
             format!(
                 "{} (*)({})",
                 get_native_type(return_type.clone()),
-                arg_types
+                arg_types.join(", ")
             )
         }
         _ => format!("{} {name}", get_native_type(internal_type)),

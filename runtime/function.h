@@ -7,7 +7,7 @@ typedef struct
 	void (*body)(void);
 
 	// Structure of variables captured by the function.
-	void *captured;
+	void *env;
 } KiloFunction;
 
 KiloFunction *function_create(void *, void *);

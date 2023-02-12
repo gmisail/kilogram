@@ -2,9 +2,9 @@
 
 #include "function.h"
 
-KiloFunction* function_create(void* body, void* captured) {
+KiloFunction* function_create(void* body, void* env) {
 	KiloFunction* func = malloc(sizeof(KiloFunction));
 	func->body = body;
-	func->captured = captured;
+	func->env = env;
 	return func; 
 }
