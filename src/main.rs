@@ -1,5 +1,5 @@
 use owo_colors::OwoColorize;
-use std::{fs::File, io::Read};
+use std::{fs::{File, self}, io::Read, time::Instant};
 
 pub mod ast;
 pub mod compiler;
@@ -13,12 +13,10 @@ use compiler::Compiler;
 use parser::parse;
 use typechecker::Typechecker;
 
-fn main() {
-    let mut file = match File::open("./syntax/basic.kg") {
-        Err(e) => panic!("couldn't open file: {e}"),
-        Ok(file) => file,
-    };
+fn compile(file: &str) -> Result<(), String> {
+    let mut file = File::open(file).expect("Failed to load file.");
 
+    let start_lex= Instant::now();
     let mut s = String::new();
     println!(
         "{}",
@@ -27,22 +25,28 @@ fn main() {
             Err(error) => format!("{} {error}", "[file]".red()),
         }
     );
+    println!("Finished lexing in {:?}", start_lex.elapsed());
 
-    let tree = match parse(s) {
-        Ok(root) => {
-            println!("{} Successful.", "[parser]".blue());
+    let start_parse = Instant::now();
+    let tree = parse(s)?;
+    println!("Finished parsing in {:?}", start_parse.elapsed());
 
-            root
-        }
-        Err(error) => panic!("{} {error}", "[parser]".red()),
-    };
-
+    let start_type = Instant::now();
     let mut checker = Typechecker::new();
-    let typed_tree = match checker.resolve_type(&tree) {
-        Ok((_, tree)) => tree,
-        Err(error) => panic!("{error}"),
-    };
+    let (_, root_node) = checker.resolve_type(&tree)?;
+    println!("Finished type-checking in {:?}", start_type.elapsed());
 
     let mut compiler = Compiler::new(checker.records);
-    println!("{}", compiler.compile(&typed_tree));
+    let source = compiler.compile(&root_node); 
+
+    fs::write("./out.c", source).expect("Failed to write file.");
+
+    Ok(())
+}
+
+fn main() {
+    match compile("./syntax/basic.kg") {
+        Ok(()) => println!("Done."),
+        Err(e) => panic!("{e}")
+    }
 }
