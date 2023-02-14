@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::fmt::Write;
 use std::rc::Rc;
 
 use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};

@@ -397,6 +397,11 @@ impl Typechecker {
                     invalid_type => Err(format!("Can't access fields from type {invalid_type}.")),
                 }
             }
+            
+            UntypedNode::Extern(name, ast_type, body) => {
+                self.add_variable(name, self.convert_ast_type(ast_type)?)?;
+                self.resolve_type(body)
+            }
         }
     }
 }

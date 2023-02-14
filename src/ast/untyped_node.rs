@@ -34,6 +34,8 @@ pub enum UntypedNode {
     // Declarations
     Let(String, AstType, Box<UntypedNode>, Box<UntypedNode>, bool),
     Function(String, AstType, Vec<(String, AstType)>, Box<UntypedNode>),
+
+    Extern(String, AstType, Box<UntypedNode>)
 }
 
 impl Display for UntypedNode {
@@ -103,6 +105,10 @@ impl Display for UntypedNode {
                     "(RecordInstance, name: {name}, fields: [{}])",
                     field_list.join(", ")
                 )
+            }
+
+            UntypedNode::Extern(name, extern_type, body) => {
+                format!("(Extern, name: {name}, type: {extern_type}, body: {body})")
             }
         };
 
