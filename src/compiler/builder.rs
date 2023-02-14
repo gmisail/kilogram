@@ -51,7 +51,9 @@ impl StructBuilder {
         if self.fields.is_empty() {
             buffer.push_str("return NULL;\n}\n");
         } else {
-            buffer.push_str(format!("{}* tmp = malloc(sizeof({}));\n", self.name, self.name).as_str());
+            buffer.push_str(
+                format!("{}* tmp = malloc(sizeof({}));\n", self.name, self.name).as_str(),
+            );
 
             for (field_name, _) in &self.fields {
                 buffer.push_str(format!("(*tmp).{field_name} = {field_name};\n").as_str());

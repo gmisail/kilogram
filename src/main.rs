@@ -1,5 +1,9 @@
 use owo_colors::OwoColorize;
-use std::{fs::{File, self}, io::Read, time::Instant};
+use std::{
+    fs::{self, File},
+    io::Read,
+    time::Instant,
+};
 
 pub mod ast;
 pub mod compiler;
@@ -16,7 +20,7 @@ use typechecker::Typechecker;
 fn compile(file: &str) -> Result<(), String> {
     let mut file = File::open(file).expect("Failed to load file.");
 
-    let start_lex= Instant::now();
+    let start_lex = Instant::now();
     let mut s = String::new();
     println!(
         "{}",
@@ -37,7 +41,7 @@ fn compile(file: &str) -> Result<(), String> {
     println!("Finished type-checking in {:?}", start_type.elapsed());
 
     let mut compiler = Compiler::new(checker.records);
-    let source = compiler.compile(&root_node); 
+    let source = compiler.compile(&root_node);
 
     fs::write("./out.c", source).expect("Failed to write file.");
 
@@ -47,6 +51,6 @@ fn compile(file: &str) -> Result<(), String> {
 fn main() {
     match compile("./syntax/basic.kg") {
         Ok(()) => println!("Done."),
-        Err(e) => panic!("{e}")
+        Err(e) => panic!("{e}"),
     }
 }

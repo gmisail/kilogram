@@ -10,6 +10,6 @@ typedef struct
 	void *env;
 } KiloFunction;
 
-KiloFunction *function_create(void *, void *);
+KiloFunction *function_create(void *);
 
 #endif

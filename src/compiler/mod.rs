@@ -1,10 +1,11 @@
 use std::collections::HashMap;
+use std::fmt::Write;
 use std::rc::Rc;
 
 use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
+use crate::compiler::free::find_free;
 use crate::typed::data_type::DataType;
 use crate::typed::typed_node::TypedNode;
-use crate::compiler::free::find_free;
 
 use self::builder::StructBuilder;
 use self::emitter::emit_if;
@@ -15,12 +16,13 @@ use self::{
 
 mod builder;
 mod emitter;
+mod free;
 mod generator;
 mod resolver;
-mod free;
 
 struct FunctionDefinition {
     name: String,
+    bound_name: Option<String>,
     data_type: Rc<DataType>,
     arguments: Vec<(String, String)>,
     body: String,
@@ -30,7 +32,8 @@ struct FunctionDefinition {
 pub struct Compiler {
     function: FunctionGenerator,
     function_header: Vec<FunctionDefinition>,
-    record_types: HashMap<String, Rc<DataType>>
+    stack: Vec<String>,
+    record_types: HashMap<String, Rc<DataType>>,
 }
 
 // TODO: create a table of symbols so we don't need to make new strings every time
@@ -40,7 +43,8 @@ impl Compiler {
         Compiler {
             function: FunctionGenerator::new(),
             function_header: Vec::new(),
-            record_types
+            stack: Vec::new(),
+            record_types,
         }
     }
 
@@ -69,7 +73,10 @@ impl Compiler {
             let mut record_struct = StructBuilder::new(name.clone());
 
             for (field_name, field_type) in record_fields {
-                record_struct.field(field_name.clone(), resolver::get_native_type(field_type.clone()));
+                record_struct.field(
+                    field_name.clone(),
+                    resolver::get_native_type(field_type.clone()),
+                );
             }
 
             buffer.push_str(&record_struct.build());
@@ -79,13 +86,61 @@ impl Compiler {
         buffer
     }
 
+    /// Generates a function which will allocate a function, load the environment,
+    /// and return its reference.
+    ///
+    /// * `name`: name of the function
+    /// * `bound_name`: optionally the name that it's assigned to
+    /// * `free_vars`: variables captured by the function
+    fn generate_function_constructor(
+        &self,
+        name: &String,
+        bound_name: &Option<String>,
+        free_vars: &HashMap<String, Rc<DataType>>,
+    ) -> String {
+        let mut buffer = String::new();
+
+        buffer.push_str(format!("KiloFunction* create_{name}").as_str());
+
+        buffer.push('(');
+        buffer.push_str(
+            free_vars
+                .iter()
+                .filter(|(var_name, _)| match bound_name {
+                    Some(name) => **var_name != name.clone(),
+                    None => true,
+                })
+                .map(|(var_name, var_type)| {
+                    format!("{} {var_name}", resolver::get_native_type(var_type.clone()))
+                })
+                .collect::<Vec<String>>()
+                .join(", ")
+                .as_str(),
+        );
+        buffer.push(')');
+        buffer.push_str("{\n");
+
+        let tmp_name = bound_name.clone().unwrap_or("tmp".to_string());
+
+        buffer.push_str(format!("KiloFunction* {tmp_name} = function_create({name});\n").as_str());
+        buffer.push_str(
+            format!(
+                "{tmp_name}->env = _create_{name}_env({});\n",
+                free_vars.keys().cloned().collect::<Vec<String>>().join(",")
+            )
+            .as_str(),
+        );
+
+        buffer.push_str(format!("return {tmp_name};\n}}\n").as_str());
+
+        buffer
+    }
+
     // Generates the header of forward declarations & function definitions.
     fn generate_function_header(&mut self) -> String {
         let mut buffer = String::new();
 
         // TODO: have forward declarations before defining functions
-        // TODO: implement functions that return function pointers
-        // TODO: generate struct for function callback
 
         for def in &self.function_header {
             let mut args = def
@@ -96,17 +151,26 @@ impl Compiler {
 
             args.push(format!("{}_env* env", def.name));
             let arg_buffer = args.join(", ");
-            
+
             let mut func_env = StructBuilder::new(format!("{}_env", def.name));
 
             for (field_name, field_type) in &def.captures {
-                func_env.field(field_name.clone(), resolver::get_native_type(field_type.clone()));
+                func_env.field(
+                    field_name.clone(),
+                    resolver::get_native_type(field_type.clone()),
+                );
             }
 
             // Brings variables from environment back into scope.
-            let hydrate_env = def.captures
+            let hydrate_env = def
+                .captures
                 .iter()
-                .map(|(env_name, env_type)| format!("{} {env_name} = env->{env_name};", resolver::get_native_type(env_type.clone())))
+                .map(|(env_name, env_type)| {
+                    format!(
+                        "{} {env_name} = env->{env_name};",
+                        resolver::get_native_type(env_type.clone())
+                    )
+                })
                 .collect::<Vec<String>>()
                 .join("\n");
 
@@ -119,9 +183,16 @@ impl Compiler {
             );
 
             buffer.push_str(&func_env.build());
+            buffer.push('\n');
             buffer.push_str(&func_env.build_constructor());
             buffer.push('\n');
             buffer.push_str(&func_buffer);
+            buffer.push('\n');
+            buffer.push_str(&self.generate_function_constructor(
+                &def.name,
+                &def.bound_name,
+                &def.captures,
+            ));
             buffer.push('\n');
         }
 
@@ -135,6 +206,10 @@ impl Compiler {
 
         buffer.push_str("#include<stdio.h>\n");
         buffer.push_str("#include<stdlib.h>\n");
+
+        buffer.push_str("#include \"runtime/string.h\"\n");
+        buffer.push_str("#include \"runtime/object.h\"\n");
+        buffer.push_str("#include \"runtime/function.h\"\n");
 
         buffer.push_str("\n// Record header\n");
         buffer.push_str(&self.generate_record_header());
@@ -213,18 +288,25 @@ impl Compiler {
         var_type: &Rc<DataType>,
         value: &TypedNode,
         body: &TypedNode,
+        is_recursive: bool,
     ) -> String {
         // Is the last node not a declaration? Return its value.
         let is_leaf = !matches!(*body, TypedNode::Let(..));
 
-        format!(
+        if is_recursive {
+            self.stack.push(name.clone());
+        }
+
+        let statement = format!(
             "{} = {};\n{}{}{}",
             self.resolve_type(name, var_type.clone()),
             self.compile_expression(value),
             if is_leaf { "return " } else { "" },
             self.compile_expression(body),
             if is_leaf { ";" } else { "" }
-        )
+        );
+
+        statement
     }
 
     /// Define the lambda under a unique name and returns a pointer
@@ -238,7 +320,7 @@ impl Compiler {
         func_type: &Rc<DataType>,
         arg_types: &[(String, Rc<DataType>)],
         value: &TypedNode,
-        free_vars: HashMap<String, Rc<DataType>>
+        free_vars: HashMap<String, Rc<DataType>>,
     ) -> String {
         // Generate fresh name.
         let fresh_name = self.function.generate();
@@ -261,23 +343,19 @@ impl Compiler {
             })
             .collect();
 
-        let create_env = format!("_create_{fresh_name}_env({})", free_vars
-            .keys()
-            .cloned()
-            .collect::<Vec<String>>()
-            .join(",")
-        );
-
         self.function_header.push(FunctionDefinition {
             name: fresh_name.clone(),
+            bound_name: self.stack.pop(),
             data_type: func_type.clone(),
             arguments,
             body: func_body,
-            captures: free_vars
+            captures: free_vars,
         });
 
+        let free_args = "";
+
         // All user-declared functions are a pointer to a function in the function header.
-        format!("function_create({fresh_name}, {create_env})")
+        format!("create_{fresh_name}({free_args})")
     }
 
     /// Generates a function call given a function name and arguments.
@@ -350,12 +428,12 @@ impl Compiler {
                 self.compile_expression(else_expr),
             ),
 
-            TypedNode::Let(name, var_type, value, body, _) => {
-                self.compile_let(name, var_type, value, body)
+            TypedNode::Let(name, var_type, value, body, is_rec) => {
+                self.compile_let(name, var_type, value, body, *is_rec)
             }
 
             TypedNode::Function(_, func_type, arg_types, value) => {
-                let free_vars = find_free(expression); 
+                let free_vars = find_free(expression);
                 self.compile_function(func_type, arg_types, value, free_vars)
             }
 
