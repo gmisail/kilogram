@@ -50,6 +50,7 @@ pub enum TokenKind {
     Or,
     End,
     Recursive,
+    Extern,
 
     Eof,
 }
@@ -112,6 +113,7 @@ impl Display for TokenKind {
                 TokenKind::If => "'if'",
                 TokenKind::Or => "'or'",
                 TokenKind::Recursive => "'rec'",
+                TokenKind::Extern => "'extern'",
                 TokenKind::Eof => "<EOF>",
             }
         )

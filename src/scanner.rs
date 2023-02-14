@@ -316,6 +316,7 @@ pub fn scan(input: String) -> Result<Vec<Token>, &'static str> {
     keywords.insert("true", TokenKind::Boolean(true));
     keywords.insert("false", TokenKind::Boolean(false));
     keywords.insert("rec", TokenKind::Recursive);
+    keywords.insert("extern", TokenKind::Extern);
 
     let mut context = ScannerContext {
         current: 0,
