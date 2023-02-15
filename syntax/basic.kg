@@ -7,4 +7,6 @@ function(x: int): int
 	else x * factorial(x - 1)
 end
 
-print(int_to_string(factorial(6)))
+let x: int = 10
+
+print(int_to_string(factorial(x)))

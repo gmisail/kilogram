@@ -12,7 +12,7 @@ use rules::{check_binary, check_logical, check_unary};
 
 pub struct Typechecker {
     primitives: HashMap<&'static str, Rc<DataType>>,
-    scoped_variables: HashMap<String, Rc<DataType>>,
+    stack: HashMap<String, Rc<DataType>>,
     pub records: HashMap<String, Rc<DataType>>,
 }
 
@@ -26,13 +26,13 @@ impl Typechecker {
 
         Typechecker {
             primitives,
-            scoped_variables: HashMap::new(),
+            stack: HashMap::new(),
             records: HashMap::new(),
         }
     }
 
     pub fn get_variable(&self, name: &String) -> Result<Rc<DataType>, String> {
-        match self.scoped_variables.get(name) {
+        match self.stack.get(name) {
             Some(var_type) => Ok(var_type.clone()),
             None => Err(format!("Can't find variable with name '{name}'")),
         }
@@ -63,14 +63,14 @@ impl Typechecker {
 
     // Add a variable to the type-checking context.
     fn add_variable(&mut self, var_name: &String, var_type: Rc<DataType>) -> Result<(), String> {
-        match self.scoped_variables.insert(var_name.clone(), var_type) {
+        match self.stack.insert(var_name.clone(), var_type) {
             Some(_) => Err(format!("Variable '{var_name}' already defined.")),
             None => Ok(()),
         }
     }
 
     fn remove_variable(&mut self, var_name: String) -> Result<(), String> {
-        match self.scoped_variables.remove(&var_name) {
+        match self.stack.remove(&var_name) {
             None => Err(format!(
                 "Can't remove variable '{var_name}' since it is not defined."
             )),
@@ -253,6 +253,8 @@ impl Typechecker {
             UntypedNode::Let(var_name, var_ast_type, var_value, body, is_recursive) => {
                 let var_type = self.convert_ast_type(var_ast_type)?;
 
+                // If recursive, it needs to have access to itself. So, add it to the stack
+                // before evaluation.
                 if *is_recursive {
                     self.add_variable(var_name, var_type.clone())?;
                 }
@@ -266,6 +268,7 @@ impl Typechecker {
                     }
 
                     let (body_type, body_node) = self.resolve_type(body)?;
+                    self.remove_variable(var_name.clone())?;
 
                     Ok((
                         body_type,
