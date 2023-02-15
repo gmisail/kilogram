@@ -32,7 +32,7 @@ pub enum UntypedNode {
     If(Box<UntypedNode>, Box<UntypedNode>, Box<UntypedNode>),
 
     // Declarations
-    Let(String, AstType, Box<UntypedNode>, Box<UntypedNode>, bool),
+    Let(String, Option<AstType>, Box<UntypedNode>, Box<UntypedNode>, bool),
     Function(String, AstType, Vec<(String, AstType)>, Box<UntypedNode>),
 
     Extern(String, AstType, Box<UntypedNode>),
@@ -63,8 +63,8 @@ impl Display for UntypedNode {
                 "(If, condition: {if_expr}, then: {then_expr}, else: {else_expr})"
             ),
 
-            UntypedNode::Let(name, ast_type, value, body, is_recursive) => format!(
-                "(Let, name: '{name}', type: {ast_type}, value: {value}, body: {body}, is_recursive: {is_recursive})"
+            UntypedNode::Let(name, _, value, body, is_recursive) => format!(
+                "(Let, name: '{name}', value: {value}, body: {body}, is_recursive: {is_recursive})", 
             ),
 
             UntypedNode::Function(name, ast_type, _, value) => format!(

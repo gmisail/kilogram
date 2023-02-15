@@ -653,7 +653,7 @@ impl Parser {
 
             let mut is_recursive = false;
 
-            // let <rec?> <name> : <AstType> = <value>
+            // let <rec?> <name> (: <AstType>)? = <value>
 
             if self.match_token(&TokenKind::Recursive) {
                 is_recursive = true;
@@ -674,9 +674,13 @@ impl Parser {
                 }
             };
 
-            self.expect_token(&TokenKind::Colon)?;
+            let variable_type = if self.match_token(&TokenKind::Colon) {
+                self.advance_token();
 
-            let variable_type = self.parse_type()?;
+                Some(self.parse_type()?)
+            } else {
+                None
+            };
 
             self.expect_token(&TokenKind::Equal)?;
 

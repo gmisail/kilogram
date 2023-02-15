@@ -251,7 +251,30 @@ impl Typechecker {
             }
 
             UntypedNode::Let(var_name, var_ast_type, var_value, body, is_recursive) => {
-                let var_type = self.convert_ast_type(var_ast_type)?;
+                let var_type = match var_ast_type {
+                    // A type is given.
+                    Some(ast_type) => self.convert_ast_type(ast_type)?,
+
+                    // No type is given, infer it based on value / type signature.
+                    None => match &**var_value {
+                        // Assume that the type of the variable is the same as the function's type
+                        // signature.
+                        UntypedNode::Function(_, func_type, func_params, _) => {
+                            let mut parameter_types = Vec::new();
+
+                            // Resolve types & add parameters to scope.
+                            for (_, param_type) in func_params{
+                                let arg_type = self.convert_ast_type(param_type)?;
+                                parameter_types.push(arg_type.clone());
+                            }
+
+                            Rc::new(DataType::Function(parameter_types, self.convert_ast_type(func_type)?))
+                        }
+
+                        // Not a function, just resolve the type.
+                        _ => self.resolve_type(var_value)?.0
+                    }
+                };
 
                 // If recursive, it needs to have access to itself. So, add it to the stack
                 // before evaluation.
