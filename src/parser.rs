@@ -614,6 +614,39 @@ impl Parser {
         }
     }
 
+    fn parse_extern_expression(&mut self) -> Result<UntypedNode, String> {
+        if self.match_token(&TokenKind::Extern) {
+            self.advance_token();
+
+            let name_token = self.expect_token(&TokenKind::Identifier("".to_string()))?;
+            let extern_name = match name_token {
+                Some(t) => match &t.kind {
+                    TokenKind::Identifier(name) => name.clone(),
+                    _ => return Err("Expected an identifier as extern name.".to_string()),
+                },
+                None => {
+                    return Err(
+                        "Expected variable name, instead we reached the end of the file."
+                            .to_string(),
+                    )
+                }
+            };
+
+            self.expect_token(&TokenKind::Colon)?;
+
+            let extern_type = self.parse_type()?;
+            let extern_body = self.parse_expression()?;
+
+            Ok(UntypedNode::Extern(
+                extern_name,
+                extern_type,
+                Box::new(extern_body),
+            ))
+        } else {
+            self.parse_if_expression()
+        }
+    }
+
     fn parse_let_expression(&mut self) -> Result<UntypedNode, String> {
         if self.match_token(&TokenKind::Let) {
             self.advance_token();
@@ -664,7 +697,7 @@ impl Parser {
                 is_recursive,
             ))
         } else {
-            self.parse_if_expression()
+            self.parse_extern_expression()
         }
     }
 

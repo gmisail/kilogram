@@ -35,7 +35,7 @@ pub enum UntypedNode {
     Let(String, AstType, Box<UntypedNode>, Box<UntypedNode>, bool),
     Function(String, AstType, Vec<(String, AstType)>, Box<UntypedNode>),
 
-    Extern(String, AstType, Box<UntypedNode>)
+    Extern(String, AstType, Box<UntypedNode>),
 }
 
 impl Display for UntypedNode {

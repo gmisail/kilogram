@@ -53,6 +53,12 @@ pub fn find_free(node: &TypedNode) -> HashMap<String, Rc<DataType>> {
             value_free
         }
 
+        TypedNode::Extern(name, _, body) => {
+            let mut body_free = find_free(body);
+            body_free.remove(name);
+            body_free
+        }
+
         TypedNode::Function(_, _, arg_types, body) => {
             let mut free = find_free(body);
 

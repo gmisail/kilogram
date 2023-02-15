@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
@@ -31,6 +31,7 @@ struct FunctionDefinition {
 pub struct Compiler {
     function: FunctionGenerator,
     function_header: Vec<FunctionDefinition>,
+    external_function: HashSet<String>,
     stack: Vec<String>,
     record_types: HashMap<String, Rc<DataType>>,
 }
@@ -42,6 +43,7 @@ impl Compiler {
         Compiler {
             function: FunctionGenerator::new(),
             function_header: Vec::new(),
+            external_function: HashSet::new(),
             stack: Vec::new(),
             record_types,
         }
@@ -209,6 +211,7 @@ impl Compiler {
         buffer.push_str("#include \"runtime/string.h\"\n");
         buffer.push_str("#include \"runtime/object.h\"\n");
         buffer.push_str("#include \"runtime/function.h\"\n");
+        buffer.push_str("#include \"runtime/stdlib.h\"\n");
 
         buffer.push_str("\n// Record header\n");
         buffer.push_str(&self.generate_record_header());
@@ -367,18 +370,29 @@ impl Compiler {
             .map(|arg| self.compile_expression(arg))
             .collect();
 
+        let mut is_extern = false;
+
         let base_type = match name {
-            TypedNode::Variable(func_type, ..) => func_type,
+            TypedNode::Variable(func_type, func_name) => {
+                is_extern = self.external_function.contains(func_name);
+
+                func_type
+            }
             _ => panic!("Do not support calling non-variables yet"),
         };
 
-        let func_type = resolver::get_function_pointer("".to_string(), base_type.clone());
-        let function = self.compile_expression(name);
+        if !is_extern {
+            let func_type = resolver::get_function_pointer("".to_string(), base_type.clone());
+            let function = self.compile_expression(name);
 
-        format!(
-            "(({func_type}) {function}->body)({}, {function}->env)",
-            argument_list.join(", "),
-        )
+            format!(
+                "(({func_type}) {function}->body)({}, {function}->env)",
+                argument_list.join(", "),
+            )
+        } else {
+            let base_expr = self.compile_expression(name);
+            format!("{base_expr}({})", argument_list.join(", "))
+        }
     }
 
     fn compile_record_instance(&mut self, name: &String, fields: &[(String, TypedNode)]) -> String {
@@ -432,7 +446,14 @@ impl Compiler {
             }
 
             TypedNode::Function(_, func_type, arg_types, value) => {
-                let free_vars = find_free(expression);
+                let mut free_vars = find_free(expression);
+
+                // External functions can be accessed without being passed down as
+                // and environment variable.
+                for extern_type in &self.external_function {
+                    free_vars.remove(extern_type);
+                }
+
                 self.compile_function(func_type, arg_types, value, free_vars)
             }
 
@@ -446,6 +467,16 @@ impl Compiler {
             TypedNode::RecordDeclaration(_, _, body) => self.compile_expression(body),
 
             TypedNode::RecordInstance(name, fields) => self.compile_record_instance(name, fields),
+
+            // Just ignore extern definitions, don't actually compile to anything.
+            TypedNode::Extern(name, extern_type, body) => {
+                // If a function, add to the list of functions.
+                if matches!(**extern_type, DataType::Function(..)) {
+                    self.external_function.insert(name.clone());
+                }
+
+                self.compile_expression(body)
+            }
         }
     }
 }

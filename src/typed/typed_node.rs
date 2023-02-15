@@ -40,4 +40,6 @@ pub enum TypedNode {
         Vec<(String, Rc<DataType>)>,
         Box<TypedNode>,
     ),
+
+    Extern(String, Rc<DataType>, Box<TypedNode>),
 }

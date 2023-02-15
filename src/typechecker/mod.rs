@@ -397,10 +397,17 @@ impl Typechecker {
                     invalid_type => Err(format!("Can't access fields from type {invalid_type}.")),
                 }
             }
-            
+
             UntypedNode::Extern(name, ast_type, body) => {
-                self.add_variable(name, self.convert_ast_type(ast_type)?)?;
-                self.resolve_type(body)
+                let extern_type = self.convert_ast_type(ast_type)?;
+                self.add_variable(name, extern_type.clone())?;
+
+                let (body_type, body_node) = self.resolve_type(body)?;
+
+                Ok((
+                    body_type,
+                    TypedNode::Extern(name.clone(), extern_type, Box::new(body_node)),
+                ))
             }
         }
     }

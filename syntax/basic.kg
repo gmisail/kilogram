@@ -1,12 +1,10 @@
+extern int_to_string: (int) -> string
+extern print: (string) -> int 
+
 let rec factorial: (int) -> int =
 function(x: int): int 
 	if x == 0 then 1
 	else x * factorial(x - 1)
 end
 
-let make_odd: (int) -> int = 
-function(i: int): int
-	i * 2 + 1
-end
-
-factorial(6)
+print(int_to_string(factorial(6)))
