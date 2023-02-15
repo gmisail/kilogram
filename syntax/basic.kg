@@ -6,7 +6,6 @@ let rec factorial = function(x: int): int
 	else x * factorial(x - 1)
 end
 
-let x = 10
-let y = "hello world!"
+let iter = 10
 
-print(int_to_string(factorial(x)))
+print(int_to_string(factorial(iter)))
