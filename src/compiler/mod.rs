@@ -466,9 +466,7 @@ impl Compiler {
             // Just ignore record declarations, already handled in the record header.
             TypedNode::RecordDeclaration(_, _, body) => self.compile_expression(body),
             TypedNode::RecordInstance(name, fields) => self.compile_record_instance(name, fields),
-            TypedNode::AnonymousRecord(fields) => {
-                "TODO".to_string()
-            },
+            TypedNode::AnonymousRecord(fields) => "TODO".to_string(),
 
             // Just ignore extern definitions, don't actually compile to anything.
             TypedNode::Extern(name, extern_type, body) => {
