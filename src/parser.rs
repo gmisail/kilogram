@@ -108,6 +108,7 @@ impl Parser {
                 TokenKind::Float(value) => self.parse_float(*value),
                 TokenKind::Identifier(name) => self.parse_identifier(name.clone()),
                 TokenKind::LeftParen => self.parse_group(),
+                TokenKind::LeftBrace => self.parse_anonymous_record(),
                 _ => Err(format!(
                     "Failed to parse UntypedNode beginning with token '{}'",
                     t.kind
@@ -120,8 +121,50 @@ impl Parser {
         }
     }
 
+    fn parse_anonymous_record(&mut self) -> Result<UntypedNode, String> {
+        let mut fields = Vec::new();
+
+        self.advance_token();
+
+        // If we immediately get a '}', don't bother parsing any fields.
+        if !self.match_token(&TokenKind::RightBrace) {
+            loop {
+                let identifier = self.expect_token(&TokenKind::Identifier("".to_string()))?;
+                let name = match identifier {
+                    Some(t) => match &t.kind {
+                        TokenKind::Identifier(literal) => literal.clone(),
+                        _ => return Err(format!("Expected identifier, got {} instead.", t.kind)),
+                    },
+                    None => {
+                        return Err("Reached end of input while parsing UntypedNode.".to_string())
+                    }
+                };
+
+                self.expect_token(&TokenKind::Colon)?;
+
+                let value = self.parse_expression()?;
+                fields.push((name, value));
+
+                if self.match_token(&TokenKind::Comma) {
+                    // Consume a comma after a key:value pair, implies there are multiple.
+                    self.advance_token();
+                } else {
+                    // Not a comma? Then we must be done.
+                    self.expect_token(&TokenKind::RightBrace)?;
+
+                    break;
+                }
+            }
+        } else {
+            // Consume the closing '}'.
+            self.advance_token();
+        }
+
+        Ok(UntypedNode::AnonymousRecord(fields))
+    }
+
     fn parse_record_instance(&mut self, record_type: String) -> Result<UntypedNode, String> {
-        let mut fields = vec![];
+        let mut fields = Vec::new();
 
         // Consume the opening brace.
         self.advance_token();

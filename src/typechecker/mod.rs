@@ -1,3 +1,4 @@
+use core::slice::SlicePattern;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -14,6 +15,7 @@ pub struct Typechecker {
     primitives: HashMap<&'static str, Rc<DataType>>,
     stack: HashMap<String, Rc<DataType>>,
     pub records: HashMap<String, Rc<DataType>>,
+    fresh_counter: i32,
 }
 
 impl Typechecker {
@@ -28,6 +30,7 @@ impl Typechecker {
             primitives,
             stack: HashMap::new(),
             records: HashMap::new(),
+            fresh_counter: 0,
         }
     }
 
@@ -263,17 +266,20 @@ impl Typechecker {
                             let mut parameter_types = Vec::new();
 
                             // Resolve types & add parameters to scope.
-                            for (_, param_type) in func_params{
+                            for (_, param_type) in func_params {
                                 let arg_type = self.convert_ast_type(param_type)?;
                                 parameter_types.push(arg_type.clone());
                             }
 
-                            Rc::new(DataType::Function(parameter_types, self.convert_ast_type(func_type)?))
+                            Rc::new(DataType::Function(
+                                parameter_types,
+                                self.convert_ast_type(func_type)?,
+                            ))
                         }
 
                         // Not a function, just resolve the type.
-                        _ => self.resolve_type(var_value)?.0
-                    }
+                        _ => self.resolve_type(var_value)?.0,
+                    },
                 };
 
                 // If recursive, it needs to have access to itself. So, add it to the stack
@@ -405,6 +411,31 @@ impl Typechecker {
             UntypedNode::RecordDeclaration(name, fields, body) => {
                 self.add_record(name, fields)?;
                 self.resolve_type(body)
+            }
+
+            UntypedNode::AnonymousRecord(fields) => {
+                let mut field_types = HashMap::new();
+                let mut field_values: Vec<(String, TypedNode)> = Vec::new();
+
+                for (field_name, field_ast_type) in fields {
+                    let (field_type, field_value) = self.resolve_type(&field_ast_type)?;
+
+                    field_types.insert(field_name.clone(), field_type);
+                    field_values.push((field_name.clone(), field_value));
+                }
+
+                let fresh_name = format!("anonymous_{}", self.fresh_counter);
+                self.fresh_counter += 1;
+
+                // TODO: register anonymous record
+
+                Ok((
+                    Rc::new(DataType::Record(
+                        format!("anonymous_{}", self.fresh_counter - 1),
+                        field_types,
+                    )),
+                    TypedNode::AnonymousRecord(field_values),
+                ))
             }
 
             UntypedNode::Get(field, parent) => {
