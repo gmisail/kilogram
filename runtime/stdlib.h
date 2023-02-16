@@ -4,6 +4,7 @@
 #include "string.h"
 
 int print(KiloString*);
+KiloString* input(KiloString*);
 
 KiloString* int_to_string(int);
 

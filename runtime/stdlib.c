@@ -15,3 +15,12 @@ int print(KiloString* str) {
 
 	return 0;
 }
+
+KiloString* input(KiloString* prompt) {
+	print(prompt);
+
+	char buffer[1024];
+	scanf("%s", buffer);
+	
+	return string_create(buffer);
+}
