@@ -1,3 +1,10 @@
-let point = { x: 10, y: 5 }
+record Vec3 
+	x: int,
+	y: int, 
+	z: int
+end
 
+let origin = Vec3 { y: 1, x: 2, z: 3 }
+let point: { x: int, y: int } = origin
+let other: { x: int, y: int } = { x: 5, y: 10 }
 point

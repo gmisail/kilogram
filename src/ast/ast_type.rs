@@ -5,6 +5,7 @@ pub enum AstType {
     Base(String),                  // string, int, ...
     Generic(String, Box<AstType>), // array<string>, list<int>, ...
     Function(Vec<Box<AstType>>, Box<AstType>),
+    Record(Vec<(String, AstType)>),
 }
 
 impl Display for AstType {
@@ -24,6 +25,14 @@ impl Display for AstType {
                         "(FunctionType, arguments: [{}], return: {return_type})",
                         arg_type_list.join(", ")
                     )
+                }
+                AstType::Record(fields) => {
+                    let field_list: Vec<String> = fields
+                        .iter()
+                        .map(|(field_name, field_type)| format!("{field_name}: {field_type}"))
+                        .collect();
+
+                    format!("(Record {})", field_list.join(", "))
                 }
             }
         )

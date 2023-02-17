@@ -466,9 +466,53 @@ impl Parser {
         Ok(AstType::Function(arguments, Box::new(return_type)))
     }
 
+    fn parse_record_type(&mut self) -> Result<AstType, String> {
+        self.advance_token();
+
+        let mut fields = Vec::new();
+
+        // If we immediately get a '}', don't bother parsing any fields.
+        if !self.match_token(&TokenKind::RightBrace) {
+            loop {
+                let identifier = self.expect_token(&TokenKind::Identifier("".to_string()))?;
+                let name = match identifier {
+                    Some(t) => match &t.kind {
+                        TokenKind::Identifier(literal) => literal.clone(),
+                        _ => return Err(format!("Expected identifier, got {} instead.", t.kind)),
+                    },
+                    None => {
+                        return Err("Reached end of input while parsing UntypedNode.".to_string())
+                    }
+                };
+
+                self.expect_token(&TokenKind::Colon)?;
+
+                let field_type = self.parse_type()?;
+                fields.push((name, field_type));
+
+                if self.match_token(&TokenKind::Comma) {
+                    // Consume a comma after a key:value pair, implies there are multiple.
+                    self.advance_token();
+                } else {
+                    // Not a comma? Then we must be done.
+                    self.expect_token(&TokenKind::RightBrace)?;
+
+                    break;
+                }
+            }
+        } else {
+            // Consume the closing '}'.
+            self.advance_token();
+        }
+
+        Ok(AstType::Record(fields))
+    }
+
     fn parse_type(&mut self) -> Result<AstType, String> {
         if self.match_token(&TokenKind::LeftParen) {
             return self.parse_function_type();
+        } else if self.match_token(&TokenKind::LeftBrace) {
+            return self.parse_record_type();
         }
 
         let base_type = match self.peek_token() {

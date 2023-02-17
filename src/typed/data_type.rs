@@ -1,5 +1,6 @@
+use std::collections::BTreeMap;
 use std::fmt::Display;
-use std::{collections::HashMap, rc::Rc};
+use std::rc::Rc;
 
 #[derive(Clone)]
 pub enum DataType {
@@ -11,7 +12,7 @@ pub enum DataType {
     // Only allow one allocation per type and simply create copies
     // of that immutable memory address.
     Function(Vec<Rc<DataType>>, Rc<DataType>),
-    Record(String, HashMap<String, Rc<DataType>>),
+    Record(String, BTreeMap<String, Rc<DataType>>),
 }
 
 impl PartialEq for DataType {

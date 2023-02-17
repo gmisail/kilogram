@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 use std::rc::Rc;
 
 mod error;
@@ -81,7 +81,7 @@ impl Typechecker {
     }
 
     // Converts an AST type (int, string, ...) into a actual type.
-    fn convert_ast_type(&self, t: &AstType) -> Result<Rc<DataType>, String> {
+    fn convert_ast_type(&mut self, t: &AstType) -> Result<Rc<DataType>, String> {
         match t {
             AstType::Base(name) => match name.as_str() {
                 // TODO: make this into one rule for primitives
@@ -104,6 +104,17 @@ impl Typechecker {
 
                 Ok(Rc::new(DataType::Function(argument_types, return_type)))
             }
+
+            // Anonymous type, register it with a temporary name.
+            AstType::Record(fields) => {
+                let fresh_name = format!("anonymous_{}", self.fresh_counter);
+                self.fresh_counter += 1;
+
+                self.add_record(&fresh_name, fields)?;
+
+                self.get_record(&fresh_name)
+            }
+
             _ => Err("Unable to convert type to internal type.".to_string()),
         }
     }
@@ -292,7 +303,7 @@ impl Typechecker {
                 if *var_type == *value_type {
                     // If recursive, the definition has already been added.
                     if !is_recursive {
-                        self.add_variable(var_name, var_type)?;
+                        self.add_variable(var_name, var_type.clone())?;
                     }
 
                     let (body_type, body_node) = self.resolve_type(body)?;
@@ -302,7 +313,7 @@ impl Typechecker {
                         body_type,
                         TypedNode::Let(
                             var_name.clone(),
-                            value_type,
+                            var_type,
                             Box::new(value_node),
                             Box::new(body_node),
                             *is_recursive,
@@ -389,7 +400,7 @@ impl Typechecker {
 
             UntypedNode::RecordInstance(name, fields) => {
                 let record_type = self.get_record(name)?;
-                let mut field_types = HashMap::new();
+                let mut field_types = BTreeMap::new();
                 let mut field_values = Vec::new();
 
                 for (field_name, field_ast_type) in fields {
@@ -413,11 +424,11 @@ impl Typechecker {
             }
 
             UntypedNode::AnonymousRecord(fields) => {
-                let mut field_types = HashMap::new();
+                let mut field_types = BTreeMap::new();
                 let mut field_values: Vec<(String, TypedNode)> = Vec::new();
 
                 for (field_name, field_ast_type) in fields {
-                    let (field_type, field_value) = self.resolve_type(&field_ast_type)?;
+                    let (field_type, field_value) = self.resolve_type(field_ast_type)?;
 
                     field_types.insert(field_name.clone(), field_type);
                     field_values.push((field_name.clone(), field_value));
@@ -426,14 +437,14 @@ impl Typechecker {
                 let fresh_name = format!("anonymous_{}", self.fresh_counter);
                 self.fresh_counter += 1;
 
-                // TODO: register anonymous record
+                self.records.insert(
+                    fresh_name.clone(),
+                    Rc::new(DataType::Record(fresh_name.clone(), field_types.clone())),
+                );
 
                 Ok((
-                    Rc::new(DataType::Record(
-                        format!("anonymous_{}", self.fresh_counter - 1),
-                        field_types,
-                    )),
-                    TypedNode::AnonymousRecord(field_values),
+                    Rc::new(DataType::Record(fresh_name.clone(), field_types)),
+                    TypedNode::RecordInstance(fresh_name, field_values),
                 ))
             }
 

@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, BTreeMap};
 use std::rc::Rc;
 
 use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
@@ -398,12 +398,19 @@ impl Compiler {
     fn compile_record_instance(&mut self, name: &String, fields: &[(String, TypedNode)]) -> String {
         let mut buffer = String::new();
 
+        // To make sure that the fields are inserted in the same order that they're stored.
+        let mut ordered_fields: BTreeMap<String, &TypedNode> = BTreeMap::new();
+
+        for (field_name, field_value) in fields {
+            ordered_fields.insert(field_name.clone(), field_value);
+        }
+
         buffer.push_str(format!("_create_{name}(").as_str());
 
         buffer.push_str(
-            fields
-                .iter()
-                .map(|(_, field_value)| self.compile_expression(field_value))
+            ordered_fields
+                .values()
+                .map(|field_value| self.compile_expression(field_value))
                 .collect::<Vec<String>>()
                 .join(", ")
                 .as_str(),
@@ -466,7 +473,6 @@ impl Compiler {
             // Just ignore record declarations, already handled in the record header.
             TypedNode::RecordDeclaration(_, _, body) => self.compile_expression(body),
             TypedNode::RecordInstance(name, fields) => self.compile_record_instance(name, fields),
-            TypedNode::AnonymousRecord(fields) => "TODO".to_string(),
 
             // Just ignore extern definitions, don't actually compile to anything.
             TypedNode::Extern(name, extern_type, body) => {
