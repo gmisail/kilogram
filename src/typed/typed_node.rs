@@ -1,6 +1,7 @@
 use super::data_type::DataType;
 use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
 
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
 ///
@@ -66,7 +67,19 @@ impl TypedNode {
 
             TypedNode::Get(_, _, _) => todo!(),
 
-            TypedNode::RecordInstance(_, _) => todo!(),
+            TypedNode::RecordInstance(name, fields) => {
+                let field_types = fields
+                    .iter()
+                    .map(|(field_name, field_type)| (field_name.clone(), field_type.get_type()))
+                    .collect::<Vec<(String, Rc<DataType>)>>();
+
+                let mut ordered_fields = BTreeMap::new();
+                for (field_name, field_type) in field_types {
+                    ordered_fields.insert(field_name, field_type);
+                }
+
+                Rc::new(DataType::Record(name.clone(), ordered_fields))
+            }
         }
     }
 }

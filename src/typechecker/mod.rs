@@ -346,7 +346,7 @@ impl Typechecker {
                     self.remove_variable(arg_name.clone())?;
                 }
 
-                if *body_type == *return_type {
+                if *return_type == *body_type {
                     let func_type =
                         Rc::new(DataType::Function(argument_types, return_type.clone()));
 

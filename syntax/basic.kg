@@ -6,12 +6,12 @@ let triple = function(x: int): int
 	double(x) + x
 end
 
-let make_pair = function(x: int, y: int): { x: int, y: int }
-	{ x: x, y: y } 
+let make_point = function(x: int, y: int, z: int): { x: int, y: int, z: int }
+	{ x: x, y: y, z: z } 
 end
 
-let double_pair = function(pair: { x: int, y: int }): int
-	0
+let make_2d_point = function(temp: { p: { x : int, y: int } }): { p: { x: int, y: int} }
+	temp
 end
 
-{ double: double, triple: triple, pair: double_pair(make_pair(1, 2)) }
+make_2d_point({ p: { x: 0, y: 1, z: 2} })

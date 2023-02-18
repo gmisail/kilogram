@@ -456,12 +456,14 @@ impl Compiler {
             {
                 if let DataType::Record(expected_name, _) = &**expected_type {
                     if let DataType::Record(actual_name, _) = &**actual_type {
-                        self.type_casts
-                            .insert((actual_name.clone(), expected_name.clone()));
+                        if expected_name != actual_name {
+                            self.type_casts
+                                .insert((actual_name.clone(), expected_name.clone()));
 
-                        // Wrap the argument with a cast, if needed.
-                        let argument = argument_list.get_mut(index).unwrap();
-                        *argument = format!("{actual_name}_to_{expected_name}({argument})");
+                            // Wrap the argument with a cast, if needed.
+                            let argument = argument_list.get_mut(index).unwrap();
+                            *argument = format!("{actual_name}_to_{expected_name}({argument})");
+                        }
                     }
                 }
             }
@@ -491,17 +493,42 @@ impl Compiler {
             ordered_fields.insert(field_name.clone(), field_value);
         }
 
+        let field_types: Vec<Rc<DataType>> = ordered_fields
+            .values()
+            .map(|node| node.get_type())
+            .collect();
+
         buffer.push_str(format!("_create_{name}(").as_str());
 
-        buffer.push_str(
-            ordered_fields
-                .values()
-                .map(|field_value| self.compile_expression(field_value))
-                .collect::<Vec<String>>()
-                .join(", ")
-                .as_str(),
-        );
+        let mut field_expressions = ordered_fields
+            .values()
+            .map(|field_value| self.compile_expression(field_value))
+            .collect::<Vec<String>>();
 
+        let record = self.record_types.get(name).expect("Record does not exist.");
+
+        if let DataType::Record(_, expected_fields) = &**record {
+            for (index, (actual_type, expected_type)) in
+                field_types.iter().zip(expected_fields.values()).enumerate()
+            {
+                if let DataType::Record(expected_name, _) = &**expected_type {
+                    if let DataType::Record(actual_name, _) = &**actual_type {
+                        println!("{expected_name} {actual_name}");
+                        if expected_name != actual_name {
+                            self.type_casts
+                                .insert((actual_name.clone(), expected_name.clone()));
+
+                            // Wrap the argument with a cast, if needed.
+                            let field_value = field_expressions.get_mut(index).unwrap();
+                            *field_value =
+                                format!("{actual_name}_to_{expected_name}({field_value})");
+                        }
+                    }
+                }
+            }
+        }
+
+        buffer.push_str(field_expressions.join(", ").as_str());
         buffer.push(')');
 
         buffer
