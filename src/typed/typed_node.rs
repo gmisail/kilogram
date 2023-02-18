@@ -20,6 +20,7 @@ pub enum TypedNode {
     RecordDeclaration(String, Vec<(String, Rc<DataType>)>, Box<TypedNode>),
     RecordInstance(String, Vec<(String, TypedNode)>),
 
+    Let(String, Rc<DataType>, Box<TypedNode>, Box<TypedNode>, bool),
     FunctionCall(Rc<DataType>, Box<TypedNode>, Vec<TypedNode>),
 
     Unary(Rc<DataType>, Box<TypedNode>, UnaryOperator),
@@ -33,7 +34,6 @@ pub enum TypedNode {
 
     If(Rc<DataType>, Box<TypedNode>, Box<TypedNode>, Box<TypedNode>),
 
-    Let(String, Rc<DataType>, Box<TypedNode>, Box<TypedNode>, bool),
     Function(
         Rc<DataType>,
         Rc<DataType>,
@@ -42,4 +42,31 @@ pub enum TypedNode {
     ),
 
     Extern(String, Rc<DataType>, Box<TypedNode>),
+}
+
+impl TypedNode {
+    pub fn get_type(&self) -> Rc<DataType> {
+        match self {
+            TypedNode::Integer(t, _)
+            | TypedNode::Float(t, _)
+            | TypedNode::Str(t, _)
+            | TypedNode::Boolean(t, _)
+            | TypedNode::Variable(t, _)
+            | TypedNode::Group(t, _)
+            | TypedNode::Unary(t, _, _)
+            | TypedNode::Binary(t, _, _, _)
+            | TypedNode::Logical(t, _, _, _)
+            | TypedNode::If(t, _, _, _)
+            | TypedNode::Extern(_, t, _)
+            | TypedNode::FunctionCall(t, _, _) => t.clone(),
+
+            TypedNode::Let(_, _, _, body, _)
+            | TypedNode::Function(_, _, _, body)
+            | TypedNode::RecordDeclaration(_, _, body) => body.get_type(),
+
+            TypedNode::Get(_, _, _) => todo!(),
+
+            TypedNode::RecordInstance(_, _) => todo!(),
+        }
+    }
 }

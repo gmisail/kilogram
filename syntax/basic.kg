@@ -1,10 +1,17 @@
-record Vec3 
-	x: int,
-	y: int, 
-	z: int
+let double = function(x: int): int
+	x * 2
 end
 
-let origin = Vec3 { y: 1, x: 2, z: 3 }
-let point: { x: int, y: int } = origin
-let other: { x: int, y: int } = { x: 5, y: 10 }
-point
+let triple = function(x: int): int
+	double(x) + x
+end
+
+let make_pair = function(x: int, y: int): { x: int, y: int }
+	{ x: x, y: y } 
+end
+
+let double_pair = function(pair: { x: int, y: int }): int
+	0
+end
+
+{ double: double, triple: triple, pair: double_pair(make_pair(1, 2)) }

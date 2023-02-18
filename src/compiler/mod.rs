@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, BTreeMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
@@ -29,10 +29,22 @@ struct FunctionDefinition {
 }
 
 pub struct Compiler {
+    // Generates fresh names for functions.
     function: FunctionGenerator,
+
+    // Stores all functions.
     function_header: Vec<FunctionDefinition>,
+
+    // Set of external function names.
     external_function: HashSet<String>,
+
+    // List of type pairs that need helper functions for casting.
+    type_casts: HashSet<(String, String)>,
+
+    // Stack of names for referencing previously visited node.
     stack: Vec<String>,
+
+    // Stores all declared records.
     record_types: HashMap<String, Rc<DataType>>,
 }
 
@@ -45,6 +57,7 @@ impl Compiler {
             function_header: Vec::new(),
             external_function: HashSet::new(),
             stack: Vec::new(),
+            type_casts: HashSet::new(),
             record_types,
         }
     }
@@ -57,12 +70,57 @@ impl Compiler {
         }
     }
 
+    // Generates a function that constructs a new record from another.
+    fn generate_record_cast(&self, from: &String, to: &String) -> String {
+        let from_rec = self
+            .record_types
+            .get(from)
+            .expect("Failed to find record with name {from}.");
+        let to_rec = self
+            .record_types
+            .get(from)
+            .expect("Failed to find record with name {to}.");
+
+        let mut buffer = String::new();
+
+        buffer.push_str(format!("{to}* {from}_to_{to}({from}* from){{\n").as_str());
+        buffer.push_str(format!("{to}* tmp = malloc(sizeof({to}));\n").as_str());
+
+        // Find the shared fields between the two records and generate assignments from the
+        // 'from' type into the 'to' type.
+        if let DataType::Record(_, from_fields) = &**from_rec {
+            let mut from_set = HashSet::new();
+            for field_name in from_fields.keys() {
+                from_set.insert(field_name);
+            }
+
+            if let DataType::Record(_, to_fields) = &**to_rec {
+                let mut to_set = HashSet::new();
+                for field_name in to_fields.keys() {
+                    to_set.insert(field_name);
+                }
+
+                let shared_fields = from_set.intersection(&to_set);
+
+                for field_name in shared_fields {
+                    buffer.push_str(format!("tmp->{field_name} = to->{field_name};\n").as_str());
+                }
+            }
+        }
+
+        buffer.push_str("return tmp;\n");
+        buffer.push_str("}\n");
+
+        buffer
+    }
+
     // Generates the header of forward declarations and the struct definitions.
     fn generate_record_header(&self) -> String {
         let mut buffer = String::new();
 
         // TODO: have forward declarations before defining records
 
+        // Generate a named struct and its constructor.
         for (name, record_type) in &self.record_types {
             let record_fields = match &**record_type {
                 DataType::Record(_, fields) => fields,
@@ -82,6 +140,11 @@ impl Compiler {
 
             buffer.push_str(&record_struct.build());
             buffer.push_str(&record_struct.build_constructor());
+        }
+
+        // Generate helper functions for casting between record types.
+        for (expected_name, actual_name) in &self.type_casts {
+            buffer.push_str(&self.generate_record_cast(actual_name, expected_name));
         }
 
         buffer
@@ -365,10 +428,13 @@ impl Compiler {
     /// * `name`:
     /// * `arguments`:
     fn compile_function_call(&mut self, name: &TypedNode, arguments: &[TypedNode]) -> String {
-        let argument_list: Vec<String> = arguments
+        let mut argument_list: Vec<String> = arguments
             .iter()
             .map(|arg| self.compile_expression(arg))
             .collect();
+
+        let argument_types: Vec<Rc<DataType>> =
+            arguments.iter().map(|node| node.get_type()).collect();
 
         let mut is_extern = false;
 
@@ -380,6 +446,26 @@ impl Compiler {
             }
             _ => panic!("Do not support calling non-variables yet"),
         };
+
+        // Compare the types of the actual function call and the expected. Based on this,
+        // we can determine if the types need to be cast. Note that all types are compatible
+        // since it passed the typechecking stage.
+        if let DataType::Function(expected_args, _) = &**base_type {
+            for (index, (actual_type, expected_type)) in
+                argument_types.iter().zip(expected_args).enumerate()
+            {
+                if let DataType::Record(expected_name, _) = &**expected_type {
+                    if let DataType::Record(actual_name, _) = &**actual_type {
+                        self.type_casts
+                            .insert((actual_name.clone(), expected_name.clone()));
+
+                        // Wrap the argument with a cast, if needed.
+                        let argument = argument_list.get_mut(index).unwrap();
+                        *argument = format!("{actual_name}_to_{expected_name}({argument})");
+                    }
+                }
+            }
+        }
 
         if !is_extern {
             let func_type = resolver::get_function_pointer("".to_string(), base_type.clone());
