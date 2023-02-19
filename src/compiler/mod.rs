@@ -119,11 +119,6 @@ impl Compiler {
     fn generate_record_header(&self) -> String {
         let mut buffer = String::new();
 
-        // Forward declarations.
-        for name in self.record_types.keys() {
-            buffer.push_str(format!("struct {name};\n").as_str());
-        }
-
         // Generate a named struct and its constructor.
         for (name, record_type) in &self.record_types {
             let record_fields = match &**record_type {
@@ -366,16 +361,14 @@ impl Compiler {
             self.stack.push(name.clone());
         }
 
-        let statement = format!(
+        format!(
             "{} = {};\n{}{}{}",
             self.resolve_type(name, var_type.clone()),
             self.compile_expression(value),
             if is_leaf { "return " } else { "" },
             self.compile_expression(body),
             if is_leaf { ";" } else { "" }
-        );
-
-        statement
+        )
     }
 
     /// Define the lambda under a unique name and returns a pointer
@@ -418,13 +411,16 @@ impl Compiler {
             data_type: func_type.clone(),
             arguments,
             body: func_body,
-            captures: free_vars,
+            captures: free_vars.clone(),
         });
 
-        let free_args = "";
+        let free_args: Vec<String> = free_vars
+            .keys()
+            .cloned()
+            .collect();
 
         // All user-declared functions are a pointer to a function in the function header.
-        format!("create_{fresh_name}({free_args})")
+        format!("create_{fresh_name}({})", free_args.join(", "))
     }
 
     /// Generates a function call given a function name and arguments.
