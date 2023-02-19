@@ -76,6 +76,7 @@ impl Compiler {
             .record_types
             .get(from)
             .expect("Failed to find record with name {from}.");
+
         let to_rec = self
             .record_types
             .get(from)
@@ -118,7 +119,10 @@ impl Compiler {
     fn generate_record_header(&self) -> String {
         let mut buffer = String::new();
 
-        // TODO: have forward declarations before defining records
+        // Forward declarations.
+        for name in self.record_types.keys() {
+            buffer.push_str(format!("struct {name};\n").as_str());
+        }
 
         // Generate a named struct and its constructor.
         for (name, record_type) in &self.record_types {
@@ -428,13 +432,10 @@ impl Compiler {
     /// * `name`:
     /// * `arguments`:
     fn compile_function_call(&mut self, name: &TypedNode, arguments: &[TypedNode]) -> String {
-        let mut argument_list: Vec<String> = arguments
+        let argument_list: Vec<String> = arguments
             .iter()
             .map(|arg| self.compile_expression(arg))
             .collect();
-
-        let argument_types: Vec<Rc<DataType>> =
-            arguments.iter().map(|node| node.get_type()).collect();
 
         let mut is_extern = false;
 
@@ -446,28 +447,6 @@ impl Compiler {
             }
             _ => panic!("Do not support calling non-variables yet"),
         };
-
-        // Compare the types of the actual function call and the expected. Based on this,
-        // we can determine if the types need to be cast. Note that all types are compatible
-        // since it passed the typechecking stage.
-        if let DataType::Function(expected_args, _) = &**base_type {
-            for (index, (actual_type, expected_type)) in
-                argument_types.iter().zip(expected_args).enumerate()
-            {
-                if let DataType::Record(expected_name, _) = &**expected_type {
-                    if let DataType::Record(actual_name, _) = &**actual_type {
-                        if expected_name != actual_name {
-                            self.type_casts
-                                .insert((actual_name.clone(), expected_name.clone()));
-
-                            // Wrap the argument with a cast, if needed.
-                            let argument = argument_list.get_mut(index).unwrap();
-                            *argument = format!("{actual_name}_to_{expected_name}({argument})");
-                        }
-                    }
-                }
-            }
-        }
 
         if !is_extern {
             let func_type = resolver::get_function_pointer("".to_string(), base_type.clone());
@@ -493,40 +472,12 @@ impl Compiler {
             ordered_fields.insert(field_name.clone(), field_value);
         }
 
-        let field_types: Vec<Rc<DataType>> = ordered_fields
-            .values()
-            .map(|node| node.get_type())
-            .collect();
-
         buffer.push_str(format!("_create_{name}(").as_str());
 
-        let mut field_expressions = ordered_fields
+        let field_expressions = ordered_fields
             .values()
             .map(|field_value| self.compile_expression(field_value))
             .collect::<Vec<String>>();
-
-        let record = self.record_types.get(name).expect("Record does not exist.");
-
-        if let DataType::Record(_, expected_fields) = &**record {
-            for (index, (actual_type, expected_type)) in
-                field_types.iter().zip(expected_fields.values()).enumerate()
-            {
-                if let DataType::Record(expected_name, _) = &**expected_type {
-                    if let DataType::Record(actual_name, _) = &**actual_type {
-                        println!("{expected_name} {actual_name}");
-                        if expected_name != actual_name {
-                            self.type_casts
-                                .insert((actual_name.clone(), expected_name.clone()));
-
-                            // Wrap the argument with a cast, if needed.
-                            let field_value = field_expressions.get_mut(index).unwrap();
-                            *field_value =
-                                format!("{actual_name}_to_{expected_name}({field_value})");
-                        }
-                    }
-                }
-            }
-        }
 
         buffer.push_str(field_expressions.join(", ").as_str());
         buffer.push(')');

@@ -1,9 +1,9 @@
-let double = function(x: int): int
+let double_num = function(x: int): int
 	x * 2
 end
 
 let triple = function(x: int): int
-	double(x) + x
+	double_num(x) + x
 end
 
 let make_point = function(x: int, y: int, z: int): { x: int, y: int, z: int }
@@ -11,7 +11,8 @@ let make_point = function(x: int, y: int, z: int): { x: int, y: int, z: int }
 end
 
 let make_2d_point = function(temp: { p: { x : int, y: int } }): { p: { x: int, y: int} }
+	let add_nums = 10 + 5 
 	temp
 end
 
-make_2d_point({ p: { x: 0, y: 1, z: 2} })
+make_2d_point({ p: { x: 0, y: 1 } })

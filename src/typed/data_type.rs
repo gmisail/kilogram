@@ -40,11 +40,8 @@ impl PartialEq for DataType {
             },
 
             DataType::Record(_, fields) => match other {
-                // Equal if fields is a subset of other_fields. Record 'B' can be used in place of record 'A'
-                // as long as 'B' has all of the fields in 'A'. However, that is not to say that they are
-                // equivalent; that is only true iff all fields in 'A' are in 'B' and vice-versa.
                 DataType::Record(_, other_fields) => {
-                    let is_subset = fields.len() <= other_fields.len();
+                    let is_subset = fields.len() == other_fields.len();
                     let contains_all = fields.keys().all(|field_name| {
                         let contains = other_fields.contains_key(field_name);
                         let types_match = fields.get(field_name) == other_fields.get(field_name);

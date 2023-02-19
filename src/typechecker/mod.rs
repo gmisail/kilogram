@@ -14,6 +14,7 @@ pub struct Typechecker {
     primitives: HashMap<&'static str, Rc<DataType>>,
     stack: HashMap<String, Rc<DataType>>,
     pub records: HashMap<String, Rc<DataType>>,
+    anonymous_records: Vec<String>,
     fresh_counter: i32,
 }
 
@@ -29,6 +30,7 @@ impl Typechecker {
             primitives,
             stack: HashMap::new(),
             records: HashMap::new(),
+            anonymous_records: Vec::new(),
             fresh_counter: 0,
         }
     }
@@ -61,6 +63,34 @@ impl Typechecker {
             Some(_) => Err(format!("Record '{name}' already defined.")),
             None => Ok(()),
         }
+    }
+
+    // Creates a record with a unique name.
+    fn add_anonymous_record(
+        &mut self,
+        field_types: BTreeMap<String, Rc<DataType>>,
+    ) -> Result<String, String> {
+        let fresh_name = format!("anonymous_{}", self.fresh_counter);
+        self.fresh_counter += 1;
+
+        let new_record = Rc::new(DataType::Record(fresh_name.clone(), field_types));
+
+        for record in &self.anonymous_records {
+            let anonymous_record = self.records.get(record).unwrap();
+
+            // Duplicate record? Return the matching previously defined record.
+            if *new_record == **anonymous_record {
+                self.fresh_counter -= 1;
+
+                return Ok(record.clone());
+            }
+        }
+
+        self.anonymous_records.push(fresh_name.clone());
+
+        self.records.insert(fresh_name.clone(), new_record);
+
+        Ok(fresh_name)
     }
 
     // Add a variable to the type-checking context.
@@ -107,10 +137,13 @@ impl Typechecker {
 
             // Anonymous type, register it with a temporary name.
             AstType::Record(fields) => {
-                let fresh_name = format!("anonymous_{}", self.fresh_counter);
-                self.fresh_counter += 1;
+                let mut field_types = BTreeMap::new();
 
-                self.add_record(&fresh_name, fields)?;
+                for (field_name, field_type) in fields {
+                    field_types.insert(field_name.clone(), self.convert_ast_type(field_type)?);
+                }
+
+                let fresh_name = self.add_anonymous_record(field_types)?;
 
                 self.get_record(&fresh_name)
             }
@@ -434,13 +467,7 @@ impl Typechecker {
                     field_values.push((field_name.clone(), field_value));
                 }
 
-                let fresh_name = format!("anonymous_{}", self.fresh_counter);
-                self.fresh_counter += 1;
-
-                self.records.insert(
-                    fresh_name.clone(),
-                    Rc::new(DataType::Record(fresh_name.clone(), field_types.clone())),
-                );
+                let fresh_name = self.add_anonymous_record(field_types.clone())?;
 
                 Ok((
                     Rc::new(DataType::Record(fresh_name.clone(), field_types)),
