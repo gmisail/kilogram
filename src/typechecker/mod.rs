@@ -478,11 +478,13 @@ impl Typechecker {
             UntypedNode::Get(field, parent) => {
                 let (get_type, get_node) = self.resolve_type(parent)?;
 
+                println!("{get_type} {parent}->{field}");
+
                 match &*get_type {
                     DataType::Record(name, fields) => match fields.get(field) {
                         Some(field_type) => Ok((
                             field_type.clone(),
-                            TypedNode::Get(field_type.clone(), name.clone(), Box::new(get_node)),
+                            TypedNode::Get(field_type.clone(), field.clone(), Box::new(get_node)),
                         )),
 
                         None => Err(format!("Can't find field {field} in record of type {name}")),

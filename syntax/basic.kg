@@ -1,20 +1,12 @@
-let double_num = function(x: int): int
-	x * 2
-end
-
-let triple = function(x: int): int
-	double_num(x) + x
-end
+extern int_to_string: (int) -> string
+extern print: (string) -> int
 
 let make_point = function(x: int, y: int, z: int): { x: int, y: int, z: int }
 	{ x: x, y: y, z: z } 
 end
 
-let make_2d_point = function(temp: { p: { x : int, y: int } }): { p: { x: int, y: int} }
-	let add_nums = 10 + 5 
-	temp
+let sum_point = function(point: { x: int, y: int, z: int }): int
+	point.x + point.y + point.z
 end
 
-let point = make_2d_point({ p: { x: 0, y: 1 } })
-
-0
+print(int_to_string(sum_point({ x: 1, y: 2, z: 3 })))

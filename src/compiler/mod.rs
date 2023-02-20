@@ -491,7 +491,6 @@ impl Compiler {
             TypedNode::Str(_, value) => format!("string_create(\"{value}\")"),
             TypedNode::Boolean(_, value) => format!("{value}"),
             TypedNode::Variable(_, name) => name.clone(),
-
             TypedNode::Group(_, expr) => format!("({})", self.compile_expression(expr)),
 
             TypedNode::Unary(_, expr, operation) => self.compile_unary(expr, operation),
@@ -524,7 +523,7 @@ impl Compiler {
                 self.compile_function(func_type, arg_types, value, free_vars)
             }
 
-            TypedNode::Get(_, _, _) => "GET TODO".to_string(),
+            TypedNode::Get(_, name, parent) => format!("{}->{name}", self.compile_expression(parent)),
 
             TypedNode::FunctionCall(_, name, arguments) => {
                 self.compile_function_call(name, arguments)
