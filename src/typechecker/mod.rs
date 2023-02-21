@@ -145,8 +145,11 @@ impl Typechecker {
                 "float" => Ok(self.primitives.get("float").unwrap().clone()),
                 "string" => Ok(self.primitives.get("string").unwrap().clone()),
                 "bool" => Ok(self.primitives.get("bool").unwrap().clone()),
+
+                // First, check if it is an Enum type.
                 name if self.enums.contains_key(name) => self.get_enum(&name.to_string()),
 
+                // Otherwise, it must be a record.
                 _ => self.get_record(name),
             },
 
