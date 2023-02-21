@@ -20,6 +20,8 @@ pub enum UntypedNode {
     RecordDeclaration(String, Vec<(String, AstType)>, Box<UntypedNode>),
     RecordInstance(String, Vec<(String, UntypedNode)>),
     AnonymousRecord(Vec<(String, UntypedNode)>),
+    
+    EnumDeclaration(String, Vec<(String, Vec<AstType>)>, Box<UntypedNode>),
 
     FunctionCall(Box<UntypedNode>, Vec<UntypedNode>),
 
@@ -125,6 +127,10 @@ impl Display for UntypedNode {
 
             UntypedNode::Extern(name, extern_type, body) => {
                 format!("(Extern, name: {name}, type: {extern_type}, body: {body})")
+            }
+
+            UntypedNode::EnumDeclaration(name, _, body) => {
+                format!("(EnumDeclaration, name: {name}, body: {body})")
             }
         };
 

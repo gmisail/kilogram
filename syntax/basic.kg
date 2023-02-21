@@ -1,6 +1,11 @@
 extern int_to_string: (int) -> string
 extern print: (string) -> int
 
+enum Maybe
+	None,
+	Some(int)
+end
+
 let make_point = function(x: int, y: int, z: int): { x: int, y: int, z: int }
 	{ x: x, y: y, z: z } 
 end

@@ -14,6 +14,7 @@ pub struct Typechecker {
     primitives: HashMap<&'static str, Rc<DataType>>,
     stack: HashMap<String, Rc<DataType>>,
     pub records: HashMap<String, Rc<DataType>>,
+    enums: HashMap<String, BTreeMap<String, Vec<Rc<DataType>>>>,
     anonymous_records: Vec<String>,
     fresh_counter: i32,
 }
@@ -31,6 +32,7 @@ impl Typechecker {
             stack: HashMap::new(),
             records: HashMap::new(),
             anonymous_records: Vec::new(),
+            enums: HashMap::new(),
             fresh_counter: 0,
         }
     }
@@ -107,6 +109,22 @@ impl Typechecker {
                 "Can't remove variable '{var_name}' since it is not defined."
             )),
             Some(_) => Ok(()),
+        }
+    }
+
+    fn add_enum(&mut self, name: &String, options: &Vec<(String, Vec<Rc<DataType>>)>) -> Result<(), String> {
+        if self.enums.contains_key(name) {
+            Err(format!("Enum {name} already defined."))
+        } else {
+            let mut option_map = BTreeMap::new();
+            
+            for (option_name, option_types) in options {
+                option_map.insert(option_name.clone(), option_types.clone());
+            }
+
+            self.enums.insert(name.clone(), option_map);
+
+            Ok(())
         }
     }
 
@@ -478,8 +496,6 @@ impl Typechecker {
             UntypedNode::Get(field, parent) => {
                 let (get_type, get_node) = self.resolve_type(parent)?;
 
-                println!("{get_type} {parent}->{field}");
-
                 match &*get_type {
                     DataType::Record(name, fields) => match fields.get(field) {
                         Some(field_type) => Ok((
@@ -504,6 +520,23 @@ impl Typechecker {
                     body_type,
                     TypedNode::Extern(name.clone(), extern_type, Box::new(body_node)),
                 ))
+            },
+
+            UntypedNode::EnumDeclaration(name, options, body) => {
+                let mut typed_options = Vec::new();
+
+                for (option_name, option_values) in options {
+                    let mut typed_option_values = Vec::new();
+                    
+                    for option_value in option_values {
+                        typed_option_values.push(self.convert_ast_type(option_value)?);
+                    }
+
+                    typed_options.push((option_name.clone(), typed_option_values));
+                }
+
+                self.add_enum(name, &typed_options)?;
+                self.resolve_type(body)
             }
         }
     }

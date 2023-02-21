@@ -607,6 +607,87 @@ impl Parser {
         }
     }
 
+    fn parse_enum(&mut self) -> Result<UntypedNode, String> {
+        if self.match_token(&TokenKind::Enum) {
+            self.advance_token();
+
+            let name_token = self.expect_token(&TokenKind::Identifier("".to_string()))?;
+            let enum_name = match name_token {
+                Some(t) => match &t.kind {
+                    TokenKind::Identifier(name) => name.clone(),
+                    _ => return Err("Expected an identifier as enum name.".to_string()),
+                },
+                None => {
+                    return Err(
+                        "Expected enum name, instead we reached the end of the file.".to_string(),
+                    )
+                }
+            };
+
+            let mut enum_types = Vec::new();
+
+            if !self.match_token(&TokenKind::End) {
+                loop {
+                    let identifier = self.expect_token(&TokenKind::Identifier("".to_string()))?;
+                    let option_name = match identifier {
+                        Some(t) => match &t.kind {
+                            TokenKind::Identifier(literal) => literal.clone(),
+                            _ => {
+                                return Err(format!("Expected identifier, got {} instead.", t.kind))
+                            }
+                        },
+                        None => {
+                            return Err(
+                                "Reached end of input while parsing UntypedNode.".to_string()
+                            )
+                        }
+                    };
+
+                    let mut option_types = Vec::new();
+                    if self.match_token(&TokenKind::LeftParen) {
+                        self.advance_token();
+
+                        loop {
+                            option_types.push(self.parse_type()?);
+
+                            if !self.match_token(&TokenKind::Comma) && self.match_token(&TokenKind::RightParen) {
+                                self.advance_token();
+
+                                break;
+                            }
+
+                            self.expect_token(&TokenKind::Comma)?;
+                        }
+                    }
+
+                    enum_types.push((option_name, option_types));
+
+                    if self.match_token(&TokenKind::Comma) {
+                        self.advance_token();
+                    } else {
+                        // Not a comma? Then we must be done.
+                        self.expect_token(&TokenKind::End)?;
+
+                        break;
+                    }
+                }
+            } else {
+                // Consume the closing 'end'.
+                self.advance_token();
+            }
+
+            if enum_types.is_empty() {
+                return Err(format!("Enum {enum_name} defined with no options."));
+            }
+
+            let body = self.parse_expression()?;
+
+            Ok(UntypedNode::EnumDeclaration(enum_name, enum_types, Box::new(body)))
+        } else {
+            self.parse_function_expression()
+        }
+    }
+
     fn parse_record_declaration(&mut self) -> Result<UntypedNode, String> {
         if self.match_token(&TokenKind::Record) {
             self.advance_token();
@@ -672,7 +753,7 @@ impl Parser {
                 Box::new(body),
             ))
         } else {
-            self.parse_function_expression()
+            self.parse_enum()
         }
     }
 
