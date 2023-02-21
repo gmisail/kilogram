@@ -8,9 +8,8 @@ pub enum DataType {
     Float,
     Str,
     Boolean,
-
-    // Only allow one allocation per type and simply create copies
-    // of that immutable memory address.
+    
+    Enum(String, BTreeMap<String, Vec<Rc<DataType>>>),
     Function(Vec<Rc<DataType>>, Rc<DataType>),
     Record(String, BTreeMap<String, Rc<DataType>>),
 }
@@ -55,6 +54,8 @@ impl PartialEq for DataType {
                 _ => false,
             },
 
+            // TODO: add enum
+
             // Left must be a primitive type; just compare
             // the enum names since there are no subfields.
             _ => std::mem::discriminant(self) == std::mem::discriminant(other),
@@ -72,6 +73,8 @@ impl Display for DataType {
                 DataType::Float => "float".to_string(),
                 DataType::Boolean => "bool".to_string(),
                 DataType::Str => "string".to_string(),
+
+                DataType::Enum(name, _) => format!("{name}"),
 
                 DataType::Function(argument_types, return_type) => {
                     let arg_type_list: Vec<String> = argument_types

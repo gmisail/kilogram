@@ -35,6 +35,8 @@ pub fn get_native_type(internal_type: Rc<DataType>) -> String {
         DataType::Str => "KiloString*".to_string(),
         DataType::Boolean => "bool".to_string(),
 
+        DataType::Enum(name, _) => format!("{name}*"),
+
         DataType::Function(_, _) => "KiloFunction*".to_string(),
         DataType::Record(name, _) => format!("{name}*"),
     }

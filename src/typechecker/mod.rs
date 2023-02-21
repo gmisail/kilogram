@@ -14,7 +14,7 @@ pub struct Typechecker {
     primitives: HashMap<&'static str, Rc<DataType>>,
     stack: HashMap<String, Rc<DataType>>,
     pub records: HashMap<String, Rc<DataType>>,
-    enums: HashMap<String, BTreeMap<String, Vec<Rc<DataType>>>>,
+    enums: HashMap<String, Rc<DataType>>,
     anonymous_records: Vec<String>,
     fresh_counter: i32,
 }
@@ -122,9 +122,17 @@ impl Typechecker {
                 option_map.insert(option_name.clone(), option_types.clone());
             }
 
-            self.enums.insert(name.clone(), option_map);
+            let enum_type = DataType::Enum(name.clone(), option_map);
+            self.enums.insert(name.clone(), Rc::new(enum_type));
 
             Ok(())
+        }
+    }
+
+    fn get_enum(&mut self, name: &String) -> Result<Rc<DataType>, String> {
+        match self.enums.get(name) {
+            Some(enum_type) => Ok(enum_type.clone()),
+            None => Err(format!("Can't find enum with name '{name}'")),
         }
     }
 
@@ -137,6 +145,7 @@ impl Typechecker {
                 "float" => Ok(self.primitives.get("float").unwrap().clone()),
                 "string" => Ok(self.primitives.get("string").unwrap().clone()),
                 "bool" => Ok(self.primitives.get("bool").unwrap().clone()),
+                name if self.enums.contains_key(name) => self.get_enum(&name.to_string()),
 
                 _ => self.get_record(name),
             },
