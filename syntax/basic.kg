@@ -1,16 +1,18 @@
 extern int_to_string: (int) -> string
 extern print: (string) -> int
 
-enum Maybe
+enum List 
 	None,
-	Some(int)
+	Cons(int, List)
 end
 
-let fetch = function(url: string): Maybe 
-	if url == "http://gmisail.me" then
-		Some(10)
-	else
+let test: List = None
+
+let rec make_list = function(size: int): List
+	if size > 0 then 
+		Cons(size, make_list(size - 1))
+	else 
 		None
 end
 
-fetch("http://gmisail.me")
+0

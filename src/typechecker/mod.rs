@@ -132,6 +132,7 @@ impl Typechecker {
 
             let enum_type = Rc::new(DataType::Enum(name.clone(), option_map));
 
+
             // Push all variants onto the stack.
             for (option_name, _) in options {
                 self.enum_variants
@@ -236,10 +237,12 @@ impl Typechecker {
             let (arg_types, arg_nodes): (Vec<Rc<DataType>>, Vec<TypedNode>) =
                 variant_arguments.iter().cloned().unzip();
 
+            // TODO: typecheck Self type and an enum.
+
             // Check that the actual & expected types match.
             for (expected_type, actual_type) in expected_variant.iter().zip(arg_types) {
                 if *expected_type != actual_type.clone() {
-                    return Err(format!("Invalid parameter type in variant {variant_name}"));
+                    return Err(format!("Invalid parameter type in variant {variant_name}: expected {expected_type}, but got {actual_type}."));
                 }
             }
 
@@ -524,6 +527,18 @@ impl Typechecker {
                     DataType::Function(arguments, return_type) => {
                         let mut typed_arguments = Vec::new();
 
+                        for (target_type, parameter) in arguments.iter().zip(parameters) {
+                            let (resolved_type, resolved_node) = self.resolve_type(parameter)?;
+
+                            if *target_type != resolved_type {
+                                return Err(format!(
+                                    "Invalid parameter type, expected {target_type} but got {resolved_type}."
+                                ));
+                            }
+
+                            typed_arguments.push(resolved_node);
+                        }
+
                         Ok((
                             return_type.clone(),
                             TypedNode::FunctionCall(
@@ -614,16 +629,33 @@ impl Typechecker {
             UntypedNode::EnumDeclaration(name, options, body) => {
                 let mut typed_variants = Vec::new();
 
+                // Add enum temporarily so that we can reference it in its variants.
+                self.add_enum(name, &Vec::new())?;
+
+                // Compute the types assuming that the self-referential enum is defined.
                 for (variant_name, variant_types) in options {
                     let mut typed_variant_types = Vec::new();
 
                     for variant_type in variant_types {
-                        typed_variant_types.push(self.convert_ast_type(variant_type)?);
+                        let mut resolved_type = self.convert_ast_type(variant_type)?;
+
+                        if let DataType::Enum(enum_name, _) = &*resolved_type {
+                            if name == enum_name {
+                                // Since we can't refer to ourselves, use a self-referencing type. 
+                                resolved_type = Rc::new(DataType::SelfReference);
+                            }
+                        }
+
+                        typed_variant_types.push(resolved_type);
                     }
 
                     typed_variants.push((variant_name.clone(), typed_variant_types));
                 }
-
+                
+                // Remove the self-referential enum.
+                self.enums.remove(name);
+                
+                // Update entry with the new definiton.
                 self.add_enum(name, &typed_variants)?;
                 self.resolve_type(body)
             }
