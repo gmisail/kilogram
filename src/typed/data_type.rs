@@ -8,7 +8,7 @@ pub enum DataType {
     Float,
     Str,
     Boolean,
-    
+
     Enum(String, BTreeMap<String, Vec<Rc<DataType>>>),
     Function(Vec<Rc<DataType>>, Rc<DataType>),
     Record(String, BTreeMap<String, Rc<DataType>>),

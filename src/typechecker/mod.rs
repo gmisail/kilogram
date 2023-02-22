@@ -14,8 +14,11 @@ pub struct Typechecker {
     primitives: HashMap<&'static str, Rc<DataType>>,
     stack: HashMap<String, Rc<DataType>>,
     pub records: HashMap<String, Rc<DataType>>,
-    enums: HashMap<String, Rc<DataType>>,
     anonymous_records: Vec<String>,
+
+    enums: HashMap<String, Rc<DataType>>,
+    enum_variants: HashMap<String, Rc<DataType>>,
+
     fresh_counter: i32,
 }
 
@@ -33,6 +36,7 @@ impl Typechecker {
             records: HashMap::new(),
             anonymous_records: Vec::new(),
             enums: HashMap::new(),
+            enum_variants: HashMap::new(),
             fresh_counter: 0,
         }
     }
@@ -112,18 +116,29 @@ impl Typechecker {
         }
     }
 
-    fn add_enum(&mut self, name: &String, options: &Vec<(String, Vec<Rc<DataType>>)>) -> Result<(), String> {
+    fn add_enum(
+        &mut self,
+        name: &String,
+        options: &Vec<(String, Vec<Rc<DataType>>)>,
+    ) -> Result<(), String> {
         if self.enums.contains_key(name) {
             Err(format!("Enum {name} already defined."))
         } else {
             let mut option_map = BTreeMap::new();
-            
+
             for (option_name, option_types) in options {
                 option_map.insert(option_name.clone(), option_types.clone());
             }
 
-            let enum_type = DataType::Enum(name.clone(), option_map);
-            self.enums.insert(name.clone(), Rc::new(enum_type));
+            let enum_type = Rc::new(DataType::Enum(name.clone(), option_map));
+
+            // Push all variants onto the stack.
+            for (option_name, _) in options {
+                self.enum_variants
+                    .insert(option_name.clone(), enum_type.clone());
+            }
+
+            self.enums.insert(name.clone(), enum_type);
 
             Ok(())
         }
@@ -133,6 +148,15 @@ impl Typechecker {
         match self.enums.get(name) {
             Some(enum_type) => Ok(enum_type.clone()),
             None => Err(format!("Can't find enum with name '{name}'")),
+        }
+    }
+
+    fn get_enum_by_variant(&self, variant_name: &String) -> Result<Rc<DataType>, String> {
+        match self.enum_variants.get(variant_name) {
+            Some(enum_type) => Ok(enum_type.clone()),
+            None => Err(format!(
+                "Could not find enum associated with variant {variant_name}."
+            )),
         }
     }
 
@@ -183,6 +207,51 @@ impl Typechecker {
         self.primitives.get(type_name).unwrap().clone()
     }
 
+    /// Checks if a node is a) an enum, b) if the number of arguments match, and c) if all of the arguments
+    /// match the types declared in the enum declaration.
+    ///
+    /// * `enum_type`: Parent enum type.
+    /// * `variant_name`: Name of the variant we're checking.
+    /// * `variant_arguments`: Arguments passed to the variant.
+    fn check_enum(
+        &mut self,
+        enum_type: Rc<DataType>,
+        variant_name: &String,
+        variant_arguments: &[(Rc<DataType>, TypedNode)],
+    ) -> Result<(Rc<DataType>, TypedNode), String> {
+        if let DataType::Enum(_, enum_variants) = &*enum_type {
+            let expected_variant = enum_variants
+                .get(variant_name)
+                .expect("Expected variant to be in enum.");
+
+            // Check that the number of arguments match.
+            if variant_arguments.len() != expected_variant.len() {
+                return Err(format!(
+                    "Variant {variant_name} accepts {} arguments, but got {}.",
+                    expected_variant.len(),
+                    variant_arguments.len()
+                ));
+            }
+
+            let (arg_types, arg_nodes): (Vec<Rc<DataType>>, Vec<TypedNode>) =
+                variant_arguments.iter().cloned().unzip();
+
+            // Check that the actual & expected types match.
+            for (expected_type, actual_type) in expected_variant.iter().zip(arg_types) {
+                if *expected_type != actual_type.clone() {
+                    return Err(format!("Invalid parameter type in variant {variant_name}"));
+                }
+            }
+
+            Ok((
+                enum_type.clone(),
+                TypedNode::EnumInstance(enum_type, variant_name.clone(), arg_nodes),
+            ))
+        } else {
+            panic!("Expected node of type enum.")
+        }
+    }
+
     /// Resolves the type of an expression. Returns a typed AST.
     pub fn resolve_type(
         &mut self,
@@ -211,12 +280,20 @@ impl Typechecker {
             }
             UntypedNode::Group(inner) => self.resolve_type(inner),
             UntypedNode::Variable(name) => {
-                let var_type = self.get_variable(name)?;
+                match self.get_enum_by_variant(name) {
+                    // Variable name is a variant of previously declared enum.
+                    Ok(enum_type) => self.check_enum(enum_type, name, &[]),
 
-                Ok((
-                    var_type.clone(),
-                    TypedNode::Variable(var_type, name.clone()),
-                ))
+                    // Variable name is *not* an enum, treat as normal variable.
+                    Err(_) => {
+                        let var_type = self.get_variable(name)?;
+
+                        Ok((
+                            var_type.clone(),
+                            TypedNode::Variable(var_type, name.clone()),
+                        ))
+                    }
+                }
             }
 
             UntypedNode::Unary(expr, operator) => {
@@ -423,26 +500,29 @@ impl Typechecker {
                     Err("Function return type and actual type returned do not match.".to_string())
                 }
             }
+
             UntypedNode::FunctionCall(parent, parameters) => {
+                let mut typed_arguments = Vec::new();
+
+                for parameter in parameters {
+                    typed_arguments.push(self.resolve_type(parameter)?);
+                }
+
+                if let UntypedNode::Variable(name) = &**parent {
+                    // Is this a variant? If not, treat this like any other function call.
+                    match self.get_enum_by_variant(name) {
+                        Ok(enum_type) => return self.check_enum(enum_type, name, &typed_arguments),
+
+                        Err(_) => (),
+                    }
+                }
+
                 // Verify that the parameter & argument types match.
                 let (func_type, func_node) = self.resolve_type(parent)?;
 
                 match &*func_type {
                     DataType::Function(arguments, return_type) => {
                         let mut typed_arguments = Vec::new();
-
-                        // Check that the types of the expressions match the expected type.
-                        for (target_type, parameter) in arguments.iter().zip(parameters) {
-                            let (resolved_type, resolved_node) = self.resolve_type(parameter)?;
-
-                            if *target_type != resolved_type {
-                                return Err(format!(
-                                    "Invalid parameter type, expected {target_type} but got {resolved_type}."
-                                ));
-                            }
-
-                            typed_arguments.push(resolved_node);
-                        }
 
                         Ok((
                             return_type.clone(),
@@ -529,22 +609,22 @@ impl Typechecker {
                     body_type,
                     TypedNode::Extern(name.clone(), extern_type, Box::new(body_node)),
                 ))
-            },
+            }
 
             UntypedNode::EnumDeclaration(name, options, body) => {
-                let mut typed_options = Vec::new();
+                let mut typed_variants = Vec::new();
 
-                for (option_name, option_values) in options {
-                    let mut typed_option_values = Vec::new();
-                    
-                    for option_value in option_values {
-                        typed_option_values.push(self.convert_ast_type(option_value)?);
+                for (variant_name, variant_types) in options {
+                    let mut typed_variant_types = Vec::new();
+
+                    for variant_type in variant_types {
+                        typed_variant_types.push(self.convert_ast_type(variant_type)?);
                     }
 
-                    typed_options.push((option_name.clone(), typed_option_values));
+                    typed_variants.push((variant_name.clone(), typed_variant_types));
                 }
 
-                self.add_enum(name, &typed_options)?;
+                self.add_enum(name, &typed_variants)?;
                 self.resolve_type(body)
             }
         }

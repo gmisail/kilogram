@@ -650,7 +650,9 @@ impl Parser {
                         loop {
                             option_types.push(self.parse_type()?);
 
-                            if !self.match_token(&TokenKind::Comma) && self.match_token(&TokenKind::RightParen) {
+                            if !self.match_token(&TokenKind::Comma)
+                                && self.match_token(&TokenKind::RightParen)
+                            {
                                 self.advance_token();
 
                                 break;
@@ -682,7 +684,11 @@ impl Parser {
 
             let body = self.parse_expression()?;
 
-            Ok(UntypedNode::EnumDeclaration(enum_name, enum_types, Box::new(body)))
+            Ok(UntypedNode::EnumDeclaration(
+                enum_name,
+                enum_types,
+                Box::new(body),
+            ))
         } else {
             self.parse_function_expression()
         }

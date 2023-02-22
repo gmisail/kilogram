@@ -414,10 +414,7 @@ impl Compiler {
             captures: free_vars.clone(),
         });
 
-        let free_args: Vec<String> = free_vars
-            .keys()
-            .cloned()
-            .collect();
+        let free_args: Vec<String> = free_vars.keys().cloned().collect();
 
         // All user-declared functions are a pointer to a function in the function header.
         format!("create_{fresh_name}({})", free_args.join(", "))
@@ -523,7 +520,9 @@ impl Compiler {
                 self.compile_function(func_type, arg_types, value, free_vars)
             }
 
-            TypedNode::Get(_, name, parent) => format!("{}->{name}", self.compile_expression(parent)),
+            TypedNode::Get(_, name, parent) => {
+                format!("{}->{name}", self.compile_expression(parent))
+            }
 
             TypedNode::FunctionCall(_, name, arguments) => {
                 self.compile_function_call(name, arguments)
@@ -542,6 +541,8 @@ impl Compiler {
 
                 self.compile_expression(body)
             }
+
+            TypedNode::EnumInstance(_, _, _) => todo!(),
         }
     }
 }

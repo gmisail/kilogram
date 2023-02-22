@@ -12,7 +12,8 @@ pub fn find_free(node: &TypedNode) -> HashMap<String, Rc<DataType>> {
         | TypedNode::Float(..)
         | TypedNode::Str(..)
         | TypedNode::Boolean(..)
-        | TypedNode::RecordInstance(..) => HashMap::new(),
+        | TypedNode::RecordInstance(..)
+        | TypedNode::EnumInstance(..) => HashMap::new(),
 
         TypedNode::Variable(var_type, name) => {
             let mut env = HashMap::new();
