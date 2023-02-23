@@ -35,7 +35,9 @@ pub fn get_native_type(internal_type: Rc<DataType>) -> String {
         DataType::Str => "KiloString*".to_string(),
         DataType::Boolean => "bool".to_string(),
 
-        DataType::SelfReference => panic!("Self-referencing type should not be used directly during compilation."),
+        DataType::NamedReference(name) => {
+            format!("{name}*")
+        }
 
         DataType::Enum(name, _) => format!("{name}*"),
 

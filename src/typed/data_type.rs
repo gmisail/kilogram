@@ -8,8 +8,8 @@ pub enum DataType {
     Float,
     Str,
     Boolean,
-    SelfReference,
 
+    NamedReference(String),
     Enum(String, BTreeMap<String, Vec<Rc<DataType>>>),
     Function(Vec<Rc<DataType>>, Rc<DataType>),
     Record(String, BTreeMap<String, Rc<DataType>>),
@@ -77,7 +77,7 @@ impl Display for DataType {
 
                 DataType::Enum(name, _) => format!("{name}"),
 
-                DataType::SelfReference => "self".to_string(),
+                DataType::NamedReference(name) => name.clone(),
 
                 DataType::Function(argument_types, return_type) => {
                     let arg_type_list: Vec<String> = argument_types

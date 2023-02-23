@@ -2,11 +2,13 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
+use crate::compiler::builder::enum_builder::EnumBuilder;
+use crate::compiler::builder::struct_builder::StructBuilder;
 use crate::compiler::free::find_free;
+use crate::typechecker::Typechecker;
 use crate::typed::data_type::DataType;
 use crate::typed::typed_node::TypedNode;
 
-use self::builder::StructBuilder;
 use self::emitter::emit_if;
 use self::{
     emitter::{emit_binary, emit_unary},
@@ -46,19 +48,23 @@ pub struct Compiler {
 
     // Stores all declared records.
     record_types: HashMap<String, Rc<DataType>>,
+
+    // Stores all declared enums.
+    enums: HashMap<String, Rc<DataType>>,
 }
 
 // TODO: create a table of symbols so we don't need to make new strings every time
 
 impl Compiler {
-    pub fn new(record_types: HashMap<String, Rc<DataType>>) -> Self {
+    pub fn new(typechecker: Typechecker) -> Self {
         Compiler {
             function: FunctionGenerator::new(),
             function_header: Vec::new(),
             external_function: HashSet::new(),
             stack: Vec::new(),
             type_casts: HashSet::new(),
-            record_types,
+            record_types: typechecker.records,
+            enums: typechecker.enums,
         }
     }
 
@@ -115,9 +121,46 @@ impl Compiler {
         buffer
     }
 
+    /// Generates all enum declarations & constructors.
+    fn generate_enum_header(&self) -> String {
+        let mut buffer = String::new();
+
+        // Declare forward declarations.
+        for enum_name in self.enums.keys() {
+            buffer.push_str(format!("typedef struct {} {};\n", enum_name, enum_name).as_str());
+        }
+
+        for (enum_name, enum_def) in &self.enums {
+            let mut builder = EnumBuilder::new(enum_name.clone());
+
+            if let DataType::Enum(_, enum_variants) = &**enum_def {
+                for (variant_name, variant_types) in enum_variants {
+                    let mut resolved_variant_types = Vec::new();
+
+                    for variant_type in variant_types {
+                        resolved_variant_types
+                            .push(resolver::get_native_type(variant_type.clone()));
+                    }
+
+                    builder.variant(variant_name.clone(), resolved_variant_types);
+                }
+            }
+
+            buffer.push_str(&builder.build());
+            buffer.push_str(&builder.build_constructors());
+        }
+
+        buffer
+    }
+
     // Generates the header of forward declarations and the struct definitions.
     fn generate_record_header(&self) -> String {
         let mut buffer = String::new();
+
+        // Declare forward declarations.
+        for record_name in self.record_types.keys() {
+            buffer.push_str(format!("typedef struct {} {};\n", record_name, record_name).as_str());
+        }
 
         // Generate a named struct and its constructor.
         for (name, record_type) in &self.record_types {
@@ -137,7 +180,7 @@ impl Compiler {
                 );
             }
 
-            buffer.push_str(&record_struct.build());
+            buffer.push_str(&record_struct.build(false));
             buffer.push_str(&record_struct.build_constructor());
         }
 
@@ -245,7 +288,7 @@ impl Compiler {
                 def.body
             );
 
-            buffer.push_str(&func_env.build());
+            buffer.push_str(&func_env.build(true));
             buffer.push('\n');
             buffer.push_str(&func_env.build_constructor());
             buffer.push('\n');
@@ -277,6 +320,8 @@ impl Compiler {
 
         buffer.push_str("\n// Record header\n");
         buffer.push_str(&self.generate_record_header());
+        buffer.push_str("\n// Enum header\n");
+        buffer.push_str(&self.generate_enum_header());
         buffer.push_str("\n// Function header\n");
         buffer.push_str(&self.generate_function_header());
         buffer.push_str("\n// Program\n");
@@ -405,16 +450,33 @@ impl Compiler {
             })
             .collect();
 
+        let bound_by = self.stack.pop();
+
+        println!("free vars: {:?} ({bound_by:?})", free_vars.keys());
+
         self.function_header.push(FunctionDefinition {
             name: fresh_name.clone(),
-            bound_name: self.stack.pop(),
+            bound_name: bound_by.clone(),
             data_type: func_type.clone(),
             arguments,
             body: func_body,
             captures: free_vars.clone(),
         });
 
-        let free_args: Vec<String> = free_vars.keys().cloned().collect();
+        // If the function is recursive, filter out the reference to itself (since it's impossible
+        // to pass a reference to something that doesn't exist yet.)
+        let free_args: Vec<String> = free_vars
+            .keys()
+            .cloned()
+            .filter(|name| {
+                if let Some(rec_name) = &bound_by {
+                    name != rec_name
+                } else {
+                    true
+                }
+            })
+            .collect();
+
 
         // All user-declared functions are a pointer to a function in the function header.
         format!("create_{fresh_name}({})", free_args.join(", "))
@@ -478,9 +540,31 @@ impl Compiler {
         buffer
     }
 
+    fn compile_enum_instance(
+        &mut self,
+        enum_type: &Rc<DataType>,
+        variant_name: &String,
+        variant_arguments: &[TypedNode],
+    ) -> String {
+        if let DataType::Enum(enum_name, _) = &**enum_type {
+            let mut arguments = Vec::new();
+
+            for argument in variant_arguments {
+                arguments.push(self.compile_expression(argument));
+            }
+
+            format!(
+                "_create_{enum_name}_{variant_name}({})",
+                arguments.join(", ")
+            )
+        } else {
+            panic!("Type in Enum is not actually an Enum!")
+        }
+    }
+
     /// Compiles an expression.
     ///
-    /// * `expression`:
+    /// * `expression`: expression to compile into a String.
     pub fn compile_expression(&mut self, expression: &TypedNode) -> String {
         match expression {
             TypedNode::Integer(_, value) => format!("{value}"),
@@ -542,7 +626,9 @@ impl Compiler {
                 self.compile_expression(body)
             }
 
-            TypedNode::EnumInstance(_, _, _) => todo!(),
+            TypedNode::EnumInstance(enum_type, variant, variant_arguments) => {
+                self.compile_enum_instance(enum_type, variant, variant_arguments)
+            }
         }
     }
 }

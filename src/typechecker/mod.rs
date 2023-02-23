@@ -11,14 +11,13 @@ use crate::{ast::ast_type::AstType, typed::typed_node::TypedNode};
 use rules::{check_binary, check_logical, check_unary};
 
 pub struct Typechecker {
+    pub enums: HashMap<String, Rc<DataType>>,
+    pub records: HashMap<String, Rc<DataType>>,
+
     primitives: HashMap<&'static str, Rc<DataType>>,
     stack: HashMap<String, Rc<DataType>>,
-    pub records: HashMap<String, Rc<DataType>>,
     anonymous_records: Vec<String>,
-
-    enums: HashMap<String, Rc<DataType>>,
     enum_variants: HashMap<String, Rc<DataType>>,
-
     fresh_counter: i32,
 }
 
@@ -132,7 +131,6 @@ impl Typechecker {
 
             let enum_type = Rc::new(DataType::Enum(name.clone(), option_map));
 
-
             // Push all variants onto the stack.
             for (option_name, _) in options {
                 self.enum_variants
@@ -237,11 +235,19 @@ impl Typechecker {
             let (arg_types, arg_nodes): (Vec<Rc<DataType>>, Vec<TypedNode>) =
                 variant_arguments.iter().cloned().unzip();
 
-            // TODO: typecheck Self type and an enum.
-
             // Check that the actual & expected types match.
-            for (expected_type, actual_type) in expected_variant.iter().zip(arg_types) {
-                if *expected_type != actual_type.clone() {
+            for (defined_type, actual_type) in expected_variant.iter().zip(arg_types) {
+                let expected_type = if let DataType::NamedReference(type_name) = &**defined_type {
+                    if self.enums.contains_key(type_name) {
+                        self.get_enum(type_name)?
+                    } else {
+                        self.get_record(type_name)?
+                    }
+                } else {
+                    defined_type.clone()
+                };
+
+                if expected_type != actual_type.clone() {
                     return Err(format!("Invalid parameter type in variant {variant_name}: expected {expected_type}, but got {actual_type}."));
                 }
             }
@@ -641,8 +647,9 @@ impl Typechecker {
 
                         if let DataType::Enum(enum_name, _) = &*resolved_type {
                             if name == enum_name {
-                                // Since we can't refer to ourselves, use a self-referencing type. 
-                                resolved_type = Rc::new(DataType::SelfReference);
+                                // Since we can't refer to ourselves, use a self-referencing type.
+                                resolved_type =
+                                    Rc::new(DataType::NamedReference(enum_name.clone()));
                             }
                         }
 
@@ -651,10 +658,10 @@ impl Typechecker {
 
                     typed_variants.push((variant_name.clone(), typed_variant_types));
                 }
-                
+
                 // Remove the self-referential enum.
                 self.enums.remove(name);
-                
+
                 // Update entry with the new definiton.
                 self.add_enum(name, &typed_variants)?;
                 self.resolve_type(body)

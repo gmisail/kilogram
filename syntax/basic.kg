@@ -1,18 +1,17 @@
-extern int_to_string: (int) -> string
-extern print: (string) -> int
-
 enum List 
 	None,
 	Cons(int, List)
 end
 
-let test: List = None
-
-let rec make_list = function(size: int): List
+let rec make_list = function(size: int): List 
 	if size > 0 then 
 		Cons(size, make_list(size - 1))
-	else 
+	else
 		None
 end
 
-0
+let rec length = function(list: List): int
+	10	
+end
+
+length(make_list(10))

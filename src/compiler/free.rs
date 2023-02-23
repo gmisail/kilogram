@@ -12,8 +12,7 @@ pub fn find_free(node: &TypedNode) -> HashMap<String, Rc<DataType>> {
         | TypedNode::Float(..)
         | TypedNode::Str(..)
         | TypedNode::Boolean(..)
-        | TypedNode::RecordInstance(..)
-        | TypedNode::EnumInstance(..) => HashMap::new(),
+        | TypedNode::RecordInstance(..) => HashMap::new(),
 
         TypedNode::Variable(var_type, name) => {
             let mut env = HashMap::new();
@@ -83,5 +82,15 @@ pub fn find_free(node: &TypedNode) -> HashMap<String, Rc<DataType>> {
         }
 
         TypedNode::RecordDeclaration(_, _, body) => find_free(body),
+
+        TypedNode::EnumInstance(_, _, arguments) => {
+            let mut all_free = HashMap::new();
+
+            for argument in arguments { 
+                all_free.extend(find_free(argument));
+            }
+
+            all_free
+        }
     }
 }
