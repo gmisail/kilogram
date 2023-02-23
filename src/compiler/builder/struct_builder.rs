@@ -31,11 +31,7 @@ impl StructBuilder {
                 self.name
             )
         } else {
-            format!(
-                "struct {} {{\n\t{}\n}};",
-                self.name,
-                body.join("\n\t")
-            )
+            format!("struct {} {{\n\t{}\n}};", self.name, body.join("\n\t"))
         }
     }
 

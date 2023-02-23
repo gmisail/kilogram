@@ -519,10 +519,8 @@ impl Typechecker {
 
                 if let UntypedNode::Variable(name) = &**parent {
                     // Is this a variant? If not, treat this like any other function call.
-                    match self.get_enum_by_variant(name) {
-                        Ok(enum_type) => return self.check_enum(enum_type, name, &typed_arguments),
-
-                        Err(_) => (),
+                    if let Ok(enum_type) = self.get_enum_by_variant(name) {
+                        return self.check_enum(enum_type, name, &typed_arguments);
                     }
                 }
 

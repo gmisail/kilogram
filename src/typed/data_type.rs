@@ -75,7 +75,7 @@ impl Display for DataType {
                 DataType::Boolean => "bool".to_string(),
                 DataType::Str => "string".to_string(),
 
-                DataType::Enum(name, _) => format!("{name}"),
+                DataType::Enum(name, _) => name.clone(),
 
                 DataType::NamedReference(name) => name.clone(),
 

@@ -226,7 +226,7 @@ impl Compiler {
         buffer.push(')');
         buffer.push_str("{\n");
 
-        let tmp_name = bound_name.clone().unwrap_or("tmp".to_string());
+        let tmp_name = bound_name.clone().unwrap_or_else(|| "tmp".to_string());
 
         buffer.push_str(format!("KiloFunction* {tmp_name} = function_create({name});\n").as_str());
         buffer.push_str(
@@ -476,7 +476,6 @@ impl Compiler {
                 }
             })
             .collect();
-
 
         // All user-declared functions are a pointer to a function in the function header.
         format!("create_{fresh_name}({})", free_args.join(", "))
