@@ -1,21 +1,17 @@
-extern int_to_string: (int) -> string
-extern print: (string) -> int
-
-enum Maybe
+enum List 
 	None,
-	Some(int)
+	Cons(int, List)
 end
 
-let make_point = function(x: int, y: int, z: int): { x: int, y: int, z: int }
-	{ x: x, y: y, z: z } 
+let rec make_list = function(size: int): List 
+	if size > 0 then 
+		Cons(size, make_list(size - 1))
+	else
+		None
 end
 
-let sum_point = function(point: { x: int, y: int, z: int }): int
-	point.x + point.y + point.z
+let rec length = function(list: List): int
+	10	
 end
 
-let fetch = function(url: string): Maybe 
-	None
-end
-
-print(int_to_string(sum_point({ x: 1, y: 2, z: 3 })))
+length(make_list(10))

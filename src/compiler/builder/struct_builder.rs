@@ -17,18 +17,22 @@ impl StructBuilder {
         self
     }
 
-    pub fn build(&self) -> String {
+    pub fn build(&self, is_typedef: bool) -> String {
         let body: Vec<String> = self
             .fields
             .iter()
             .map(|(field_name, field_type)| format!("{field_type} {field_name};"))
             .collect();
 
-        format!(
-            "typedef struct {{\n\t{}\n}} {};",
-            body.join("\n\t"),
-            self.name
-        )
+        if is_typedef {
+            format!(
+                "typedef struct {{\n\t{}\n}} {};",
+                body.join("\n\t"),
+                self.name
+            )
+        } else {
+            format!("struct {} {{\n\t{}\n}};", self.name, body.join("\n\t"))
+        }
     }
 
     pub fn build_constructor(&self) -> String {

@@ -40,7 +40,7 @@ fn compile(file: &str) -> Result<(), String> {
     let (_, root_node) = checker.resolve_type(&tree)?;
     println!("Finished type-checking in {:?}", start_type.elapsed());
 
-    let mut compiler = Compiler::new(checker.records);
+    let mut compiler = Compiler::new(checker);
     let source = compiler.compile(&root_node);
 
     fs::write("./out.c", source).expect("Failed to write file.");

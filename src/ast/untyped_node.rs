@@ -20,7 +20,7 @@ pub enum UntypedNode {
     RecordDeclaration(String, Vec<(String, AstType)>, Box<UntypedNode>),
     RecordInstance(String, Vec<(String, UntypedNode)>),
     AnonymousRecord(Vec<(String, UntypedNode)>),
-    
+
     EnumDeclaration(String, Vec<(String, Vec<AstType>)>, Box<UntypedNode>),
 
     FunctionCall(Box<UntypedNode>, Vec<UntypedNode>),
