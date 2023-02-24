@@ -667,6 +667,7 @@ impl Typechecker {
                 self.add_enum(name, &typed_variants)?;
                 self.resolve_type(body)
             }
+            UntypedNode::CaseOf(_, _) => todo!(),
         }
     }
 }

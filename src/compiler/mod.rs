@@ -452,8 +452,6 @@ impl Compiler {
 
         let bound_by = self.stack.pop();
 
-        println!("free vars: {:?} ({bound_by:?})", free_vars.keys());
-
         self.function_header.push(FunctionDefinition {
             name: fresh_name.clone(),
             bound_name: bound_by.clone(),

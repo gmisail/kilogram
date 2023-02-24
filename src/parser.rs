@@ -763,6 +763,48 @@ impl Parser {
         }
     }
 
+    fn parse_case_of_expression(&mut self) -> Result<UntypedNode, String> {
+        if self.match_token(&TokenKind::Case) {
+            /*
+               case <expr> of
+                   [<condition> -> <body>]+
+               end
+            */
+            self.advance_token();
+
+            let expr = self.parse_expression()?;
+            self.expect_token(&TokenKind::Of)?;
+
+            let mut arms = Vec::new();
+
+            if !self.match_token(&TokenKind::End) {
+                loop {
+                    let condition = self.parse_expression()?;
+
+                    self.expect_token(&TokenKind::ThinArrow)?;
+
+                    let body = self.parse_expression()?;
+
+                    arms.push((condition, body));
+
+                    if !self.match_token(&TokenKind::Comma) && self.match_token(&TokenKind::End) {
+                        self.advance_token();
+
+                        break;
+                    } else {
+                        self.expect_token(&TokenKind::Comma)?;
+                    }
+                }
+
+                Ok(UntypedNode::CaseOf(Box::new(expr), arms))
+            } else {
+                Err("No conditions in 'case' statement.".to_string())
+            }
+        } else {
+            self.parse_record_declaration()
+        }
+    }
+
     fn parse_if_expression(&mut self) -> Result<UntypedNode, String> {
         if self.match_token(&TokenKind::If) {
             // Consume 'if' token.
@@ -784,7 +826,7 @@ impl Parser {
                 Box::new(else_expression),
             ))
         } else {
-            self.parse_record_declaration()
+            self.parse_case_of_expression()
         }
     }
 

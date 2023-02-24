@@ -3,15 +3,11 @@ enum List
 	Cons(int, List)
 end
 
-let rec make_list = function(size: int): List 
-	if size > 0 then 
-		Cons(size, make_list(size - 1))
-	else
-		None
-end
-
 let rec length = function(list: List): int
-	10	
+	case list of
+		None -> 0,
+		Cons(num, tail) -> 1 + length(tail)
+	end
 end
 
-length(make_list(10))
+length(Cons(0, Cons(1, Cons(2, Cons(3, Cons(4, None))))))

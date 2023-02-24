@@ -31,8 +31,8 @@ pub enum UntypedNode {
     Logical(Box<UntypedNode>, LogicalOperator, Box<UntypedNode>),
 
     // Control Flow
-    // if  \/  then    \/   else   \/
     If(Box<UntypedNode>, Box<UntypedNode>, Box<UntypedNode>),
+    CaseOf(Box<UntypedNode>, Vec<(UntypedNode, UntypedNode)>),
 
     // Declarations
     Let(
@@ -132,6 +132,8 @@ impl Display for UntypedNode {
             UntypedNode::EnumDeclaration(name, _, body) => {
                 format!("(EnumDeclaration, name: {name}, body: {body})")
             }
+
+            UntypedNode::CaseOf(_, _) => todo!(),
         };
 
         write!(f, "{value}")
