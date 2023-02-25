@@ -3,9 +3,11 @@ use std::rc::Rc;
 
 mod error;
 mod rules;
+mod unify;
 
 use crate::ast::operator::BinaryOperator;
 use crate::ast::untyped_node::UntypedNode;
+use crate::typechecker::unify::unify_enum;
 use crate::typed::data_type::DataType;
 use crate::{ast::ast_type::AstType, typed::typed_node::TypedNode};
 use rules::{check_binary, check_logical, check_unary};
@@ -411,6 +413,32 @@ impl Typechecker {
                     Err(format!("Expected condition in 'if' statement to be of type boolean, but was {} instead.", *condition_type))
                 }
             }
+            UntypedNode::CaseOf(expression, arms) => {
+                let (expr_type, expr_node) = self.resolve_type(expression)?;
+
+                let variants = if let DataType::Enum(_, enum_variants) = &*expr_type {
+                    enum_variants
+                } else {
+                    return Err(
+                        "Non-enum types in a case..of expression are not yet supported."
+                            .to_string(),
+                    );
+                };
+
+                for (arm_cond, arm_value) in arms {
+                    // Find free variables in the condition.
+                    let unbound_vars = unify_enum(arm_cond, variants)?;
+
+                    // TODO: substitute those unbound variables so that we can type-check the condition and value.
+
+                    println!("{:?}", unbound_vars.keys());
+
+                    // println!("cond: {}", cond_type);
+                    // println!("value: {}", value_type);
+                }
+
+                todo!()
+            }
 
             UntypedNode::Let(var_name, var_ast_type, var_value, body, is_recursive) => {
                 let var_type = match var_ast_type {
@@ -667,7 +695,6 @@ impl Typechecker {
                 self.add_enum(name, &typed_variants)?;
                 self.resolve_type(body)
             }
-            UntypedNode::CaseOf(_, _) => todo!(),
         }
     }
 }
