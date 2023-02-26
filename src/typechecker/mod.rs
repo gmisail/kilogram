@@ -108,8 +108,8 @@ impl Typechecker {
         }
     }
 
-    fn remove_variable(&mut self, var_name: String) -> Result<(), String> {
-        match self.stack.remove(&var_name) {
+    fn remove_variable(&mut self, var_name: &String) -> Result<(), String> {
+        match self.stack.remove(var_name) {
             None => Err(format!(
                 "Can't remove variable '{var_name}' since it is not defined."
             )),
@@ -211,6 +211,18 @@ impl Typechecker {
         self.primitives.get(type_name).unwrap().clone()
     }
 
+    fn resolve_reference(&mut self, defined_type: Rc<DataType>) -> Result<Rc<DataType>, String> {
+        if let DataType::NamedReference(type_name) = &*defined_type {
+            if self.enums.contains_key(type_name) {
+                self.get_enum(type_name)
+            } else {
+                self.get_record(type_name)
+            }
+        } else {
+            Ok(defined_type.clone())
+        }
+    }
+
     /// Checks if a node is a) an enum, b) if the number of arguments match, and c) if all of the arguments
     /// match the types declared in the enum declaration.
     ///
@@ -242,15 +254,7 @@ impl Typechecker {
 
             // Check that the actual & expected types match.
             for (defined_type, actual_type) in expected_variant.iter().zip(arg_types) {
-                let expected_type = if let DataType::NamedReference(type_name) = &**defined_type {
-                    if self.enums.contains_key(type_name) {
-                        self.get_enum(type_name)?
-                    } else {
-                        self.get_record(type_name)?
-                    }
-                } else {
-                    defined_type.clone()
-                };
+                let expected_type = self.resolve_reference(defined_type.clone())?;
 
                 if expected_type != actual_type.clone() {
                     return Err(format!("Invalid parameter type in variant {variant_name}: expected {expected_type}, but got {actual_type}."));
@@ -425,19 +429,53 @@ impl Typechecker {
                     );
                 };
 
+                let mut checked_arms = Vec::new();
+                let mut arm_types = Vec::new();
+
                 for (arm_cond, arm_value) in arms {
-                    // Find free variables in the condition.
+                    // Find unbound variables in the condition.
                     let unbound_vars = unify_enum(arm_cond, variants)?;
 
-                    // TODO: substitute those unbound variables so that we can type-check the condition and value.
+                    // Temporarily bind these unbound variables.
+                    for (unbound_name, unbound_type) in &unbound_vars {
+                        let resolved_type = self.resolve_reference(unbound_type.clone())?;
 
-                    println!("{:?}", unbound_vars.keys());
+                        self.add_variable(&unbound_name, resolved_type.clone())?;
+                    }
 
-                    // println!("cond: {}", cond_type);
-                    // println!("value: {}", value_type);
+                    let (cond_type, cond_node) = self.resolve_type(arm_cond)?;
+                    let (val_type, val_node) = self.resolve_type(arm_value)?;
+
+                    // The first arm is used as the reference type; that is, we check to make sure that
+                    // all arms have the same types as the first.
+                    if let Some((first_cond, first_val)) = arm_types.get(0) {
+                        if *first_cond != cond_type {
+                            return Err("Mismatched types in case..of arms.".to_string());
+                        }
+
+                        if *first_val != val_type {
+                            return Err(format!("Mismatched types in case..of arms: got {val_type} but expected {first_val}."));
+                        }
+                    }
+
+                    checked_arms.push((cond_node, val_node));
+                    arm_types.push((cond_type, val_type));
+
+                    // Remove unbound variables from scope.
+                    for unbound_name in unbound_vars.keys() {
+                        self.remove_variable(unbound_name)?;
+                    }
                 }
 
-                todo!()
+                // The type of a case..of expression is the type that it returns.
+                if let Some((_, val_type)) = arm_types.get(0) {
+                    Ok((
+                        val_type.clone(),
+                        TypedNode::CaseOf(val_type.clone(), Box::new(expr_node), checked_arms),
+                    ))
+                } else {
+                    Err("No arms in case..of expression.".to_string())
+                }
             }
 
             UntypedNode::Let(var_name, var_ast_type, var_value, body, is_recursive) => {
@@ -484,7 +522,7 @@ impl Typechecker {
                     }
 
                     let (body_type, body_node) = self.resolve_type(body)?;
-                    self.remove_variable(var_name.clone())?;
+                    self.remove_variable(var_name)?;
 
                     Ok((
                         body_type,
@@ -520,7 +558,7 @@ impl Typechecker {
 
                 // Since the expression has been evaluated, pop parameters from scope.
                 for (arg_name, _) in ast_argument_types {
-                    self.remove_variable(arg_name.clone())?;
+                    self.remove_variable(arg_name)?;
                 }
 
                 if *return_type == *body_type {

@@ -35,6 +35,7 @@ pub enum TypedNode {
     ),
 
     If(Rc<DataType>, Box<TypedNode>, Box<TypedNode>, Box<TypedNode>),
+    CaseOf(Rc<DataType>, Box<TypedNode>, Vec<(TypedNode, TypedNode)>),
 
     Function(
         Rc<DataType>,
@@ -63,7 +64,8 @@ impl TypedNode {
             | TypedNode::If(t, _, _, _)
             | TypedNode::Extern(_, t, _)
             | TypedNode::FunctionCall(t, _, _)
-            | TypedNode::EnumInstance(t, _, _) => t.clone(),
+            | TypedNode::EnumInstance(t, _, _)
+            | TypedNode::CaseOf(t, _, _) => t.clone(),
 
             TypedNode::Let(_, _, _, body, _)
             | TypedNode::Function(_, _, _, body)

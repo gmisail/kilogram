@@ -585,6 +585,8 @@ impl Compiler {
                 self.compile_expression(else_expr),
             ),
 
+            TypedNode::CaseOf(..) => todo!(),
+
             TypedNode::Let(name, var_type, value, body, is_rec) => {
                 self.compile_let(name, var_type, value, body, *is_rec)
             }

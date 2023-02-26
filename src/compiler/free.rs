@@ -43,6 +43,10 @@ pub fn find_free(node: &TypedNode) -> HashMap<String, Rc<DataType>> {
             if_free
         }
 
+        TypedNode::CaseOf(_, expr, arms) => {
+            todo!()
+        }
+
         TypedNode::Let(name, _, value, body, _) => {
             let mut value_free = find_free(value);
             let mut body_free = find_free(body);

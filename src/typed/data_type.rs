@@ -77,7 +77,7 @@ impl Display for DataType {
 
                 DataType::Enum(name, _) => name.clone(),
 
-                DataType::NamedReference(name) => name.clone(),
+                DataType::NamedReference(name) => format!("NamedReference({name})"),
 
                 DataType::Function(argument_types, return_type) => {
                     let arg_type_list: Vec<String> = argument_types
