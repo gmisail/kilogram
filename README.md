@@ -1,6 +1,6 @@
 # kilogram
 
-Functional programming language inspired by OCaml and Lua. For high performance and maximum portability, it compiles into C11 with no external dependencies. 
+Functional programming language inspired by OCaml and Lua. For high performance and maximum portability, it compiles into C11 and does not use any external dependencies. 
 
 ```lua
 enum IntList
@@ -8,7 +8,7 @@ enum IntList
     Cons(int, IntList)
 end
 
-let rec make_list(initial_value: int, len: int): List
+let rec make_list(initial_value: int, len: int): IntList
     if len == 0 then
     	None
     else
