@@ -1,7 +1,7 @@
 use super::data_type::DataType;
 use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
 ///
@@ -35,7 +35,11 @@ pub enum TypedNode {
     ),
 
     If(Rc<DataType>, Box<TypedNode>, Box<TypedNode>, Box<TypedNode>),
-    CaseOf(Rc<DataType>, Box<TypedNode>, Vec<(TypedNode, TypedNode)>),
+    CaseOf(
+        Rc<DataType>,
+        Box<TypedNode>,
+        Vec<(TypedNode, TypedNode, HashMap<String, Rc<DataType>>)>,
+    ),
 
     Function(
         Rc<DataType>,

@@ -594,6 +594,8 @@ impl Compiler {
             TypedNode::Function(_, func_type, arg_types, value) => {
                 let mut free_vars = find_free(expression);
 
+                println!("{:?}", free_vars.keys());
+
                 // External functions can be accessed without being passed down as
                 // and environment variable.
                 for extern_type in &self.external_function {

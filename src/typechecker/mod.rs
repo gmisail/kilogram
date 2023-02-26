@@ -435,12 +435,14 @@ impl Typechecker {
                 for (arm_cond, arm_value) in arms {
                     // Find unbound variables in the condition.
                     let unbound_vars = unify_enum(arm_cond, variants)?;
+                    let mut resolved_vars = HashMap::new();
 
                     // Temporarily bind these unbound variables.
                     for (unbound_name, unbound_type) in &unbound_vars {
                         let resolved_type = self.resolve_reference(unbound_type.clone())?;
+                        resolved_vars.insert(unbound_name.clone(), resolved_type.clone());
 
-                        self.add_variable(&unbound_name, resolved_type.clone())?;
+                        self.add_variable(&unbound_name, resolved_type)?;
                     }
 
                     let (cond_type, cond_node) = self.resolve_type(arm_cond)?;
@@ -458,7 +460,7 @@ impl Typechecker {
                         }
                     }
 
-                    checked_arms.push((cond_node, val_node));
+                    checked_arms.push((cond_node, val_node, resolved_vars));
                     arm_types.push((cond_type, val_type));
 
                     // Remove unbound variables from scope.
