@@ -8,6 +8,7 @@ use std::{
 pub mod ast;
 pub mod compiler;
 pub mod parser;
+pub mod pattern;
 pub mod scanner;
 pub mod token;
 pub mod typechecker;
