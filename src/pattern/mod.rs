@@ -1,4 +1,4 @@
-mod tree;
+mod matrix;
 mod clause;
 
 use crate::typed::typed_node::TypedNode;
@@ -9,6 +9,9 @@ pub enum Pattern {
 
     // x, y, z
     Variable(String),
+
+    // _
+    Wildcard
 }
 
 impl Pattern {
