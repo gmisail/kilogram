@@ -1,8 +1,9 @@
-mod matrix;
 mod clause;
+mod matrix;
 
 use crate::typed::typed_node::TypedNode;
 
+#[derive(Clone)]
 pub enum Pattern {
     // Cons(10, Nil), Nil
     Constructor(String, Vec<Pattern>),
@@ -11,7 +12,7 @@ pub enum Pattern {
     Variable(String),
 
     // _
-    Wildcard
+    Wildcard,
 }
 
 impl Pattern {
@@ -47,21 +48,21 @@ mod tests {
         match var_pattern {
             Pattern::Variable(found_name) => {
                 assert_eq!(found_name, "my_var");
-            }, 
+            }
 
-            _ => panic!()
+            _ => panic!(),
         }
     }
 
     #[test]
     fn creates_enum() {
         let node_type = Rc::new(DataType::Integer);
-        
+
         // my_enum(my_var)
         let tree = TypedNode::EnumInstance(
-            node_type.clone(), 
-            String::from("my_enum"), 
-            vec![TypedNode::Variable(node_type, String::from("my_var"))]
+            node_type.clone(),
+            String::from("my_enum"),
+            vec![TypedNode::Variable(node_type, String::from("my_var"))],
         );
 
         let var_pattern = Pattern::new(&tree);
@@ -69,15 +70,15 @@ mod tests {
         match var_pattern {
             Pattern::Constructor(name, arguments) if name == "my_enum" => {
                 assert_eq!(1, arguments.len());
-                
+
                 if let Some(Pattern::Variable(var_name)) = arguments.get(0) {
                     assert_eq!("my_var", var_name);
                 } else {
                     panic!();
                 }
-            }, 
+            }
 
-            _ => panic!()
+            _ => panic!(),
         }
     }
 }

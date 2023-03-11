@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::fmt::Display;
 use std::rc::Rc;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum DataType {
     Integer,
     Float,

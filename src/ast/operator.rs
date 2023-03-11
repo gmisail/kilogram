@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum UnaryOperator {
     Minus,
     Bang,
@@ -19,7 +19,7 @@ impl Display for UnaryOperator {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum BinaryOperator {
     Add,
     Sub,
@@ -54,7 +54,7 @@ impl Display for BinaryOperator {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum LogicalOperator {
     And,
     Or,
