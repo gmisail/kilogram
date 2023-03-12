@@ -3,7 +3,7 @@ mod matrix;
 
 use crate::typed::typed_node::TypedNode;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Pattern {
     // Cons(10, Nil), Nil
     Constructor(String, Vec<Pattern>),

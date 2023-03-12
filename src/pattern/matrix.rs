@@ -1,3 +1,5 @@
+use std::collections::{HashSet, BTreeSet, BTreeMap};
+
 use crate::typed::typed_node::TypedNode;
 
 use super::Pattern;
@@ -7,6 +9,34 @@ fn is_variable_or_wildcard(pattern: &Pattern) -> bool {
         Pattern::Variable(..) | Pattern::Wildcard => true,
         _ => false,
     }
+}
+
+fn has_leading_constructor(patterns: &[(Vec<Pattern>, TypedNode)]) -> bool {
+    match patterns.first() {
+        Some((case_patterns, _)) => {
+            case_patterns
+                .first()
+                .map_or(false, |pattern| {
+                    !is_variable_or_wildcard(pattern)
+                })
+        },
+        None => false
+    }
+}
+
+/// From a list of patterns, find a set of constructor names.
+///
+/// * `patterns`: 
+fn unique_constructors(patterns: &Vec<Pattern>) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+
+    for pattern in patterns {
+        if let Pattern::Constructor(name, ..) = pattern {
+            names.insert(name.clone());
+        }
+    }
+
+    names
 }
 
 ///
@@ -38,6 +68,27 @@ pub fn transform(
             head_expr,
             transform(tail_exprs, &new_patterns, default)
         )
+    } else if has_leading_constructor(patterns) {
+        // Split patterns into those with and without leading constructors
+        let (constructors, variables): (Vec<&(Vec<Pattern>, TypedNode)>, Vec<&(Vec<Pattern>, TypedNode)>) = patterns
+            .iter()
+            .partition(|(case_patterns, _)| {
+                if let Some(Pattern::Constructor(..)) = case_patterns.first() {
+                    true
+                } else {
+                    false
+                }
+            });
+
+        // Organize each of the patterns into buckets, match on the constructor type of the first
+        // pattern
+        
+        // For each constructor, add its arguments to the set of { <pattern> : expression } pairs
+
+        // Find the first variable pattern; the first one is the only one that will match
+        // No variable pattern? Create a catch-all variable that returns the default case.
+        
+        format!("{:?}", constructors)
     } else {
         format!("Done.")
     }
@@ -79,6 +130,51 @@ mod tests {
                 vec![Pattern::Variable(String::from("b")), Pattern::Wildcard],
                 TypedNode::Variable(node_type.clone(), String::from("var_d")),
             ),
+        ];
+
+        println!(
+            "{}",
+            transform(
+                exprs,
+                patterns,
+                TypedNode::Variable(node_type.clone(), String::from("default"))
+            )
+        );
+    }
+
+
+    #[test]
+    fn leading_constructor() {
+        /*
+        *   case list of
+        *       Cons(id) -> ... 
+        *       Cons(_) -> ...
+        *       None -> ... 
+        *       rest -> ...
+        *   end
+        * */
+        let node_type = Rc::new(DataType::Integer);
+        let exprs = &[
+            TypedNode::Variable(node_type.clone(), String::from("list"))
+        ];
+
+        let patterns = &[
+            (
+                vec![Pattern::Constructor(String::from("Cons"), vec![Pattern::Variable(String::from("id"))])],
+                TypedNode::Variable(node_type.clone(), String::from("case_a"))
+            ),
+            (
+                vec![Pattern::Constructor(String::from("Cons"), vec![Pattern::Wildcard])],
+                TypedNode::Variable(node_type.clone(), String::from("case_b"))
+            ),
+            (
+                vec![Pattern::Constructor(String::from("None"), vec![])],
+                TypedNode::Variable(node_type.clone(), String::from("case_c"))
+            ),
+            (
+                vec![Pattern::Variable(String::from("rest"))],
+                TypedNode::Variable(node_type.clone(), String::from("case_d"))
+            )
         ];
 
         println!(
