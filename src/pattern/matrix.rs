@@ -1,8 +1,10 @@
-use std::collections::{HashSet, BTreeSet, BTreeMap};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
 use crate::typed::typed_node::TypedNode;
 
 use super::Pattern;
+
+type Case = (Vec<Pattern>, TypedNode);
 
 fn is_variable_or_wildcard(pattern: &Pattern) -> bool {
     match pattern {
@@ -13,20 +15,16 @@ fn is_variable_or_wildcard(pattern: &Pattern) -> bool {
 
 fn has_leading_constructor(patterns: &[(Vec<Pattern>, TypedNode)]) -> bool {
     match patterns.first() {
-        Some((case_patterns, _)) => {
-            case_patterns
-                .first()
-                .map_or(false, |pattern| {
-                    !is_variable_or_wildcard(pattern)
-                })
-        },
-        None => false
+        Some((case_patterns, _)) => case_patterns
+            .first()
+            .map_or(false, |pattern| !is_variable_or_wildcard(pattern)),
+        None => false,
     }
 }
 
 /// From a list of patterns, find a set of constructor names.
 ///
-/// * `patterns`: 
+/// * `patterns`:
 fn unique_constructors(patterns: &Vec<Pattern>) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
 
@@ -42,11 +40,7 @@ fn unique_constructors(patterns: &Vec<Pattern>) -> BTreeSet<String> {
 ///
 /// From a list of expressions & patterns, create a decision plan for compiling the pattern match.
 ///
-pub fn transform(
-    expressions: &[TypedNode],
-    patterns: &[(Vec<Pattern>, TypedNode)],
-    default: TypedNode,
-) -> String {
+pub fn transform(expressions: &[TypedNode], patterns: &[Case], default: TypedNode) -> String {
     if expressions.len() == 0 {
         format!("{:?}", patterns.first().unwrap().1)
     } else if patterns
@@ -61,7 +55,7 @@ pub fn transform(
                 let (_, tail) = case_patterns.split_first().unwrap();
                 (tail.to_vec(), case_expr.clone())
             })
-            .collect::<Vec<(Vec<Pattern>, TypedNode)>>();
+            .collect::<Vec<Case>>();
 
         format!(
             "case {:?} of\n{}\nend",
@@ -70,9 +64,8 @@ pub fn transform(
         )
     } else if has_leading_constructor(patterns) {
         // Split patterns into those with and without leading constructors
-        let (constructors, variables): (Vec<&(Vec<Pattern>, TypedNode)>, Vec<&(Vec<Pattern>, TypedNode)>) = patterns
-            .iter()
-            .partition(|(case_patterns, _)| {
+        let (constructors, variables): (Vec<&Case>, Vec<&Case>) =
+            patterns.iter().partition(|(case_patterns, _)| {
                 if let Some(Pattern::Constructor(..)) = case_patterns.first() {
                     true
                 } else {
@@ -82,13 +75,25 @@ pub fn transform(
 
         // Organize each of the patterns into buckets, match on the constructor type of the first
         // pattern
-        
+        let mut constructor_groups: BTreeMap<&String, Vec<&Case>> = BTreeMap::new();
+
+        for constructor in &constructors {
+            let (case_patterns, _) = constructor;
+
+            if let Some(Pattern::Constructor(name, _)) = case_patterns.first() {
+                constructor_groups
+                    .entry(name)
+                    .or_insert_with(Vec::new)
+                    .push(constructor);
+            }
+        }
+
         // For each constructor, add its arguments to the set of { <pattern> : expression } pairs
 
         // Find the first variable pattern; the first one is the only one that will match
         // No variable pattern? Create a catch-all variable that returns the default case.
-        
-        format!("{:?}", constructors)
+
+        format!("{:?}", constructor_groups)
     } else {
         format!("Done.")
     }
@@ -142,39 +147,42 @@ mod tests {
         );
     }
 
-
     #[test]
     fn leading_constructor() {
         /*
-        *   case list of
-        *       Cons(id) -> ... 
-        *       Cons(_) -> ...
-        *       None -> ... 
-        *       rest -> ...
-        *   end
-        * */
+         *   case list of
+         *       Cons(id) -> ...
+         *       Cons(_) -> ...
+         *       None -> ...
+         *       rest -> ...
+         *   end
+         * */
         let node_type = Rc::new(DataType::Integer);
-        let exprs = &[
-            TypedNode::Variable(node_type.clone(), String::from("list"))
-        ];
+        let exprs = &[TypedNode::Variable(node_type.clone(), String::from("list"))];
 
         let patterns = &[
             (
-                vec![Pattern::Constructor(String::from("Cons"), vec![Pattern::Variable(String::from("id"))])],
-                TypedNode::Variable(node_type.clone(), String::from("case_a"))
+                vec![Pattern::Constructor(
+                    String::from("Cons"),
+                    vec![Pattern::Variable(String::from("id"))],
+                )],
+                TypedNode::Variable(node_type.clone(), String::from("case_a")),
             ),
             (
-                vec![Pattern::Constructor(String::from("Cons"), vec![Pattern::Wildcard])],
-                TypedNode::Variable(node_type.clone(), String::from("case_b"))
+                vec![Pattern::Constructor(
+                    String::from("Cons"),
+                    vec![Pattern::Wildcard],
+                )],
+                TypedNode::Variable(node_type.clone(), String::from("case_b")),
             ),
             (
                 vec![Pattern::Constructor(String::from("None"), vec![])],
-                TypedNode::Variable(node_type.clone(), String::from("case_c"))
+                TypedNode::Variable(node_type.clone(), String::from("case_c")),
             ),
             (
                 vec![Pattern::Variable(String::from("rest"))],
-                TypedNode::Variable(node_type.clone(), String::from("case_d"))
-            )
+                TypedNode::Variable(node_type.clone(), String::from("case_d")),
+            ),
         ];
 
         println!(
