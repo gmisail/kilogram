@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::collections::BTreeMap;
 
 use crate::typed::typed_node::TypedNode;
 
@@ -22,27 +22,12 @@ fn has_leading_constructor(patterns: &[(Vec<Pattern>, TypedNode)]) -> bool {
     }
 }
 
-/// From a list of patterns, find a set of constructor names.
-///
-/// * `patterns`:
-fn unique_constructors(patterns: &Vec<Pattern>) -> BTreeSet<String> {
-    let mut names = BTreeSet::new();
-
-    for pattern in patterns {
-        if let Pattern::Constructor(name, ..) = pattern {
-            names.insert(name.clone());
-        }
-    }
-
-    names
-}
-
 ///
 /// From a list of expressions & patterns, create a decision plan for compiling the pattern match.
 ///
 pub fn transform(expressions: &[TypedNode], patterns: &[Case], default: TypedNode) -> String {
     if expressions.len() == 0 {
-        format!("{:?}", patterns.first().unwrap().1)
+        format!("{:?}\n", patterns.first().unwrap().1)
     } else if patterns
         .iter()
         .all(|(pat, _)| pat.first().map_or(false, is_variable_or_wildcard))
@@ -58,7 +43,7 @@ pub fn transform(expressions: &[TypedNode], patterns: &[Case], default: TypedNod
             .collect::<Vec<Case>>();
 
         format!(
-            "case {:?} of\n{}\nend",
+            "case {:?} of\n{}\nend\n",
             head_expr,
             transform(tail_exprs, &new_patterns, default)
         )
@@ -88,12 +73,57 @@ pub fn transform(expressions: &[TypedNode], patterns: &[Case], default: TypedNod
             }
         }
 
-        // For each constructor, add its arguments to the set of { <pattern> : expression } pairs
+        let mut buffer = String::new();
+        buffer.push_str("case {TODO} of\n");
+
+        for (group_name, group) in &constructor_groups {
+            buffer.push_str(format!("{group_name} -> ").as_str());
+
+            let mut pairs = Vec::new();
+
+            for (group_patterns, group_expression) in group {
+                let mut child_patterns = group_patterns.clone();
+                let leading_constr = child_patterns.remove(0);
+
+                if let Pattern::Constructor(_, params) = leading_constr {
+                    let mut unwrapped_params = params.clone();
+                    unwrapped_params.extend(child_patterns);
+
+                    pairs.push((unwrapped_params, group_expression.clone()));
+                } else {
+                    panic!();
+                }
+            }
+
+            let child_exprs = Vec::from(&expressions[1..]);
+            // TODO: Prepend n fresh variables to expressions, where n is the number of arguments in the enum constructor
+
+            buffer.push_str(&transform(&child_exprs, pairs.as_slice(), default.clone()));
+        }
 
         // Find the first variable pattern; the first one is the only one that will match
-        // No variable pattern? Create a catch-all variable that returns the default case.
+        if let Some((var_patterns, var_expr)) = &variables.first() {
+            let mut child_patterns = var_patterns.clone();
+            let matched_var = child_patterns.remove(0);
 
-        format!("{:?}", constructor_groups)
+            let child_exprs = Vec::from(&expressions[1..]);
+
+            if let Pattern::Variable(matched_name) = matched_var {
+                buffer.push_str(format!("{matched_name} -> ").as_str());
+            }
+
+            buffer.push_str(&transform(
+                &child_exprs,
+                &[(child_patterns, var_expr.clone())],
+                default.clone(),
+            ));
+        } else {
+            // No variable pattern? Create a catch-all variable that returns the default case.
+        }
+
+        buffer.push_str("\nend\n");
+
+        buffer
     } else {
         format!("Done.")
     }
@@ -104,7 +134,7 @@ mod tests {
     use std::rc::Rc;
 
     use crate::{
-        pattern::{matrix::transform, Pattern},
+        pattern::{compiler::transform, Pattern},
         typed::{data_type::DataType, typed_node::TypedNode},
     };
 
@@ -151,11 +181,14 @@ mod tests {
     fn leading_constructor() {
         /*
          *   case list of
-         *       Cons(id) -> ...
-         *       Cons(_) -> ...
-         *       None -> ...
-         *       rest -> ...
+         *       Cons(id) -> case_a
+         *       Cons(_) -> case_b
+         *       None -> case_c
+         *       rest -> case_d
          *   end
+         *
+         *   In this example, the first set of 'Cons' will reduce to just the initial case, since 'id'
+         *   will capture everything before the wildcard does.
          * */
         let node_type = Rc::new(DataType::Integer);
         let exprs = &[TypedNode::Variable(node_type.clone(), String::from("list"))];

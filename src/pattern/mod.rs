@@ -1,5 +1,5 @@
 mod clause;
-mod matrix;
+mod compiler;
 
 use crate::typed::typed_node::TypedNode;
 
