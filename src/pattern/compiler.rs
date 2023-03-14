@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
+use std::rc::Rc;
 
+use crate::typed::data_type::DataType;
 use crate::typed::typed_node::TypedNode;
 
 use super::Pattern;
@@ -23,9 +25,24 @@ fn has_leading_constructor(patterns: &[(Vec<Pattern>, TypedNode)]) -> bool {
 }
 
 ///
-/// From a list of expressions & patterns, create a decision plan for compiling the pattern match.
+/// From a list of expressions & patterns, desugar the pattern match such that we only match against primitives.
 ///
 pub fn transform(expressions: &[TypedNode], patterns: &[Case], default: TypedNode) -> String {
+    // Ensure that we:
+    //   a) have at least one pattern
+    //   b) the number of expressions is equal to the width of the pattern matrix
+    assert!(patterns.len() > 0);
+    assert!(patterns
+        .iter()
+        .all(|(case_patterns, _)| { expressions.len() == case_patterns.len() }));
+
+    /*
+        Cases:
+            - No more expressions to match against.
+            - Every pattern has a leading wildcard or variable.
+            - There is a series of constructors followed by a list of variables.
+            - There is a mix of constructors and variables.
+    */
     if expressions.len() == 0 {
         format!("{:?}\n", patterns.first().unwrap().1)
     } else if patterns
@@ -37,8 +54,11 @@ pub fn transform(expressions: &[TypedNode], patterns: &[Case], default: TypedNod
         let new_patterns = patterns
             .iter()
             .map(|(case_patterns, case_expr)| {
-                let (_, tail) = case_patterns.split_first().unwrap();
-                (tail.to_vec(), case_expr.clone())
+                if let Some((_, tail)) = case_patterns.split_first() {
+                    (tail.to_vec(), case_expr.clone())
+                } else {
+                    panic!()
+                }
             })
             .collect::<Vec<Case>>();
 
@@ -74,7 +94,7 @@ pub fn transform(expressions: &[TypedNode], patterns: &[Case], default: TypedNod
         }
 
         let mut buffer = String::new();
-        buffer.push_str("case {TODO} of\n");
+        buffer.push_str(&format!("case {:?} of\n", expressions));
 
         for (group_name, group) in &constructor_groups {
             buffer.push_str(format!("{group_name} -> ").as_str());
@@ -95,8 +115,18 @@ pub fn transform(expressions: &[TypedNode], patterns: &[Case], default: TypedNod
                 }
             }
 
-            let child_exprs = Vec::from(&expressions[1..]);
             // TODO: Prepend n fresh variables to expressions, where n is the number of arguments in the enum constructor
+            let node_type = Rc::new(DataType::Integer);
+            let mut child_exprs = if group_name.contains("Cons") {
+                vec![
+                    TypedNode::Variable(node_type.clone(), String::from("a")),
+                    TypedNode::Variable(node_type.clone(), String::from("b")),
+                ]
+            } else {
+                Vec::new()
+            };
+
+            child_exprs.extend(Vec::from(&expressions[1..]));
 
             buffer.push_str(&transform(&child_exprs, pairs.as_slice(), default.clone()));
         }
@@ -181,8 +211,8 @@ mod tests {
     fn leading_constructor() {
         /*
          *   case list of
-         *       Cons(id) -> case_a
-         *       Cons(_) -> case_b
+         *       Cons(id, Cons(id2, None)) -> case_a
+         *       Cons(wildcard1, wildcard2) -> case_b
          *       None -> case_c
          *       rest -> case_d
          *   end
@@ -197,14 +227,26 @@ mod tests {
             (
                 vec![Pattern::Constructor(
                     String::from("Cons"),
-                    vec![Pattern::Variable(String::from("id"))],
+                    vec![
+                        Pattern::Variable(String::from("id")),
+                        Pattern::Constructor(
+                            String::from("Cons"),
+                            vec![
+                                Pattern::Variable(String::from("id2")),
+                                Pattern::Constructor(String::from("None"), vec![]),
+                            ],
+                        ),
+                    ],
                 )],
                 TypedNode::Variable(node_type.clone(), String::from("case_a")),
             ),
             (
                 vec![Pattern::Constructor(
                     String::from("Cons"),
-                    vec![Pattern::Wildcard],
+                    vec![
+                        Pattern::Variable(String::from("wildcard1")),
+                        Pattern::Variable(String::from("wildcard2")),
+                    ],
                 )],
                 TypedNode::Variable(node_type.clone(), String::from("case_b")),
             ),
