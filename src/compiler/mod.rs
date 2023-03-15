@@ -9,8 +9,6 @@ use crate::typechecker::Typechecker;
 use crate::typed::data_type::DataType;
 use crate::typed::typed_node::TypedNode;
 
-use crate::pattern;
-
 use self::emitter::emit_if;
 use self::{
     emitter::{emit_binary, emit_unary},
