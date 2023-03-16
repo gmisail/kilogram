@@ -1,4 +1,3 @@
-mod clause;
 mod compiler;
 
 use crate::typed::typed_node::TypedNode;

@@ -36,8 +36,8 @@ impl PatternCompiler {
     ///
     /// Given a list of cases, group by the leading constructor (if it has one.)
     ///
-    fn group_by_constructor(&self, constructors: &Vec<&Case>) -> BTreeMap<&String, Vec<&Case>> {
-        let groups = BTreeMap::new();
+    fn group_by_constructor<'a>(&'a self, constructors: &Vec<&'a Case>) -> BTreeMap<&String, Vec<&'a Case>> {
+        let mut groups = BTreeMap::new();
 
         for constructor in constructors {
             let (case_patterns, _) = constructor;
@@ -65,14 +65,14 @@ impl PatternCompiler {
             let variant_types = variants.get(variant_name).unwrap();
 
             // TODO: For every argument, generate a fresh name.
-            let fresh_names = variant_types
+            let fresh_names: Vec<String> = variant_types
                 .iter()
                 .map(|_| String::from("fresh_var"))
                 .collect();
 
             let fresh_variables = variant_types
                 .iter()
-                .zip(fresh_names)
+                .zip(fresh_names.clone())
                 .map(|(variant_type, fresh_name)| {
                     TypedNode::Variable(variant_type.clone(), fresh_name)
                 })
@@ -122,15 +122,15 @@ impl PatternCompiler {
 
             // Create fresh variables from the arguments of the constructor.
             let constructor_type = head_expr.get_type();
-            let (fresh_names, fresh_vars) =
+            let (fresh_names, mut fresh_vars) =
                 self.generate_fresh_variables_from_constructor(constructor_type, &group_name);
 
             // Generate a generic constructor that we can match against
             let fresh_pattern = Pattern::Constructor(
-                **group_name,
+                (**group_name).clone(),
                 fresh_names
                     .iter()
-                    .map(|fresh_name| Pattern::Variable(*fresh_name))
+                    .map(|fresh_name| Pattern::Variable((*fresh_name).clone()))
                     .collect(),
             );
 
@@ -162,7 +162,9 @@ impl PatternCompiler {
         }
 
         // TODO: in the vector, put the arms of the resultant expression
-        TypedNode::CaseOf(head_expr.get_type(), Box::new(head_expr.clone()), arms)
+        // TypedNode::CaseOf(head_expr.get_type(), Box::new(head_expr.clone()), arms)
+        
+        todo!()
     }
 
     ///
@@ -225,15 +227,13 @@ impl PatternCompiler {
             .iter()
             .all(|(case_patterns, _)| { expressions.len() == case_patterns.len() }));
 
-        /*
-            Cases:
-                - No more expressions to match against.
-                - Every pattern has a leading wildcard or variable.
-                - There is a series of constructors followed by a list of variables.
-                - There is a mix of constructors and variables.
-        */
+        // Cases:
+        // - No more expressions to match against.
+        // - Every pattern has a leading wildcard or variable.
+        // - There is a series of constructors followed by a list of variables.
+        // - There is a mix of constructors and variables.
         if expressions.len() == 0 {
-            patterns.first().unwrap().1
+            patterns.first().unwrap().1.clone()
         } else if patterns.iter().all(|(pat, _)| {
             pat.first().map_or(false, |leading_pattern| {
                 self.is_variable_or_wildcard(leading_pattern)
@@ -251,7 +251,7 @@ impl PatternCompiler {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
+    use std::{rc::Rc, collections::HashMap};
 
     use crate::{
         pattern::{compiler::PatternCompiler, Pattern},
@@ -287,16 +287,8 @@ mod tests {
             ),
         ];
 
-        let compiler = PatternCompiler::new();
-
-        println!(
-            "{}",
-            compiler.transform(
-                exprs,
-                patterns,
-                TypedNode::Variable(node_type.clone(), String::from("default"))
-            )
-        );
+        // TODO: replace with actual enums
+        let compiler = PatternCompiler::new(HashMap::new());
     }
 
     #[test]
@@ -352,15 +344,6 @@ mod tests {
             ),
         ];
 
-        let compiler = PatternCompiler::new();
-
-        println!(
-            "{}",
-            compiler.transform(
-                exprs,
-                patterns,
-                TypedNode::Variable(node_type.clone(), String::from("default"))
-            )
-        );
+        let compiler = PatternCompiler::new(HashMap::new());
     }
 }

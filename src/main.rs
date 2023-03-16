@@ -13,6 +13,7 @@ pub mod scanner;
 pub mod token;
 pub mod typechecker;
 pub mod typed;
+pub mod fresh;
 
 use compiler::Compiler;
 use parser::parse;
