@@ -1,5 +1,4 @@
 /// Generates unique variables for a given namespace, i.e. "variable" or "lambda"
-
 pub struct FreshGenerator {
     subject: &'static str,
     index: usize,
@@ -9,12 +8,12 @@ impl FreshGenerator {
     /// Create a new FreshGenerator with a subject.
     ///
     /// * `subject`: the fresh variable namespace, i.e. "variable", "lambda"
-    fn new(subject: &'static str) -> Self {
+    pub fn new(subject: &'static str) -> Self {
         FreshGenerator { subject, index: 0 }
     }
 
     /// Generates a new fresh variable name.
-    fn next(&mut self) -> String {
+    pub fn next(&mut self) -> String {
         self.index += 1;
 
         format!("_kg_{}_{}", self.subject, self.index - 1)

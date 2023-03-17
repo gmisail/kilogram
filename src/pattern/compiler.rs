@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
+use crate::fresh::generator::FreshGenerator;
 use crate::typed::data_type::DataType;
 use crate::typed::typed_node::TypedNode;
 
@@ -10,11 +11,15 @@ type Case = (Vec<Pattern>, TypedNode);
 
 struct PatternCompiler {
     enums: HashMap<String, Rc<DataType>>,
+    fresh: FreshGenerator,
 }
 
 impl PatternCompiler {
     fn new(enums: HashMap<String, Rc<DataType>>) -> Self {
-        PatternCompiler { enums }
+        PatternCompiler {
+            enums,
+            fresh: FreshGenerator::new("pattern"),
+        }
     }
 
     fn is_variable_or_wildcard(&self, pattern: &Pattern) -> bool {
@@ -36,7 +41,10 @@ impl PatternCompiler {
     ///
     /// Given a list of cases, group by the leading constructor (if it has one.)
     ///
-    fn group_by_constructor<'a>(&'a self, constructors: &Vec<&'a Case>) -> BTreeMap<&String, Vec<&'a Case>> {
+    fn group_by_constructor<'a>(
+        &'a self,
+        constructors: &Vec<&'a Case>,
+    ) -> BTreeMap<&String, Vec<&'a Case>> {
         let mut groups = BTreeMap::new();
 
         for constructor in constructors {
@@ -61,26 +69,35 @@ impl PatternCompiler {
         constructor_type: Rc<DataType>,
         variant_name: &String,
     ) -> (Vec<String>, Vec<TypedNode>) {
-        if let DataType::Enum(_, variants) = &*constructor_type {
-            let variant_types = variants.get(variant_name).unwrap();
+        match &*constructor_type {
+            DataType::Enum(_, variants) => {
+                let variant_types = variants.get(variant_name).unwrap();
 
-            // TODO: For every argument, generate a fresh name.
-            let fresh_names: Vec<String> = variant_types
-                .iter()
-                .map(|_| String::from("fresh_var"))
-                .collect();
+                // TODO: For every argument, generate a fresh name.
+                let fresh_names: Vec<String> = variant_types
+                    .iter()
+                    .map(|_| String::from("fresh") /*self.fresh.next()*/)
+                    .collect();
 
-            let fresh_variables = variant_types
-                .iter()
-                .zip(fresh_names.clone())
-                .map(|(variant_type, fresh_name)| {
-                    TypedNode::Variable(variant_type.clone(), fresh_name)
-                })
-                .collect::<Vec<TypedNode>>();
+                let fresh_variables = variant_types
+                    .iter()
+                    .zip(fresh_names.clone())
+                    .map(|(variant_type, fresh_name)| {
+                        TypedNode::Variable(variant_type.clone(), fresh_name)
+                    })
+                    .collect::<Vec<TypedNode>>();
 
-            (fresh_names, fresh_variables)
-        } else {
-            panic!()
+                (fresh_names, fresh_variables)
+            }
+
+            DataType::NamedReference(parent) => {
+                // TODO: handle this unwrap properly
+                let parent_constr = self.enums.get(parent).unwrap();
+
+                self.generate_fresh_variables_from_constructor(parent_constr.clone(), variant_name)
+            }
+
+            _ => panic!("Unrecognized constructor"),
         }
     }
 
@@ -103,7 +120,7 @@ impl PatternCompiler {
         let (head_expr, remaining_exprs) = expressions.split_first().unwrap();
         let mut arms = Vec::new();
 
-        for (group_name, group) in &constructor_groups {
+        for (group_name, group) in constructor_groups {
             let mut pairs = Vec::new();
 
             for (group_patterns, group_expression) in group {
@@ -122,17 +139,12 @@ impl PatternCompiler {
 
             // Create fresh variables from the arguments of the constructor.
             let constructor_type = head_expr.get_type();
-            let (fresh_names, mut fresh_vars) =
-                self.generate_fresh_variables_from_constructor(constructor_type, &group_name);
+            let (fresh_names, mut fresh_vars) = self
+                .generate_fresh_variables_from_constructor(constructor_type.clone(), &group_name);
 
             // Generate a generic constructor that we can match against
-            let fresh_pattern = Pattern::Constructor(
-                (**group_name).clone(),
-                fresh_names
-                    .iter()
-                    .map(|fresh_name| Pattern::Variable((*fresh_name).clone()))
-                    .collect(),
-            );
+            let fresh_pattern =
+                TypedNode::EnumInstance(constructor_type, group_name.clone(), fresh_vars.clone());
 
             // Prepend these fresh variables to the list of expressions
             fresh_vars.extend(Vec::from(remaining_exprs));
@@ -140,31 +152,36 @@ impl PatternCompiler {
             arms.push((
                 fresh_pattern,
                 self.transform(&fresh_vars, pairs.as_slice(), default.clone()),
+                HashMap::new(),
             ));
         }
 
         // Find the first variable pattern; the first one is the only one that will match.
         if let Some((var_patterns, var_expr)) = &variables.first() {
             let mut child_patterns = var_patterns.clone();
-            let matched_var = child_patterns.remove(0);
+            child_patterns.remove(0);
+
             let child_exprs = Vec::from(remaining_exprs);
 
             arms.push((
-                matched_var,
+                var_expr.clone(),
                 self.transform(
                     &child_exprs,
                     &[(child_patterns, var_expr.clone())],
                     default.clone(),
                 ),
+                HashMap::new(),
             ));
         } else {
-            // TODO: No variable pattern? Create a catch-all variable that returns the default case.
+            // TODO: change this to fresh variable
+            arms.push((
+                TypedNode::Variable(head_expr.get_type(), String::from("wildcard")),
+                default.clone(),
+                HashMap::new()
+            ));
         }
 
-        // TODO: in the vector, put the arms of the resultant expression
-        // TypedNode::CaseOf(head_expr.get_type(), Box::new(head_expr.clone()), arms)
-        
-        todo!()
+        TypedNode::CaseOf(head_expr.get_type(), Box::new(head_expr.clone()), arms)
     }
 
     ///
@@ -251,7 +268,8 @@ impl PatternCompiler {
 
 #[cfg(test)]
 mod tests {
-    use std::{rc::Rc, collections::HashMap};
+    use std::collections::{BTreeMap, HashMap};
+    use std::rc::Rc;
 
     use crate::{
         pattern::{compiler::PatternCompiler, Pattern},
@@ -289,6 +307,9 @@ mod tests {
 
         // TODO: replace with actual enums
         let compiler = PatternCompiler::new(HashMap::new());
+        let result = compiler.transform(exprs, patterns, TypedNode::Integer(node_type.clone(), 0));
+
+        println!("{:?}", result);
     }
 
     #[test]
@@ -305,7 +326,19 @@ mod tests {
          *   will capture everything before the wildcard does.
          * */
         let node_type = Rc::new(DataType::Integer);
-        let exprs = &[TypedNode::Variable(node_type.clone(), String::from("list"))];
+        let mut list_variants = BTreeMap::new();
+        list_variants.insert(String::from("None"), vec![]);
+        list_variants.insert(
+            String::from("Cons"),
+            vec![
+                node_type.clone(),
+                Rc::new(DataType::NamedReference(String::from("List"))),
+            ],
+        );
+
+        let list_type = Rc::new(DataType::Enum(String::from("List"), list_variants));
+
+        let exprs = &[TypedNode::Variable(list_type.clone(), String::from("list"))];
 
         let patterns = &[
             (
@@ -344,6 +377,12 @@ mod tests {
             ),
         ];
 
-        let compiler = PatternCompiler::new(HashMap::new());
+        let mut enums = HashMap::new();
+        enums.insert(String::from("List"), list_type);
+
+        let compiler = PatternCompiler::new(enums);
+        let result = compiler.transform(exprs, patterns, TypedNode::Integer(node_type.clone(), 0));
+
+        println!("{:?}", result);
     }
 }

@@ -1,1 +1,1 @@
-mod generator;
+pub mod generator;
