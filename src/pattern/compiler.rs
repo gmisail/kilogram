@@ -9,13 +9,13 @@ use super::Pattern;
 
 type Case = (Vec<Pattern>, TypedNode);
 
-struct PatternCompiler {
-    enums: HashMap<String, Rc<DataType>>,
+pub struct PatternCompiler<'c> {
+    enums: &'c HashMap<String, Rc<DataType>>,
     fresh: FreshGenerator,
 }
 
-impl PatternCompiler {
-    fn new(enums: HashMap<String, Rc<DataType>>) -> Self {
+impl<'c> PatternCompiler<'c> {
+    pub fn new(enums: &'c HashMap<String, Rc<DataType>>) -> Self {
         PatternCompiler {
             enums,
             fresh: FreshGenerator::new("pattern"),
@@ -305,8 +305,8 @@ mod tests {
             ),
         ];
 
-        // TODO: replace with actual enums
-        let compiler = PatternCompiler::new(HashMap::new());
+        let enums = HashMap::new();
+        let compiler = PatternCompiler::new(&enums);
         let result = compiler.transform(exprs, patterns, TypedNode::Integer(node_type.clone(), 0));
 
         println!("{:?}", result);
@@ -380,7 +380,7 @@ mod tests {
         let mut enums = HashMap::new();
         enums.insert(String::from("List"), list_type);
 
-        let compiler = PatternCompiler::new(enums);
+        let compiler = PatternCompiler::new(&enums);
         let result = compiler.transform(exprs, patterns, TypedNode::Integer(node_type.clone(), 0));
 
         println!("{:?}", result);

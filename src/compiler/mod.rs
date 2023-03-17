@@ -5,9 +5,11 @@ use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
 use crate::compiler::builder::enum_builder::EnumBuilder;
 use crate::compiler::builder::struct_builder::StructBuilder;
 use crate::compiler::free::find_free;
+use crate::pattern::Pattern;
 use crate::typechecker::Typechecker;
 use crate::typed::data_type::DataType;
 use crate::typed::typed_node::TypedNode;
+use crate::pattern::compiler::PatternCompiler;
 
 use self::emitter::emit_if;
 use self::{
@@ -537,6 +539,23 @@ impl Compiler {
         buffer
     }
 
+    fn compile_case_of(&mut self, expression: &TypedNode, arms: &[(TypedNode, TypedNode, HashMap<String, Rc<DataType>>)]) -> String {
+        let pattern_arms = arms
+                .iter()
+                .map(|(pattern, body, _)| (vec![Pattern::new(pattern)], body.clone()))
+                .collect::<Vec<(Vec<Pattern>, TypedNode)>>();
+
+        // TODO: replace this with panic 
+        let default = TypedNode::Variable(Rc::new(DataType::Integer), String::from("nothing"));
+        
+        let pattern_compiler = PatternCompiler::new(&self.enums);
+        let tree = pattern_compiler.transform(&[expression.clone()], &pattern_arms, default);
+
+        println!("{:?}", tree);
+        
+        todo!()
+    }
+
     fn compile_enum_instance(
         &mut self,
         enum_type: &Rc<DataType>,
@@ -585,7 +604,7 @@ impl Compiler {
                 self.compile_expression(else_expr),
             ),
 
-            TypedNode::CaseOf(..) => todo!(),
+            TypedNode::CaseOf(_, expr, arms) => self.compile_case_of(expr, arms),
 
             TypedNode::Let(name, var_type, value, body, is_rec) => {
                 self.compile_let(name, var_type, value, body, *is_rec)
@@ -593,8 +612,6 @@ impl Compiler {
 
             TypedNode::Function(_, func_type, arg_types, value) => {
                 let mut free_vars = find_free(expression);
-
-                println!("{:?}", free_vars.keys());
 
                 // External functions can be accessed without being passed down as
                 // and environment variable.

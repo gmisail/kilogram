@@ -1,4 +1,4 @@
-mod compiler;
+pub mod compiler;
 
 use crate::typed::typed_node::TypedNode;
 
