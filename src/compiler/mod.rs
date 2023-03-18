@@ -551,8 +551,6 @@ impl Compiler {
         let pattern_compiler = PatternCompiler::new(&self.enums);
         let tree = pattern_compiler.transform(&[expression.clone()], &pattern_arms, default);
 
-        println!("{:?}", tree);
-        
         todo!()
     }
 
