@@ -7,6 +7,7 @@ use std::{
 
 pub mod ast;
 pub mod compiler;
+pub mod desugar;
 pub mod fresh;
 pub mod parser;
 pub mod pattern;
@@ -14,14 +15,13 @@ pub mod scanner;
 pub mod token;
 pub mod typechecker;
 pub mod typed;
-pub mod desugar;
 
 use compiler::Compiler;
 use parser::parse;
 use typechecker::Typechecker;
 
-use desugar::DesugarPhase;
 use desugar::pattern::PatternPhase;
+use desugar::DesugarPhase;
 
 fn compile(file: &str) -> Result<(), String> {
     let mut file = File::open(file).expect("Failed to load file.");
@@ -46,7 +46,7 @@ fn compile(file: &str) -> Result<(), String> {
     let (_, root_node) = checker.resolve_type(&tree)?;
     println!("Finished type-checking in {:?}", start_type.elapsed());
 
-    let desugared_tree = PatternPhase{}.transform(&root_node);
+    let desugared_tree = PatternPhase {}.transform(&root_node);
     println!("{:?}", desugared_tree);
 
     let mut compiler = Compiler::new(checker);

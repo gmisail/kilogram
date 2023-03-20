@@ -177,7 +177,7 @@ impl<'c> PatternCompiler<'c> {
             arms.push((
                 TypedNode::Variable(head_expr.get_type(), String::from("wildcard")),
                 default.clone(),
-                HashMap::new()
+                HashMap::new(),
             ));
         }
 

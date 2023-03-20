@@ -1,5 +1,4 @@
 /// Handles desugaring expressions into an expanded form.
-
 use crate::typed::typed_node::TypedNode;
 
 pub mod pattern;
@@ -9,4 +8,3 @@ pub mod pattern;
 pub trait DesugarPhase {
     fn transform(&self, root: &TypedNode) -> TypedNode;
 }
-

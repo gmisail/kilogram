@@ -6,11 +6,11 @@ use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
 use crate::compiler::builder::enum_builder::EnumBuilder;
 use crate::compiler::builder::struct_builder::StructBuilder;
 use crate::compiler::free::find_free;
+use crate::pattern::compiler::PatternCompiler;
 use crate::pattern::Pattern;
 use crate::typechecker::Typechecker;
 use crate::typed::data_type::DataType;
 use crate::typed::typed_node::TypedNode;
-use crate::pattern::compiler::PatternCompiler;
 
 use self::emitter::emit_if;
 use self::{
@@ -540,13 +540,17 @@ impl Compiler {
         buffer
     }
 
-    fn compile_case_of(&mut self, expression: &TypedNode, arms: &[(TypedNode, TypedNode, HashMap<String, Rc<DataType>>)]) -> String {
+    fn compile_case_of(
+        &mut self,
+        expression: &TypedNode,
+        arms: &[(TypedNode, TypedNode, HashMap<String, Rc<DataType>>)],
+    ) -> String {
         let pattern_arms = arms
-                .iter()
-                .map(|(pattern, body, _)| (vec![Pattern::new(pattern)], body.clone()))
-                .collect::<Vec<(Vec<Pattern>, TypedNode)>>();
+            .iter()
+            .map(|(pattern, body, _)| (vec![Pattern::new(pattern)], body.clone()))
+            .collect::<Vec<(Vec<Pattern>, TypedNode)>>();
 
-        // TODO: replace this with panic 
+        // TODO: replace this with panic
         let default = TypedNode::Variable(Rc::new(DataType::Integer), String::from("nothing"));
 
         let pattern_compiler = PatternCompiler::new(&self.enums);
