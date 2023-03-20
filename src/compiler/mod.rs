@@ -1,3 +1,4 @@
+use std::any::TypeId;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
@@ -547,7 +548,7 @@ impl Compiler {
 
         // TODO: replace this with panic 
         let default = TypedNode::Variable(Rc::new(DataType::Integer), String::from("nothing"));
-        
+
         let pattern_compiler = PatternCompiler::new(&self.enums);
         let tree = pattern_compiler.transform(&[expression.clone()], &pattern_arms, default);
 

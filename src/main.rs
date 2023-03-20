@@ -19,8 +19,9 @@ pub mod desugar;
 use compiler::Compiler;
 use parser::parse;
 use typechecker::Typechecker;
-use desugar::PatternPhase;
+
 use desugar::DesugarPhase;
+use desugar::pattern::PatternPhase;
 
 fn compile(file: &str) -> Result<(), String> {
     let mut file = File::open(file).expect("Failed to load file.");
