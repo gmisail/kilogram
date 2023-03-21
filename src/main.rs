@@ -9,10 +9,12 @@ pub mod ast;
 pub mod compiler;
 pub mod fresh;
 pub mod parser;
-pub mod pattern;
 pub mod scanner;
 pub mod token;
 pub mod typechecker;
+
+pub mod preprocess;
+pub mod postprocess;
 
 use compiler::Compiler;
 use parser::parse;

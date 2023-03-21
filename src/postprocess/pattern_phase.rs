@@ -1,9 +1,18 @@
 /// Transforms pattern matching expressions into simple matches on primitives.
-use super::DesugarPhase;
-use crate::pattern::compiler::PatternCompiler;
-use crate::typed::typed_node::TypedNode;
+use std::collections::HashMap;
+use std::rc::Rc;
 
-pub struct PatternPhase;
+use crate::postprocess::PostprocessPhase;
+use crate::postprocess::pattern::compiler::PatternCompiler;
+
+use crate::ast::typed::data_type::DataType;
+use crate::ast::typed::typed_node::TypedNode;
+
+use super::pattern::Pattern;
+
+pub struct PatternPhase {
+    enums: HashMap<String, Rc<DataType>>
+}
 
 impl PostprocessPhase for PatternPhase {
     /// Replace the body of each node with its desugared version. All
@@ -92,9 +101,19 @@ impl PostprocessPhase for PatternPhase {
             ),
 
             TypedNode::CaseOf(data_type, expr, arms) => {
-                // let compiler = PatternCompiler::new(enums)
+                let compiler = PatternCompiler::new(&self.enums);
 
-                todo!()
+                // TODO: change to more permanent solution
+                let default = TypedNode::Variable(data_type.clone(), String::from("default_case"));
+
+                let patterns = arms
+                    .iter()
+                    .map(|(arm_cond, arm_body, _)| {
+                        (vec![Pattern::new(arm_cond)], self.transform(&*arm_body))
+                    })
+                    .collect::<Vec<(Vec<Pattern>, TypedNode)>>();
+
+                compiler.transform(&[**expr], &patterns, default)
             }
         }
     }

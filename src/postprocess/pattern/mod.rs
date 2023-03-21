@@ -32,7 +32,7 @@ impl Pattern {
 mod tests {
     use std::rc::Rc;
 
-    use crate::pattern::Pattern;
+    use crate::postprocess::pattern::Pattern;
 
     use crate::ast::typed::data_type::DataType;
     use crate::ast::typed::typed_node::TypedNode;
