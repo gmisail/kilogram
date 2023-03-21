@@ -442,7 +442,7 @@ impl Typechecker {
                         let resolved_type = self.resolve_reference(unbound_type.clone())?;
                         resolved_vars.insert(unbound_name.clone(), resolved_type.clone());
 
-                        self.add_variable(&unbound_name, resolved_type)?;
+                        self.add_variable(unbound_name, resolved_type)?;
                     }
 
                     let (cond_type, cond_node) = self.resolve_type(arm_cond)?;

@@ -33,7 +33,7 @@ impl EnumBuilder {
             buffer.push_str("struct {\n");
 
             for (index, variant_type) in variant_types.iter().enumerate() {
-                buffer.push_str(format!("{} {}_{};\n", variant_type, variant_name, index).as_str());
+                buffer.push_str(format!("{variant_type} {variant_name}_{index};\n").as_str());
             }
 
             buffer.push_str("};\n");

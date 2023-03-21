@@ -14,10 +14,10 @@ fn unify_variant(
 
     match variant {
         Some(types) => {
-            if types.len() == 0 && arguments.len() == 0 {
+            if types.is_empty() && arguments.is_empty() {
                 // No variables to capture since there are no arguments.
                 Ok(HashMap::new())
-            } else if types.len() > 0 && types.len() == arguments.len() {
+            } else if !types.is_empty() && types.len() == arguments.len() {
                 let mut unbound = HashMap::new();
 
                 // TODO: make this more robust, more like a pattern matching system.
@@ -35,7 +35,7 @@ fn unify_variant(
             }
         }
 
-        None => return Err("Cannot find variant.".to_string()),
+        None => Err("Cannot find variant.".to_string()),
     }
 }
 
@@ -47,7 +47,7 @@ pub fn unify_enum(
         unify_variant(name, variants, &[])
     } else if let UntypedNode::FunctionCall(parent, arguments) = expression {
         if let UntypedNode::Variable(name) = &**parent {
-            unify_variant(name, variants, &arguments)
+            unify_variant(name, variants, arguments)
         } else {
             Err("Cannot unify non-enum type.".to_string())
         }

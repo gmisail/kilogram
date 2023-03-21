@@ -109,11 +109,11 @@ impl PostprocessPhase for PatternPhase {
                 let patterns = arms
                     .iter()
                     .map(|(arm_cond, arm_body, _)| {
-                        (vec![Pattern::new(arm_cond)], self.transform(&*arm_body))
+                        (vec![Pattern::new(arm_cond)], self.transform(arm_body))
                     })
                     .collect::<Vec<(Vec<Pattern>, TypedNode)>>();
 
-                compiler.transform(&[**expr], &patterns, default)
+                compiler.transform(&[(**expr).clone()], &patterns, default)
             }
         }
     }

@@ -5,8 +5,6 @@ use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
 use crate::compiler::builder::enum_builder::EnumBuilder;
 use crate::compiler::builder::struct_builder::StructBuilder;
 use crate::compiler::free::find_free;
-use crate::pattern::compiler::PatternCompiler;
-use crate::pattern::Pattern;
 use crate::typechecker::Typechecker;
 use crate::ast::typed::data_type::DataType;
 use crate::ast::typed::typed_node::TypedNode;
@@ -129,7 +127,7 @@ impl Compiler {
 
         // Declare forward declarations.
         for enum_name in self.enums.keys() {
-            buffer.push_str(format!("typedef struct {} {};\n", enum_name, enum_name).as_str());
+            buffer.push_str(format!("typedef struct {enum_name} {enum_name};\n").as_str());
         }
 
         for (enum_name, enum_def) in &self.enums {
@@ -161,7 +159,7 @@ impl Compiler {
 
         // Declare forward declarations.
         for record_name in self.record_types.keys() {
-            buffer.push_str(format!("typedef struct {} {};\n", record_name, record_name).as_str());
+            buffer.push_str(format!("typedef struct {record_name} {record_name};\n").as_str());
         }
 
         // Generate a named struct and its constructor.
@@ -541,20 +539,9 @@ impl Compiler {
 
     fn compile_case_of(
         &mut self,
-        expression: &TypedNode,
-        arms: &[(TypedNode, TypedNode, HashMap<String, Rc<DataType>>)],
+        _expression: &TypedNode,
+        _arms: &[(TypedNode, TypedNode, HashMap<String, Rc<DataType>>)],
     ) -> String {
-        let pattern_arms = arms
-            .iter()
-            .map(|(pattern, body, _)| (vec![Pattern::new(pattern)], body.clone()))
-            .collect::<Vec<(Vec<Pattern>, TypedNode)>>();
-
-        // TODO: replace this with panic
-        let default = TypedNode::Variable(Rc::new(DataType::Integer), String::from("nothing"));
-
-        let pattern_compiler = PatternCompiler::new(&self.enums);
-        let tree = pattern_compiler.transform(&[expression.clone()], &pattern_arms, default);
-
         todo!()
     }
 

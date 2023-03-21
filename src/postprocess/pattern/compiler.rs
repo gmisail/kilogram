@@ -139,8 +139,8 @@ impl<'c> PatternCompiler<'c> {
 
             // Create fresh variables from the arguments of the constructor.
             let constructor_type = head_expr.get_type();
-            let (fresh_names, mut fresh_vars) = self
-                .generate_fresh_variables_from_constructor(constructor_type.clone(), &group_name);
+            let (_fresh_names, mut fresh_vars) = self
+                .generate_fresh_variables_from_constructor(constructor_type.clone(), group_name);
 
             // Generate a generic constructor that we can match against
             let fresh_pattern =
@@ -239,7 +239,7 @@ impl<'c> PatternCompiler<'c> {
         // Ensure that we:
         //   a) have at least one pattern
         //   b) the number of expressions is equal to the width of the pattern matrix
-        assert!(patterns.len() > 0);
+        assert!(!patterns.is_empty());
         assert!(patterns
             .iter()
             .all(|(case_patterns, _)| { expressions.len() == case_patterns.len() }));
@@ -249,7 +249,7 @@ impl<'c> PatternCompiler<'c> {
         // - Every pattern has a leading wildcard or variable.
         // - There is a series of constructors followed by a list of variables.
         // - There is a mix of constructors and variables.
-        if expressions.len() == 0 {
+        if expressions.is_empty() {
             patterns.first().unwrap().1.clone()
         } else if patterns.iter().all(|(pat, _)| {
             pat.first().map_or(false, |leading_pattern| {
