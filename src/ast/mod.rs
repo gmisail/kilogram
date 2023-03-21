@@ -1,3 +1,4 @@
-pub mod ast_type;
+pub mod untyped;
+pub mod typed;
+
 pub mod operator;
-pub mod untyped_node;

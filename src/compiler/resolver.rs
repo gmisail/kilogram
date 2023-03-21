@@ -4,7 +4,7 @@
 
 use std::rc::Rc;
 
-use crate::typed::data_type::DataType;
+use crate::ast::typed::data_type::DataType;
 
 pub fn get_function_pointer(name: String, internal_type: Rc<DataType>) -> String {
     match &*internal_type {

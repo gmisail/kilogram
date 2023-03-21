@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
 use crate::fresh::generator::FreshGenerator;
-use crate::typed::data_type::DataType;
-use crate::typed::typed_node::TypedNode;
+use crate::ast::typed::data_type::DataType;
+use crate::ast::typed::typed_node::TypedNode;
 
 use super::Pattern;
 
@@ -273,7 +273,7 @@ mod tests {
 
     use crate::{
         pattern::{compiler::PatternCompiler, Pattern},
-        typed::{data_type::DataType, typed_node::TypedNode},
+        ast::typed::{data_type::DataType, typed_node::TypedNode},
     };
 
     #[test]

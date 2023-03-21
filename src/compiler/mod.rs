@@ -1,4 +1,3 @@
-use std::any::TypeId;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
@@ -9,8 +8,8 @@ use crate::compiler::free::find_free;
 use crate::pattern::compiler::PatternCompiler;
 use crate::pattern::Pattern;
 use crate::typechecker::Typechecker;
-use crate::typed::data_type::DataType;
-use crate::typed::typed_node::TypedNode;
+use crate::ast::typed::data_type::DataType;
+use crate::ast::typed::typed_node::TypedNode;
 
 use self::emitter::emit_if;
 use self::{

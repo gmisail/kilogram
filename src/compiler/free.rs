@@ -4,7 +4,7 @@
 
 use std::{collections::HashMap, rc::Rc};
 
-use crate::typed::{data_type::DataType, typed_node::TypedNode};
+use crate::ast::typed::{data_type::DataType, typed_node::TypedNode};
 
 pub fn find_free(node: &TypedNode) -> HashMap<String, Rc<DataType>> {
     match node {

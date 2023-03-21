@@ -1,6 +1,6 @@
 pub mod compiler;
 
-use crate::typed::typed_node::TypedNode;
+use crate::ast::typed::typed_node::TypedNode;
 
 #[derive(Clone, Debug)]
 pub enum Pattern {
@@ -34,8 +34,8 @@ mod tests {
 
     use crate::pattern::Pattern;
 
-    use crate::typed::data_type::DataType;
-    use crate::typed::typed_node::TypedNode;
+    use crate::ast::typed::data_type::DataType;
+    use crate::ast::typed::typed_node::TypedNode;
 
     #[test]
     fn creates_variable() {

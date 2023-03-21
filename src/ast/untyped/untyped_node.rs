@@ -1,9 +1,7 @@
 use std::fmt::Display;
 
-use super::{
-    ast_type::AstType,
-    operator::{BinaryOperator, LogicalOperator, UnaryOperator},
-};
+use super::ast_type::AstType;
+use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
 
 #[derive(Clone)]
 pub enum UntypedNode {
