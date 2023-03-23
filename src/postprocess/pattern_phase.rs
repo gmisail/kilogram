@@ -2,19 +2,25 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::postprocess::PostprocessPhase;
 use crate::postprocess::pattern::compiler::PatternCompiler;
+use crate::postprocess::PostprocessPhase;
 
 use crate::ast::typed::data_type::DataType;
 use crate::ast::typed::typed_node::TypedNode;
 
 use super::pattern::Pattern;
 
-pub struct PatternPhase {
-    enums: HashMap<String, Rc<DataType>>
+pub struct PatternPhase<'a> {
+    enums: &'a HashMap<String, Rc<DataType>>,
 }
 
-impl PostprocessPhase for PatternPhase {
+impl<'a> PatternPhase<'a> {
+    pub fn new(enums: &'a HashMap<String, Rc<DataType>>) -> Self {
+        PatternPhase { enums }
+    }
+}
+
+impl<'a> PostprocessPhase for PatternPhase<'a> {
     /// Replace the body of each node with its desugared version. All
     /// nodes with no body are unchanged.
     fn transform(&self, root: &TypedNode) -> TypedNode {
@@ -101,7 +107,7 @@ impl PostprocessPhase for PatternPhase {
             ),
 
             TypedNode::CaseOf(data_type, expr, arms) => {
-                let compiler = PatternCompiler::new(&self.enums);
+                let compiler = PatternCompiler::new(self.enums);
 
                 // TODO: change to more permanent solution
                 let default = TypedNode::Variable(data_type.clone(), String::from("default_case"));

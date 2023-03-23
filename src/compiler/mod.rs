@@ -2,12 +2,12 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::rc::Rc;
 
 use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
+use crate::ast::typed::data_type::DataType;
+use crate::ast::typed::typed_node::TypedNode;
 use crate::compiler::builder::enum_builder::EnumBuilder;
 use crate::compiler::builder::struct_builder::StructBuilder;
 use crate::compiler::free::find_free;
 use crate::typechecker::Typechecker;
-use crate::ast::typed::data_type::DataType;
-use crate::ast::typed::typed_node::TypedNode;
 
 use self::emitter::emit_if;
 use self::{

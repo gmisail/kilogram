@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
-use crate::fresh::generator::FreshGenerator;
 use crate::ast::typed::data_type::DataType;
 use crate::ast::typed::typed_node::TypedNode;
+use crate::fresh::generator::FreshGenerator;
 
 use super::Pattern;
 
@@ -11,22 +11,19 @@ type Case = (Vec<Pattern>, TypedNode);
 
 pub struct PatternCompiler<'c> {
     enums: &'c HashMap<String, Rc<DataType>>,
-    fresh: FreshGenerator,
+    _fresh: FreshGenerator,
 }
 
 impl<'c> PatternCompiler<'c> {
     pub fn new(enums: &'c HashMap<String, Rc<DataType>>) -> Self {
         PatternCompiler {
             enums,
-            fresh: FreshGenerator::new("pattern"),
+            _fresh: FreshGenerator::new("pattern"),
         }
     }
 
     fn is_variable_or_wildcard(&self, pattern: &Pattern) -> bool {
-        match pattern {
-            Pattern::Variable(..) | Pattern::Wildcard => true,
-            _ => false,
-        }
+        matches!(pattern, Pattern::Variable(..) | Pattern::Wildcard)
     }
 
     fn has_leading_constructor(&self, patterns: &[(Vec<Pattern>, TypedNode)]) -> bool {
@@ -54,7 +51,7 @@ impl<'c> PatternCompiler<'c> {
                 groups
                     .entry(name)
                     .or_insert_with(Vec::new)
-                    .push(constructor.clone());
+                    .push(*constructor);
             }
         }
 
@@ -272,8 +269,8 @@ mod tests {
     use std::rc::Rc;
 
     use crate::{
-        pattern::{compiler::PatternCompiler, Pattern},
         ast::typed::{data_type::DataType, typed_node::TypedNode},
+        postprocess::pattern::{compiler::PatternCompiler, Pattern},
     };
 
     #[test]

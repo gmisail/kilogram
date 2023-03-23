@@ -3,7 +3,7 @@ use std::{
     rc::Rc,
 };
 
-use crate::{ast::untyped::untyped_node::UntypedNode, ast::typed::data_type::DataType};
+use crate::{ast::typed::data_type::DataType, ast::untyped::untyped_node::UntypedNode};
 
 fn unify_variant(
     name: &String,

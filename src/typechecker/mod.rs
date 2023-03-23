@@ -6,10 +6,10 @@ mod rules;
 mod unify;
 
 use crate::ast::operator::BinaryOperator;
+use crate::ast::typed::data_type::DataType;
 use crate::ast::untyped::untyped_node::UntypedNode;
 use crate::typechecker::unify::unify_enum;
-use crate::ast::typed::data_type::DataType;
-use crate::{ast::untyped::ast_type::AstType, ast::typed::typed_node::TypedNode};
+use crate::{ast::typed::typed_node::TypedNode, ast::untyped::ast_type::AstType};
 use rules::{check_binary, check_logical, check_unary};
 
 pub struct Typechecker {

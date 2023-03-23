@@ -1,6 +1,6 @@
-use crate::ast::untyped::untyped_node::UntypedNode;
-use crate::ast::untyped::ast_type::AstType;
 use crate::ast::operator::*;
+use crate::ast::untyped::ast_type::AstType;
+use crate::ast::untyped::untyped_node::UntypedNode;
 
 use super::scanner;
 use super::token::{Token, TokenKind};

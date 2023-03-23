@@ -13,12 +13,14 @@ pub mod scanner;
 pub mod token;
 pub mod typechecker;
 
-pub mod preprocess;
 pub mod postprocess;
+pub mod preprocess;
 
 use compiler::Compiler;
 use parser::parse;
 use typechecker::Typechecker;
+
+use crate::postprocess::apply_all;
 
 fn compile(file: &str) -> Result<(), String> {
     let mut file = File::open(file).expect("Failed to load file.");
@@ -43,8 +45,14 @@ fn compile(file: &str) -> Result<(), String> {
     let (_, root_node) = checker.resolve_type(&tree)?;
     println!("Finished type-checking in {:?}", start_type.elapsed());
 
+    let start_post = Instant::now();
+    let postprocessed_node = apply_all(&root_node, &checker.enums);
+    println!("Finished postprocessing in {:?}", start_post.elapsed());
+
+    let start_comp = Instant::now();
     let mut compiler = Compiler::new(checker);
-    let source = compiler.compile(&root_node);
+    let source = compiler.compile(&postprocessed_node);
+    println!("Finished compilng in {:?}", start_comp.elapsed());
 
     fs::write("./out.c", source).expect("Failed to write file.");
 
