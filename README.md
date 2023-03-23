@@ -8,16 +8,18 @@ enum IntList
     Cons(int, IntList)
 end
 
-let rec make_list(initial_value: int, len: int): IntList
-    if len == 0 then
-    	None
-    else
-    	Cons(initial_value, make_list(inital_value, len - 1))
+let rec length(list: IntList): int
+    case list of 
+        Cons(num, next) -> 1 + length(next),
+	Nil -> 0
+    end
 end
 
 let rec factorial = function(x: int): int 
-	if x == 0 then 1
-	else x * factorial(x - 1)
+    if x == 0 then 
+    	1
+    else 
+    	x * factorial(x - 1)
 end
 
 let iter = 10
