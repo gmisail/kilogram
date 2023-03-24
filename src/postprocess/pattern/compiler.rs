@@ -1,9 +1,10 @@
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
+use crate::fresh::generator::fresh_variable;
+
 use crate::ast::typed::data_type::DataType;
 use crate::ast::typed::typed_node::TypedNode;
-use crate::fresh::generator::FreshGenerator;
 
 use super::Pattern;
 
@@ -11,14 +12,12 @@ type Case = (Vec<Pattern>, TypedNode);
 
 pub struct PatternCompiler<'c> {
     enums: &'c HashMap<String, Rc<DataType>>,
-    _fresh: FreshGenerator,
 }
 
 impl<'c> PatternCompiler<'c> {
     pub fn new(enums: &'c HashMap<String, Rc<DataType>>) -> Self {
         PatternCompiler {
             enums,
-            _fresh: FreshGenerator::new("pattern"),
         }
     }
 
@@ -70,10 +69,9 @@ impl<'c> PatternCompiler<'c> {
             DataType::Enum(_, variants) => {
                 let variant_types = variants.get(variant_name).unwrap();
 
-                // TODO: For every argument, generate a fresh name.
                 let fresh_names: Vec<String> = variant_types
                     .iter()
-                    .map(|_| String::from("fresh") /*self.fresh.next()*/)
+                    .map(|_| fresh_variable("pattern"))
                     .collect();
 
                 let fresh_variables = variant_types
@@ -88,10 +86,11 @@ impl<'c> PatternCompiler<'c> {
             }
 
             DataType::NamedReference(parent) => {
-                // TODO: handle this unwrap properly
-                let parent_constr = self.enums.get(parent).unwrap();
-
-                self.generate_fresh_variables_from_constructor(parent_constr.clone(), variant_name)
+                if let Some(parent_constr) = self.enums.get(parent) {
+                    self.generate_fresh_variables_from_constructor(parent_constr.clone(), variant_name)
+                } else {
+                    panic!("Self-reference to {parent} does not exist.")
+                } 
             }
 
             _ => panic!("Unrecognized constructor"),
@@ -170,9 +169,8 @@ impl<'c> PatternCompiler<'c> {
                 HashMap::new(),
             ));
         } else {
-            // TODO: change this to fresh variable
             arms.push((
-                TypedNode::Variable(head_expr.get_type(), String::from("wildcard")),
+                TypedNode::Variable(head_expr.get_type(), fresh_variable("wildcard")),
                 default.clone(),
                 HashMap::new(),
             ));

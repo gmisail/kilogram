@@ -1,45 +1,31 @@
-/// Generates unique variables for a given namespace, i.e. "variable" or "lambda"
-pub struct FreshGenerator {
-    subject: &'static str,
-    index: usize,
+use std::cell::Cell;
+
+thread_local! {
+    pub static INDEX: Cell<usize> = Cell::new(0);
 }
 
-impl FreshGenerator {
-    /// Create a new FreshGenerator with a subject.
-    ///
-    /// * `subject`: the fresh variable namespace, i.e. "variable", "lambda"
-    pub fn new(subject: &'static str) -> Self {
-        FreshGenerator { subject, index: 0 }
-    }
-}
+pub fn fresh_variable(subject: &'static str) -> String {
+    let index = INDEX.with(|i| {
+        let res = i.get();
+        i.set(res + 1);
+        res
+    });
 
-impl Iterator for FreshGenerator {
-    type Item = String;
-
-    /// Generates a new fresh variable name.
-    fn next(&mut self) -> Option<Self::Item> {
-        self.index += 1;
-
-        Some(format!("_kg_{}_{}", self.subject, self.index - 1))
-    }
+    format!("_kg_{}_{}", subject, index)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::fresh::generator::FreshGenerator;
+    use crate::fresh::generator::fresh_variable;
 
     #[test]
     fn generates_fresh_variable() {
-        let mut test_gen = FreshGenerator::new("test");
+        assert_eq!("_kg_test_0", fresh_variable("test"));
+        assert_eq!("_kg_test_1", fresh_variable("test"));
+        assert_eq!("_kg_test_2", fresh_variable("test"));
 
-        assert_eq!("_kg_test_0", test_gen.next().unwrap());
-        assert_eq!("_kg_test_1", test_gen.next().unwrap());
-        assert_eq!("_kg_test_2", test_gen.next().unwrap());
-
-        let mut var_gen = FreshGenerator::new("var");
-
-        assert_eq!("_kg_var_0", var_gen.next().unwrap());
-        assert_eq!("_kg_var_1", var_gen.next().unwrap());
-        assert_eq!("_kg_var_2", var_gen.next().unwrap());
+        assert_eq!("_kg_var_3", fresh_variable("var"));
+        assert_eq!("_kg_var_4", fresh_variable("var"));
+        assert_eq!("_kg_var_5", fresh_variable("var"));
     }
 }

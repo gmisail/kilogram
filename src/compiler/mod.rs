@@ -539,9 +539,19 @@ impl Compiler {
 
     fn compile_case_of(
         &mut self,
-        _expression: &TypedNode,
-        _arms: &[(TypedNode, TypedNode, HashMap<String, Rc<DataType>>)],
+        expression: &TypedNode,
+        arms: &[(TypedNode, TypedNode, HashMap<String, Rc<DataType>>)],
     ) -> String {
+        let match_on = self.compile_expression(expression);
+
+        println!("match {match_on} {{");
+
+        for (arm_cond, arm_body, _) in arms {
+            println!("cond => {}\n", self.compile_expression(arm_body));
+        }
+
+        println!("}}");
+
         todo!()
     }
 
