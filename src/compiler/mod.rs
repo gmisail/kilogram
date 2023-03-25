@@ -1,4 +1,6 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
+use std::env::var;
+use std::os::unix::raw::off_t;
 use std::rc::Rc;
 
 use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
@@ -537,22 +539,102 @@ impl Compiler {
         buffer
     }
 
+    /// Generates a condition for checking if an expression is of a variant type.
+    fn get_expression_variant_check(
+        &mut self,
+        expression: &TypedNode,
+        enum_type: Rc<DataType>,
+        constructor: &String,
+    ) -> String {
+        let compiled_target = self.compile_expression(expression);
+
+        if let DataType::Enum(_, variants) = &*enum_type {
+            let (index, variant) = variants
+                .keys()
+                .enumerate()
+                .find(|(_, variant_name)| *variant_name == constructor)
+                .expect("Cannot find variant in enum.");
+
+            format!("{compiled_target}->id == {index}")
+        } else {
+            panic!("Cannot create expression-variant check for non-enum type.")
+        }
+    }
+
+    fn generate_let_chain(&self, variables: &[TypedNode], default: &TypedNode) -> TypedNode {
+        match variables {
+            [head, tail @ ..] => {
+                if let TypedNode::Variable(var_type, var_name) = head {
+                    TypedNode::Let(
+                        var_name.clone(),
+                        var_type.clone(),
+                        Box::new(head.clone()),
+                        Box::new(self.generate_let_chain(tail, default)),
+                        false,
+                    )
+                } else {
+                    panic!()
+                }
+            }
+            [] => default.clone(),
+        }
+    }
+
     fn compile_case_of(
         &mut self,
         expression: &TypedNode,
         arms: &[(TypedNode, TypedNode, HashMap<String, Rc<DataType>>)],
     ) -> String {
         let match_on = self.compile_expression(expression);
-
-        println!("match {match_on} {{");
+        let mut buffer = String::new();
 
         for (arm_cond, arm_body, _) in arms {
-            println!("cond => {}\n", self.compile_expression(arm_body));
+            match arm_cond {
+                TypedNode::Variable(var_type, var_name) => {
+                    buffer.push_str("else {\n");
+
+                    buffer.push_str(
+                        self.compile_expression(&TypedNode::Let(
+                            var_name.to_string(),
+                            var_type.clone(),
+                            Box::new(expression.clone()),
+                            Box::new(arm_body.clone()),
+                            false,
+                        ))
+                        .as_str(),
+                    );
+
+                    buffer.push_str("}\n");
+                }
+
+                TypedNode::EnumInstance(enum_type, constructor_name, bindings) => {
+                    buffer.push_str(
+                        format!(
+                            "// {constructor_name}\nif({}){{\n",
+                            self.get_expression_variant_check(
+                                expression,
+                                enum_type.clone(),
+                                constructor_name,
+                            )
+                        )
+                        .as_str(),
+                    );
+
+                    buffer.push_str(format!("Bindings: {:?}\n", bindings).as_str());
+
+                    buffer.push_str(
+                        &self.compile_expression(&self.generate_let_chain(bindings, arm_body)),
+                    );
+
+                    buffer.push_str("}");
+                }
+                _ => panic!(),
+            }
         }
 
-        println!("}}");
+        buffer.push_str("}");
 
-        todo!()
+        buffer
     }
 
     fn compile_enum_instance(

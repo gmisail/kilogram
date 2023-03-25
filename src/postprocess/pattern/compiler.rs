@@ -16,9 +16,7 @@ pub struct PatternCompiler<'c> {
 
 impl<'c> PatternCompiler<'c> {
     pub fn new(enums: &'c HashMap<String, Rc<DataType>>) -> Self {
-        PatternCompiler {
-            enums,
-        }
+        PatternCompiler { enums }
     }
 
     fn is_variable_or_wildcard(&self, pattern: &Pattern) -> bool {
@@ -87,10 +85,13 @@ impl<'c> PatternCompiler<'c> {
 
             DataType::NamedReference(parent) => {
                 if let Some(parent_constr) = self.enums.get(parent) {
-                    self.generate_fresh_variables_from_constructor(parent_constr.clone(), variant_name)
+                    self.generate_fresh_variables_from_constructor(
+                        parent_constr.clone(),
+                        variant_name,
+                    )
                 } else {
                     panic!("Self-reference to {parent} does not exist.")
-                } 
+                }
             }
 
             _ => panic!("Unrecognized constructor"),

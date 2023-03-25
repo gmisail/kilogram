@@ -1,13 +1,13 @@
 enum List 
-	None,
+	Nil,
 	Cons(int, List)
 end
 
 let rec length = function(list: List): int
 	case list of
-		None -> 0,
+		Nil -> 0,
 		Cons(num, tail) -> 1 + length(tail)
 	end
 end
 
-length(Cons(0, Cons(1, Cons(2, Cons(3, Cons(4, None))))))
+length(Cons(0, Cons(1, Cons(2, Cons(3, Cons(4, Nil))))))
