@@ -549,7 +549,7 @@ impl Compiler {
         let compiled_target = self.compile_expression(expression);
 
         if let DataType::Enum(_, variants) = &*enum_type {
-            let (index, variant) = variants
+            let (index, _variant) = variants
                 .keys()
                 .enumerate()
                 .find(|(_, variant_name)| *variant_name == constructor)
@@ -561,31 +561,11 @@ impl Compiler {
         }
     }
 
-    fn generate_let_chain(&self, variables: &[TypedNode], default: &TypedNode) -> TypedNode {
-        match variables {
-            [head, tail @ ..] => {
-                if let TypedNode::Variable(var_type, var_name) = head {
-                    TypedNode::Let(
-                        var_name.clone(),
-                        var_type.clone(),
-                        Box::new(head.clone()),
-                        Box::new(self.generate_let_chain(tail, default)),
-                        false,
-                    )
-                } else {
-                    panic!()
-                }
-            }
-            [] => default.clone(),
-        }
-    }
-
     fn compile_case_of(
         &mut self,
         expression: &TypedNode,
         arms: &[(TypedNode, TypedNode, HashMap<String, Rc<DataType>>)],
     ) -> String {
-        let match_on = self.compile_expression(expression);
         let mut buffer = String::new();
 
         for (arm_cond, arm_body, _) in arms {
@@ -620,19 +600,30 @@ impl Compiler {
                         .as_str(),
                     );
 
-                    buffer.push_str(format!("Bindings: {:?}\n", bindings).as_str());
+                    let match_on = self.compile_expression(expression);
 
-                    buffer.push_str(
-                        &self.compile_expression(&self.generate_let_chain(bindings, arm_body)),
-                    );
+                    // Load bindings into scope.
+                    for (constructor_id, binding) in bindings.iter().enumerate() {
+                        if let TypedNode::Variable(var_type, var_name) = binding {
+                            buffer.push_str(&format!(
+                                "{} = {match_on}->{constructor_name}_{constructor_id};\n",
+                                self.resolve_type(var_name, var_type.clone()),
+                            ));
+                        } else {
+                            panic!("Expected binding to be variable.")
+                        }
+                    }
 
-                    buffer.push_str("}");
+                    // Now that the bindings are in scope, we can evaluate the arm.
+                    buffer.push_str(&self.compile_expression(arm_body));
+
+                    buffer.push('}');
                 }
                 _ => panic!(),
             }
         }
 
-        buffer.push_str("}");
+        buffer.push('}');
 
         buffer
     }

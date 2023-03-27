@@ -203,7 +203,7 @@ impl<'c> PatternCompiler<'c> {
             .collect::<Vec<Case>>();
 
         // TODO: generate fresh name here
-        let fresh_var = TypedNode::Variable(head_expr.get_type(), String::from("fresh_name"));
+        let fresh_var = TypedNode::Variable(head_expr.get_type(), fresh_variable("var"));
 
         // Since we only have variables, the first will match; thus, generate a case expression on
         // the expression 'e' with only one arm:
