@@ -98,6 +98,15 @@ impl<'c> PatternCompiler<'c> {
         }
     }
 
+    /// Substitutes a variable name for another.
+    ///
+    /// * `root`: Tree that will be modified.
+    /// * `original`: Name that will be replaced.
+    /// * `updated`: Name to replace the original name with.
+    fn substitute(&self, root: &mut TypedNode, original: &String, updated: &String) {
+        todo!()
+    }
+
     ///
     /// Simplify a case-tree with leading constructors, optionally followed by variable cases.
     ///
