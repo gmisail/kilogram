@@ -11,7 +11,7 @@ pub fn fresh_variable(subject: &'static str) -> String {
         res
     });
 
-    format!("_kg_{}_{}", subject, index)
+    format!("_kg_{subject}_{index}")
 }
 
 #[cfg(test)]

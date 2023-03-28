@@ -1,3 +1,5 @@
+mod substitute;
+
 pub mod compiler;
 
 use crate::ast::typed::typed_node::TypedNode;

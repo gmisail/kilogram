@@ -6,7 +6,7 @@ use crate::fresh::generator::fresh_variable;
 use crate::ast::typed::data_type::DataType;
 use crate::ast::typed::typed_node::TypedNode;
 
-use super::Pattern;
+use super::{substitute::substitute, Pattern};
 
 type Case = (Vec<Pattern>, TypedNode);
 
@@ -96,15 +96,6 @@ impl<'c> PatternCompiler<'c> {
 
             _ => panic!("Unrecognized constructor"),
         }
-    }
-
-    /// Substitutes a variable name for another.
-    ///
-    /// * `root`: Tree that will be modified.
-    /// * `original`: Name that will be replaced.
-    /// * `updated`: Name to replace the original name with.
-    fn substitute(&self, root: &mut TypedNode, original: &String, updated: &String) {
-        todo!()
     }
 
     ///
@@ -198,21 +189,27 @@ impl<'c> PatternCompiler<'c> {
         patterns: &[(Vec<Pattern>, TypedNode)],
         default: &TypedNode,
     ) -> TypedNode {
-        let (head_expr, tail_exprs) = expressions.split_first().unwrap();
+        let (head_expr, tail_exprs) = expressions
+            .split_first()
+            .expect("Expected first expression to be variable.");
+        let head_name = match head_expr {
+            TypedNode::Variable(_, head_name) => head_name,
+            _ => panic!(),
+        };
+
+        let fresh_name = fresh_variable("var");
+        let fresh_var = TypedNode::Variable(head_expr.get_type(), fresh_name.clone());
 
         let new_patterns = patterns
             .iter()
             .map(|(case_patterns, case_expr)| {
                 if let Some((_, tail)) = case_patterns.split_first() {
-                    (tail.to_vec(), case_expr.clone())
+                    (tail.to_vec(), substitute(case_expr, head_name, &fresh_name))
                 } else {
                     panic!()
                 }
             })
             .collect::<Vec<Case>>();
-
-        // TODO: generate fresh name here
-        let fresh_var = TypedNode::Variable(head_expr.get_type(), fresh_variable("var"));
 
         // Since we only have variables, the first will match; thus, generate a case expression on
         // the expression 'e' with only one arm:
