@@ -6,6 +6,8 @@ use crate::ast::typed::typed_node::TypedNode;
 /// * `original`: Name that will be replaced.
 /// * `updated`: Name to replace the original name with.
 pub fn substitute(root: &TypedNode, original: &String, updated: &String) -> TypedNode {
+    println!("replace {original} with {updated}");
+
     match root {
         TypedNode::Integer(..)
         | TypedNode::Float(..)

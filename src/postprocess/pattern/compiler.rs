@@ -136,12 +136,24 @@ impl<'c> PatternCompiler<'c> {
 
             // Create fresh variables from the arguments of the constructor.
             let constructor_type = head_expr.get_type();
-            let (_fresh_names, mut fresh_vars) = self
+            let (free_names, mut fresh_vars) = self
                 .generate_fresh_variables_from_constructor(constructor_type.clone(), group_name);
 
             // Generate a generic constructor that we can match against
             let fresh_pattern =
                 TypedNode::EnumInstance(constructor_type, group_name.clone(), fresh_vars.clone());
+
+            // Substitute the free variable if necessary.
+            pairs = pairs
+                .iter()
+                .cloned()
+                .map(|(arm_patterns, arm_body)| {
+                    // for each arm_pattern.zip(fresh_names)
+                    //      if variable
+                    //          substitute variable name ==> fresh_name
+                    todo!()
+                })
+                .collect();
 
             // Prepend these fresh variables to the list of expressions
             fresh_vars.extend(Vec::from(remaining_exprs));
