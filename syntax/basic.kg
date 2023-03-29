@@ -6,7 +6,8 @@ end
 let rec length = function(list: List): int
 	case list of
 		Nil -> 0,
-		Cons(num, tail) -> 1 + length(tail)
+		Cons(num, tail) -> 1 + length(tail),
+		Cons(test, test_two) -> 2
 	end
 end
 

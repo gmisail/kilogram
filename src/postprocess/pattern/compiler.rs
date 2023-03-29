@@ -6,7 +6,8 @@ use crate::fresh::generator::fresh_variable;
 use crate::ast::typed::data_type::DataType;
 use crate::ast::typed::typed_node::TypedNode;
 
-use super::{substitute::substitute, Pattern};
+use super::substitute::{substitute, substitute_all};
+use super::Pattern;
 
 type Case = (Vec<Pattern>, TypedNode);
 
@@ -98,6 +99,31 @@ impl<'c> PatternCompiler<'c> {
         }
     }
 
+    fn substitute_constructor_arguments(&self, patterns: &[Pattern], body: &TypedNode, fresh_names: &[String]) -> TypedNode {
+        // From a list of patterns, find the variables that need to be substituted and what to
+        // substitute them with. 
+        let fresh_mappings = patterns
+            .iter()
+            .zip(fresh_names)
+            .filter(|(pattern, _)| {
+                matches!(pattern, Pattern::Variable(..))
+            })
+            .map(|(pattern, fresh)| {
+                if let Pattern::Variable(var_name) = pattern {
+                    (var_name.clone(), fresh.clone())
+                } else {
+                    panic!()
+                }
+            })
+            .collect::<Vec<(String, String)>>();
+        
+        // Convert list of [(old, new)] to a mapping of { old => new }.
+        let substitutions: HashMap<String, String> = fresh_mappings.into_iter().collect();
+
+        // Substitute all instances of "old" in tree "body" with variable "new".
+        substitute_all(body, &substitutions)
+    }
+
     ///
     /// Simplify a case-tree with leading constructors, optionally followed by variable cases.
     ///
@@ -148,10 +174,7 @@ impl<'c> PatternCompiler<'c> {
                 .iter()
                 .cloned()
                 .map(|(arm_patterns, arm_body)| {
-                    // for each arm_pattern.zip(fresh_names)
-                    //      if variable
-                    //          substitute variable name ==> fresh_name
-                    todo!()
+                    (arm_patterns.clone(), self.substitute_constructor_arguments(&arm_patterns, &arm_body, &free_names))
                 })
                 .collect();
 
@@ -171,6 +194,8 @@ impl<'c> PatternCompiler<'c> {
             child_patterns.remove(0);
 
             let child_exprs = Vec::from(remaining_exprs);
+
+            // TODO: substitute for fresh variable
 
             arms.push((
                 var_expr.clone(),
