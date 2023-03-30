@@ -10,6 +10,7 @@ use super::substitute::{substitute, substitute_all};
 use super::Pattern;
 
 type Case = (Vec<Pattern>, TypedNode);
+pub type MatchArm = (TypedNode, TypedNode, HashMap<String, Rc<DataType>>);
 
 pub struct PatternCompiler<'c> {
     enums: &'c HashMap<String, Rc<DataType>>,

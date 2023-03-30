@@ -121,8 +121,8 @@ pub fn substitute_all(root: &TypedNode, substitutions: &HashMap<String, String>)
 /// * `root`: Tree that will be modified.
 /// * `original`: Name that will be replaced.
 /// * `updated`: Name to replace the original name with.
-pub fn substitute(root: &TypedNode, original: &String, updated: &String) -> TypedNode {
+pub fn substitute(root: &TypedNode, original: &str, updated: &str) -> TypedNode {
     let mut substitutions = HashMap::new();
-    substitutions.insert(original.clone(), updated.clone());
+    substitutions.insert(original.to_owned(), updated.to_owned());
     substitute_all(root, &substitutions)
 }

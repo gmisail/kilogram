@@ -6,7 +6,7 @@ use crate::ast::typed::{data_type::DataType, typed_node::TypedNode};
 
 use self::pattern_phase::PatternPhase;
 
-mod pattern;
+pub mod pattern;
 mod pattern_phase;
 
 pub trait PostprocessPhase {

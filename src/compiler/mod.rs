@@ -4,21 +4,23 @@ use std::rc::Rc;
 use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
 use crate::ast::typed::data_type::DataType;
 use crate::ast::typed::typed_node::TypedNode;
+
+use crate::postprocess::pattern::compiler::MatchArm;
+
 use crate::compiler::builder::enum_builder::EnumBuilder;
 use crate::compiler::builder::struct_builder::StructBuilder;
 use crate::compiler::free::find_free;
+
+use crate::fresh::generator::fresh_variable;
+
 use crate::typechecker::Typechecker;
 
 use self::emitter::emit_if;
-use self::{
-    emitter::{emit_binary, emit_unary},
-    generator::FunctionGenerator,
-};
+use self::emitter::{emit_binary, emit_unary};
 
 mod builder;
 mod emitter;
 mod free;
-mod generator;
 mod resolver;
 
 struct FunctionDefinition {
@@ -31,9 +33,6 @@ struct FunctionDefinition {
 }
 
 pub struct Compiler {
-    // Generates fresh names for functions.
-    function: FunctionGenerator,
-
     // Stores all functions.
     function_header: Vec<FunctionDefinition>,
 
@@ -58,7 +57,6 @@ pub struct Compiler {
 impl Compiler {
     pub fn new(typechecker: Typechecker) -> Self {
         Compiler {
-            function: FunctionGenerator::new(),
             function_header: Vec::new(),
             external_function: HashSet::new(),
             stack: Vec::new(),
@@ -430,7 +428,7 @@ impl Compiler {
         free_vars: HashMap<String, Rc<DataType>>,
     ) -> String {
         // Generate fresh name.
-        let fresh_name = self.function.generate();
+        let fresh_name = fresh_variable("function");
         let is_leaf = !matches!(*value, TypedNode::Let(..));
 
         let func_body = format!(
@@ -559,11 +557,7 @@ impl Compiler {
         }
     }
 
-    fn compile_case_of(
-        &mut self,
-        expression: &TypedNode,
-        arms: &[(TypedNode, TypedNode, HashMap<String, Rc<DataType>>)],
-    ) -> String {
+    fn compile_case_of(&mut self, expression: &TypedNode, arms: &[MatchArm]) -> String {
         let mut buffer = String::new();
 
         for (arm_cond, arm_body, _) in arms {
