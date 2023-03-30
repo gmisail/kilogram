@@ -17,7 +17,9 @@ pub fn substitute_all(root: &TypedNode, substitutions: &HashMap<String, String>)
         | TypedNode::Extern(..) => root.clone(),
 
         TypedNode::Variable(var_type, var_name) if substitutions.contains_key(var_name) => {
-            let new_name = substitutions.get(var_name).expect("Expected name to be in mapping.");
+            let new_name = substitutions
+                .get(var_name)
+                .expect("Expected name to be in mapping.");
 
             TypedNode::Variable(var_type.clone(), new_name.clone())
         }

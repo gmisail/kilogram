@@ -99,15 +99,18 @@ impl<'c> PatternCompiler<'c> {
         }
     }
 
-    fn substitute_constructor_arguments(&self, patterns: &[Pattern], body: &TypedNode, fresh_names: &[String]) -> TypedNode {
+    fn substitute_constructor_arguments(
+        &self,
+        patterns: &[Pattern],
+        body: &TypedNode,
+        fresh_names: &[String],
+    ) -> TypedNode {
         // From a list of patterns, find the variables that need to be substituted and what to
-        // substitute them with. 
+        // substitute them with.
         let fresh_mappings = patterns
             .iter()
             .zip(fresh_names)
-            .filter(|(pattern, _)| {
-                matches!(pattern, Pattern::Variable(..))
-            })
+            .filter(|(pattern, _)| matches!(pattern, Pattern::Variable(..)))
             .map(|(pattern, fresh)| {
                 if let Pattern::Variable(var_name) = pattern {
                     (var_name.clone(), fresh.clone())
@@ -116,7 +119,7 @@ impl<'c> PatternCompiler<'c> {
                 }
             })
             .collect::<Vec<(String, String)>>();
-        
+
         // Convert list of [(old, new)] to a mapping of { old => new }.
         let substitutions: HashMap<String, String> = fresh_mappings.into_iter().collect();
 
@@ -174,7 +177,14 @@ impl<'c> PatternCompiler<'c> {
                 .iter()
                 .cloned()
                 .map(|(arm_patterns, arm_body)| {
-                    (arm_patterns.clone(), self.substitute_constructor_arguments(&arm_patterns, &arm_body, &free_names))
+                    (
+                        arm_patterns.clone(),
+                        self.substitute_constructor_arguments(
+                            &arm_patterns,
+                            &arm_body,
+                            &free_names,
+                        ),
+                    )
                 })
                 .collect();
 
@@ -234,8 +244,8 @@ impl<'c> PatternCompiler<'c> {
             _ => panic!(),
         };
 
+        // Fresh name to represent the expression.
         let fresh_name = fresh_variable("var");
-        let fresh_var = TypedNode::Variable(head_expr.get_type(), fresh_name.clone());
 
         let new_patterns = patterns
             .iter()
@@ -252,17 +262,21 @@ impl<'c> PatternCompiler<'c> {
         // the expression 'e' with only one arm:
         //
         //    case e of
-        //        fresh => ...
+        //        fresh => body
         //    end
         //
-        TypedNode::CaseOf(
+        // We can simplify this further by simply introducing 'fresh' as a variable. So, this
+        // expression reduces to:
+        //
+        //    let fresh = e
+        //    body
+        //
+        TypedNode::Let(
+            fresh_name,
             head_expr.get_type(),
             Box::new(head_expr.clone()),
-            vec![(
-                fresh_var,
-                self.transform(tail_exprs, &new_patterns, default.clone()),
-                HashMap::new(),
-            )],
+            Box::new(self.transform(tail_exprs, &new_patterns, default.clone())),
+            false,
         )
     }
 

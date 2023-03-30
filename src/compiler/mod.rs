@@ -1,6 +1,4 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::env::var;
-use std::os::unix::raw::off_t;
 use std::rc::Rc;
 
 use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
@@ -571,20 +569,15 @@ impl Compiler {
         for (arm_cond, arm_body, _) in arms {
             match arm_cond {
                 TypedNode::Variable(var_type, var_name) => {
-                    buffer.push_str("else {\n");
+                    let compiled_arm = self.compile_expression(&TypedNode::Let(
+                        var_name.to_string(),
+                        var_type.clone(),
+                        Box::new(expression.clone()),
+                        Box::new(arm_body.clone()),
+                        false,
+                    ));
 
-                    buffer.push_str(
-                        self.compile_expression(&TypedNode::Let(
-                            var_name.to_string(),
-                            var_type.clone(),
-                            Box::new(expression.clone()),
-                            Box::new(arm_body.clone()),
-                            false,
-                        ))
-                        .as_str(),
-                    );
-
-                    buffer.push_str("}\n");
+                    buffer.push_str(format!("else {{\n{compiled_arm}\n }}").as_str());
                 }
 
                 TypedNode::EnumInstance(enum_type, constructor_name, bindings) => {
@@ -622,8 +615,6 @@ impl Compiler {
                 _ => panic!(),
             }
         }
-
-        buffer.push('}');
 
         buffer
     }
