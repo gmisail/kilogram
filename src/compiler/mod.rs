@@ -33,9 +33,19 @@ struct FunctionDefinition {
     captures: HashMap<String, Rc<DataType>>,
 }
 
+struct BranchDefinition {
+    name: String,
+    data_type: Rc<DataType>,
+    body: String,
+    captures: BTreeMap<String, Rc<DataType>>,
+}
+
 pub struct Compiler {
     // Stores all functions.
     function_header: Vec<FunctionDefinition>,
+
+    // Stores all branches.
+    branch_header: Vec<BranchDefinition>,
 
     // Set of external function names.
     external_function: HashSet<String>,
@@ -59,6 +69,7 @@ impl Compiler {
     pub fn new(typechecker: Typechecker) -> Self {
         Compiler {
             function_header: Vec::new(),
+            branch_header: Vec::new(),
             external_function: HashSet::new(),
             stack: Vec::new(),
             type_casts: HashSet::new(),
@@ -673,13 +684,11 @@ impl Compiler {
             else_body
         );
 
-        self.function_header.push(FunctionDefinition {
-            name: fresh_name.clone(),
-            bound_name: None,
-            data_type: then_expr.get_type(),
-            arguments: Vec::new(),
-            body: if_body,
-            captures: free_vars.clone(),
+        self.branch_header.push(BranchDefinition { 
+            name: fresh_name, 
+            data_type: then_expr.get_type(), 
+            body: if_body, 
+            captures: todo!("Pass a BTreeMap or Vec<(String, DataType)> for arguments, i.e. captured variables.") 
         });
 
         let free_args = free_vars
@@ -687,7 +696,7 @@ impl Compiler {
             .cloned()
             .collect::<Vec<String>>();
 
-        // All user-declared functions are a pointer to a function in the function header.
+        // TODO: replace with call to branch function (generated in branch header)
         format!("create_{fresh_name}({})", free_args.join(", "))
     }
 
