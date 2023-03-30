@@ -1,14 +1,9 @@
-enum List 
-	Nil,
-	Cons(int, List)
-end
-
-let rec length = function(list: List): int
-	case list of
-		Nil -> 0,
-		Cons(num, tail) -> 1 + length(tail),
-		Cons(test, test_two) -> 2
-	end
-end
-
-length(Cons(0, Cons(1, Cons(2, Cons(3, Cons(4, Nil))))))
+let i = 0
+let j = 10
+if i != j then 
+	if i == 5 then 
+		"cool" 
+	else 
+		"not cool"
+else 
+	"no"

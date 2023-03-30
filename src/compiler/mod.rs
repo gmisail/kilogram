@@ -5,6 +5,7 @@ use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
 use crate::ast::typed::data_type::DataType;
 use crate::ast::typed::typed_node::TypedNode;
 
+use crate::fresh;
 use crate::postprocess::pattern::compiler::MatchArm;
 
 use crate::compiler::builder::enum_builder::EnumBuilder;
@@ -72,6 +73,10 @@ impl Compiler {
             DataType::Function(_, _) => format!("KiloFunction* {var_name}"),
             _ => format!("{} {var_name}", resolver::get_native_type(var_type)),
         }
+    }
+
+    fn is_leaf(&self, node: &TypedNode) -> bool {
+        !matches!(*node, TypedNode::Let(..))
     }
 
     // Generates a function that constructs a new record from another.
@@ -398,7 +403,7 @@ impl Compiler {
         is_recursive: bool,
     ) -> String {
         // Is the last node not a declaration? Return its value.
-        let is_leaf = !matches!(*body, TypedNode::Let(..));
+        let leaf = self.is_leaf(body);
 
         if is_recursive {
             self.stack.push(name.clone());
@@ -408,9 +413,9 @@ impl Compiler {
             "{} = {};\n{}{}{}",
             self.resolve_type(name, var_type.clone()),
             self.compile_expression(value),
-            if is_leaf { "return " } else { "" },
+            if leaf { "return " } else { "" },
             self.compile_expression(body),
-            if is_leaf { ";" } else { "" }
+            if leaf { ";" } else { "" }
         )
     }
 
@@ -429,13 +434,13 @@ impl Compiler {
     ) -> String {
         // Generate fresh name.
         let fresh_name = fresh_variable("function");
-        let is_leaf = !matches!(*value, TypedNode::Let(..));
+        let leaf = self.is_leaf(value);
 
         let func_body = format!(
             "{}{}{}",
-            if is_leaf { "return " } else { "" },
+            if leaf { "return " } else { "" },
             self.compile_expression(value),
-            if is_leaf { ";" } else { "" }
+            if leaf { ";" } else { "" }
         );
 
         let arguments = arg_types
@@ -487,13 +492,11 @@ impl Compiler {
             .map(|arg| self.compile_expression(arg))
             .collect();
 
-        let mut is_extern = false;
-
-        let base_type = match name {
+        let (base_type, is_extern) = match name {
             TypedNode::Variable(func_type, func_name) => {
-                is_extern = self.external_function.contains(func_name);
+                let is_extern = self.external_function.contains(func_name);
 
-                func_type
+                (func_type, is_extern)
             }
             _ => panic!("Do not support calling non-variables yet"),
         };
@@ -635,6 +638,59 @@ impl Compiler {
         }
     }
 
+    fn compile_if(
+        &mut self,
+        if_expr: &TypedNode,
+        then_expr: &TypedNode,
+        else_expr: &TypedNode,
+        free_vars: HashMap<String, Rc<DataType>>
+    ) -> String {
+        // Generate a unique name to represent the if-expression.
+        let fresh_name = fresh_variable("if");
+
+        // Condition in the if-expression.
+        let condition = self.compile_expression(if_expr);
+
+        let then_leaf = self.is_leaf(then_expr);
+        let then_body = format!(
+            "{}{}{}",
+            if then_leaf { "return " } else { "" },
+            self.compile_expression(then_expr),
+            if then_leaf { ";" } else { "" }
+        );
+
+        let else_leaf = self.is_leaf(else_expr);
+        let else_body = format!(
+            "{}{}{}",
+            if else_leaf { "return " } else { "" },
+            self.compile_expression(else_expr),
+            if else_leaf { ";" } else { "" }
+        );
+
+        let if_body = emit_if(
+            condition,
+            then_body,
+            else_body
+        );
+
+        self.function_header.push(FunctionDefinition {
+            name: fresh_name.clone(),
+            bound_name: None,
+            data_type: then_expr.get_type(),
+            arguments: Vec::new(),
+            body: if_body,
+            captures: free_vars.clone(),
+        });
+
+        let free_args = free_vars
+            .keys()
+            .cloned()
+            .collect::<Vec<String>>();
+
+        // All user-declared functions are a pointer to a function in the function header.
+        format!("create_{fresh_name}({})", free_args.join(", "))
+    }
+
     /// Compiles an expression.
     ///
     /// * `expression`: expression to compile into a String.
@@ -655,12 +711,14 @@ impl Compiler {
                 self.compile_logical(left, right, operation)
             }
 
-            TypedNode::If(_, if_expr, then_expr, else_expr) => emit_if(
-                self.compile_expression(if_expr),
-                self.compile_expression(then_expr),
-                self.compile_expression(else_expr),
-            ),
+            TypedNode::If(_, if_expr, then_expr, else_expr) => {
+                let mut free_vars = find_free(expression);
+                for extern_type in &self.external_function {
+                    free_vars.remove(extern_type);
+                }
 
+                self.compile_if(if_expr, then_expr, else_expr, free_vars)
+            }
             TypedNode::CaseOf(_, expr, arms) => self.compile_case_of(expr, arms),
 
             TypedNode::Let(name, var_type, value, body, is_rec) => {
