@@ -1,9 +1,8 @@
-let i = 0
-let j = 10
-if i != j then 
-	if i == 5 then 
-		"cool" 
-	else 
-		"not cool"
-else 
-	"no"
+let rec is_done = function(num: int): string 
+	if num > 0 then
+		is_done(num - 1)
+	else
+		"we hit zero, we're done"
+end
+let message = is_done(100)
+0

@@ -5,7 +5,6 @@ use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
 use crate::ast::typed::data_type::DataType;
 use crate::ast::typed::typed_node::TypedNode;
 
-use crate::fresh;
 use crate::postprocess::pattern::compiler::MatchArm;
 
 use crate::compiler::builder::enum_builder::EnumBuilder;
@@ -319,19 +318,49 @@ impl Compiler {
         buffer
     }
 
+    /// For each branch, create a function and add a forward declaration.
+    fn generate_branch_header(&mut self) -> String {
+        let mut buffer = String::new();
+
+        // TODO: Add forward declarations before implementation
+
+        for def in &self.branch_header {
+            // <type> <name>
+            buffer.push_str(&self.resolve_type(&def.name, def.data_type.clone()));
+
+            // (arg_0 .. arg_n) {
+            let arg_buffer = def
+                .captures
+                .iter()
+                .map(|(field_name, field_type)| {
+                    self.resolve_type(field_name, field_type.clone())
+                })
+                .collect::<Vec<String>>()
+                .join(", ");
+
+            buffer.push_str(&format!("({arg_buffer}){{\n"));
+            buffer.push_str(&def.body);
+            buffer.push_str("\n}\n");
+        }
+
+        buffer
+    }
+
     pub fn compile(&mut self, expression: &TypedNode) -> String {
         let mut buffer = String::new();
 
         let root_expr = self.compile_expression(expression);
 
-        buffer.push_str("#include<stdio.h>\n");
-        buffer.push_str("#include<stdlib.h>\n");
+        buffer.push_str("#include <stdio.h>\n");
+        buffer.push_str("#include <stdlib.h>\n");
 
         buffer.push_str("#include \"runtime/string.h\"\n");
         buffer.push_str("#include \"runtime/object.h\"\n");
         buffer.push_str("#include \"runtime/function.h\"\n");
         buffer.push_str("#include \"runtime/stdlib.h\"\n");
 
+        buffer.push_str("\n// Branch header\n");
+        buffer.push_str(&self.generate_branch_header());
         buffer.push_str("\n// Record header\n");
         buffer.push_str(&self.generate_record_header());
         buffer.push_str("\n// Enum header\n");
@@ -654,7 +683,7 @@ impl Compiler {
         if_expr: &TypedNode,
         then_expr: &TypedNode,
         else_expr: &TypedNode,
-        free_vars: HashMap<String, Rc<DataType>>
+        free_vars: HashMap<String, Rc<DataType>>,
     ) -> String {
         // Generate a unique name to represent the if-expression.
         let fresh_name = fresh_variable("if");
@@ -678,26 +707,26 @@ impl Compiler {
             if else_leaf { ";" } else { "" }
         );
 
-        let if_body = emit_if(
-            condition,
-            then_body,
-            else_body
-        );
+        let if_body = emit_if(condition, then_body, else_body);
 
-        self.branch_header.push(BranchDefinition { 
-            name: fresh_name, 
-            data_type: then_expr.get_type(), 
-            body: if_body, 
-            captures: todo!("Pass a BTreeMap or Vec<(String, DataType)> for arguments, i.e. captured variables.") 
-        });
+        let mut captures = BTreeMap::new();
+        for (free_name, free_type) in &free_vars {
+            captures.insert(free_name.clone(), free_type.clone());
+        }
 
-        let free_args = free_vars
+        let captured_args = captures
             .keys()
             .cloned()
             .collect::<Vec<String>>();
+    
+        self.branch_header.push(BranchDefinition { 
+            name: fresh_name.clone(), 
+            data_type: then_expr.get_type(), 
+            body: if_body, 
+            captures
+        });
 
-        // TODO: replace with call to branch function (generated in branch header)
-        format!("create_{fresh_name}({})", free_args.join(", "))
+        format!("{fresh_name}({})", captured_args.join(", "))
     }
 
     /// Compiles an expression.
