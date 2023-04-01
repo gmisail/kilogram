@@ -332,9 +332,7 @@ impl Compiler {
             let arg_buffer = def
                 .captures
                 .iter()
-                .map(|(field_name, field_type)| {
-                    self.resolve_type(field_name, field_type.clone())
-                })
+                .map(|(field_name, field_type)| self.resolve_type(field_name, field_type.clone()))
                 .collect::<Vec<String>>()
                 .join(", ");
 
@@ -714,16 +712,13 @@ impl Compiler {
             captures.insert(free_name.clone(), free_type.clone());
         }
 
-        let captured_args = captures
-            .keys()
-            .cloned()
-            .collect::<Vec<String>>();
-    
-        self.branch_header.push(BranchDefinition { 
-            name: fresh_name.clone(), 
-            data_type: then_expr.get_type(), 
-            body: if_body, 
-            captures
+        let captured_args = captures.keys().cloned().collect::<Vec<String>>();
+
+        self.branch_header.push(BranchDefinition {
+            name: fresh_name.clone(),
+            data_type: then_expr.get_type(),
+            body: if_body,
+            captures,
         });
 
         format!("{fresh_name}({})", captured_args.join(", "))

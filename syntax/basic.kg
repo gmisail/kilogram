@@ -1,8 +1,11 @@
-let rec is_done = function(num: int): string 
-	if num > 0 then
-		is_done(num - 1)
-	else
-		"we hit zero, we're done"
+let make_even = function(num: int): int 
+	if num == 0 then 0
+	else num * 2
 end
-let message = is_done(100)
-0
+
+let make_odd = function(num: int): int 
+	if num == 0 then 0 
+	else make_even(num) + 1
+end
+
+make_even(5)
