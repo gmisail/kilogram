@@ -1,11 +1,13 @@
-let make_even = function(num: int): int 
-	if num == 0 then 0
-	else num * 2
+enum Sequence 
+	Cons(int, Sequence),
+	Nil
 end
 
-let make_odd = function(num: int): int 
-	if num == 0 then 0 
-	else make_even(num) + 1
+let rec length = function(seq: Sequence): int 
+	case seq of
+		Cons(num, tail) -> 1 + length(tail),
+		Nil -> 0
+	end
 end
 
-make_even(5)
+length(Cons(1, Cons(2, Cons(3, Nil))))

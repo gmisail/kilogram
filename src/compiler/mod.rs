@@ -598,58 +598,78 @@ impl Compiler {
         }
     }
 
+    fn compile_case_arm(&mut self, arm: MatchArm) -> String {
+        String::from("TODO")
+    }
+
+    /// Converts a series of arms into if / else pairs.
+    ///
+    /// * `arms`: Arms in a simplfied pattern matching expression.
+    fn compile_case_arms(&mut self, expression: &TypedNode, arms: &[MatchArm]) -> String {
+        match arms {
+            [(arm_cond, arm_body, _), tail @ ..] => {
+                match arm_cond {
+                    TypedNode::Variable(var_type, var_name) => {
+                        self.compile_expression(&TypedNode::Let(
+                            var_name.to_string(),
+                            var_type.clone(),
+                            Box::new(expression.clone()),
+                            Box::new(arm_body.clone()),
+                            false,
+                        ))
+                    }
+
+                    TypedNode::EnumInstance(enum_type, constructor_name, bindings) => {
+                        let mut buffer = String::new();
+
+                        buffer.push_str(
+                            format!(
+                                "// {constructor_name}\nif({}){{\n",
+                                self.get_expression_variant_check(
+                                    expression,
+                                    enum_type.clone(),
+                                    constructor_name,
+                                )
+                            )
+                            .as_str(),
+                        );
+
+                        let match_on = self.compile_expression(expression);
+
+                        // Load bindings into scope.
+                        for (constructor_id, binding) in bindings.iter().enumerate() {
+                            if let TypedNode::Variable(var_type, var_name) = binding {
+                                buffer.push_str(&format!(
+                                    "{} = {match_on}->{constructor_name}_{constructor_id};\n",
+                                    self.resolve_type(var_name, var_type.clone()),
+                                ));
+                            } else {
+                                panic!("Expected binding to be variable.")
+                            }
+                        }
+
+                        // Now that the bindings are in scope, we can evaluate the arm.
+                        buffer.push_str(&self.compile_expression(arm_body));
+
+                        buffer.push('}');
+
+                        buffer.push_str(&format!("else {{ {} }}", self.compile_case_arms(expression, tail)));
+
+                        buffer
+                    },
+
+                    _ => String::from("TODO")
+                }
+            } 
+
+            [] => todo!()
+        }       
+    }
+
     fn compile_case_of(&mut self, expression: &TypedNode, arms: &[MatchArm]) -> String {
         let mut buffer = String::new();
 
-        for (arm_cond, arm_body, _) in arms {
-            match arm_cond {
-                TypedNode::Variable(var_type, var_name) => {
-                    let compiled_arm = self.compile_expression(&TypedNode::Let(
-                        var_name.to_string(),
-                        var_type.clone(),
-                        Box::new(expression.clone()),
-                        Box::new(arm_body.clone()),
-                        false,
-                    ));
-
-                    buffer.push_str(format!("else {{\n{compiled_arm}\n }}").as_str());
-                }
-
-                TypedNode::EnumInstance(enum_type, constructor_name, bindings) => {
-                    buffer.push_str(
-                        format!(
-                            "// {constructor_name}\nif({}){{\n",
-                            self.get_expression_variant_check(
-                                expression,
-                                enum_type.clone(),
-                                constructor_name,
-                            )
-                        )
-                        .as_str(),
-                    );
-
-                    let match_on = self.compile_expression(expression);
-
-                    // Load bindings into scope.
-                    for (constructor_id, binding) in bindings.iter().enumerate() {
-                        if let TypedNode::Variable(var_type, var_name) = binding {
-                            buffer.push_str(&format!(
-                                "{} = {match_on}->{constructor_name}_{constructor_id};\n",
-                                self.resolve_type(var_name, var_type.clone()),
-                            ));
-                        } else {
-                            panic!("Expected binding to be variable.")
-                        }
-                    }
-
-                    // Now that the bindings are in scope, we can evaluate the arm.
-                    buffer.push_str(&self.compile_expression(arm_body));
-
-                    buffer.push('}');
-                }
-                _ => panic!(),
-            }
-        }
+        buffer.push_str(&self.compile_case_arms(expression, arms));
 
         buffer
     }
