@@ -89,6 +89,23 @@ impl Compiler {
         !matches!(*node, TypedNode::Let(..))
     }
 
+    fn return_leaf(&mut self, node: &TypedNode) -> String {
+        let leaf = self.is_leaf(node);
+
+        format!(
+            "{}{}{}",
+            if leaf { "return " } else { "" },
+            self.compile_expression(node),
+            if leaf { ";" } else { "" }
+        )
+    }
+
+    fn get_free_variables(&self, expression: &TypedNode) -> HashMap<String, Rc<DataType>> {
+        let mut free_vars = find_free(expression);
+        free_vars.retain(|var_name, _| !self.external_function.contains(var_name));
+        free_vars
+    }
+
     // Generates a function that constructs a new record from another.
     fn generate_record_cast(&self, from: &String, to: &String) -> String {
         let from_rec = self
@@ -472,14 +489,7 @@ impl Compiler {
     ) -> String {
         // Generate fresh name.
         let fresh_name = fresh_variable("function");
-        let leaf = self.is_leaf(value);
-
-        let func_body = format!(
-            "{}{}{}",
-            if leaf { "return " } else { "" },
-            self.compile_expression(value),
-            if leaf { ";" } else { "" }
-        );
+        let func_body = self.return_leaf(value);
 
         let arguments = arg_types
             .iter()
@@ -598,37 +608,30 @@ impl Compiler {
         }
     }
 
-    fn compile_case_arm(&mut self, arm: MatchArm) -> String {
-        String::from("TODO")
-    }
-
     /// Converts a series of arms into if / else pairs.
     ///
     /// * `arms`: Arms in a simplfied pattern matching expression.
     fn compile_case_arms(&mut self, expression: &TypedNode, arms: &[MatchArm]) -> String {
-        let free_vars = find_free(expression);
-
-        // TODO: remove external
+        let free_vars = self.get_free_variables(expression);
         let mut captures = BTreeMap::new();
+
         for (free_name, free_type) in &free_vars {
             captures.insert(free_name.clone(), free_type.clone());
         }
 
         let captured_args = captures.keys().cloned().collect::<Vec<String>>();
-        let fresh_name = fresh_variable("case_branch");
+        let fresh_name = fresh_variable("case");
 
         let compiled_arm = match arms {
             [(arm_cond, arm_body, _), tail @ ..] => {
                 match arm_cond {
-                    TypedNode::Variable(var_type, var_name) => {
-                        self.compile_expression(&TypedNode::Let(
-                            var_name.to_string(),
-                            var_type.clone(),
-                            Box::new(expression.clone()),
-                            Box::new(arm_body.clone()),
-                            false,
-                        ))
-                    }
+                    TypedNode::Variable(var_type, var_name) => self.return_leaf(&TypedNode::Let(
+                        var_name.to_string(),
+                        var_type.clone(),
+                        Box::new(expression.clone()),
+                        Box::new(arm_body.clone()),
+                        false,
+                    )),
 
                     TypedNode::EnumInstance(enum_type, constructor_name, bindings) => {
                         let mut buffer = String::new();
@@ -660,19 +663,19 @@ impl Compiler {
                         }
 
                         // Now that the bindings are in scope, we can evaluate the arm.
-                        buffer.push_str(&self.compile_expression(arm_body));
+                        buffer.push_str(&format!("{}\n}}", self.return_leaf(arm_body)));
 
-                        buffer.push('}');
-
+                        // Always produces a call to another branch, so insert the 'return ... ;'
+                        // statement
                         buffer.push_str(&format!(
-                            "else {{ {} }}",
-                            self.compile_case_arms(expression, tail)
+                            " else {{\nreturn {};\n}}\n",
+                            self.compile_case_arms(expression, tail),
                         ));
 
                         buffer
                     }
 
-                    _ => String::from("TODO"),
+                    _ => todo!()
                 }
             }
 
@@ -787,11 +790,7 @@ impl Compiler {
             }
 
             TypedNode::If(_, if_expr, then_expr, else_expr) => {
-                let mut free_vars = find_free(expression);
-                for extern_type in &self.external_function {
-                    free_vars.remove(extern_type);
-                }
-
+                let free_vars = self.get_free_variables(expression);
                 self.compile_if(if_expr, then_expr, else_expr, free_vars)
             }
             TypedNode::CaseOf(_, expr, arms) => self.compile_case_of(expr, arms),
@@ -801,14 +800,7 @@ impl Compiler {
             }
 
             TypedNode::Function(_, func_type, arg_types, value) => {
-                let mut free_vars = find_free(expression);
-
-                // External functions can be accessed without being passed down as
-                // and environment variable.
-                for extern_type in &self.external_function {
-                    free_vars.remove(extern_type);
-                }
-
+                let free_vars = self.get_free_variables(expression);
                 self.compile_function(func_type, arg_types, value, free_vars)
             }
 
