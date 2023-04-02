@@ -51,7 +51,7 @@ pub fn find_free(node: &TypedNode) -> HashMap<String, Rc<DataType>> {
                 env.extend(find_free(arm_val));
 
                 // Remove all free variables that are actually bound.
-                env.retain(|key, _| !arm_unbound.contains_key(key));
+                env.retain(|key, _| arm_unbound.contains_key(key));
             }
 
             env

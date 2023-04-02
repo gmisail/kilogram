@@ -339,7 +339,19 @@ impl Compiler {
     fn generate_branch_header(&mut self) -> String {
         let mut buffer = String::new();
 
-        // TODO: Add forward declarations before implementation
+        for def in &self.branch_header {
+            // <type> <name>
+            buffer.push_str(&self.resolve_type(&def.name, def.data_type.clone()));
+
+            let arg_buffer = def
+                .captures
+                .iter()
+                .map(|(_, field_type)| resolver::get_native_type(field_type.clone()))
+                .collect::<Vec<String>>()
+                .join(", ");
+
+            buffer.push_str(&format!("({arg_buffer});\n"));
+        }
 
         for def in &self.branch_header {
             // <type> <name>
@@ -374,12 +386,12 @@ impl Compiler {
         buffer.push_str("#include \"runtime/function.h\"\n");
         buffer.push_str("#include \"runtime/stdlib.h\"\n");
 
-        buffer.push_str("\n// Branch header\n");
-        buffer.push_str(&self.generate_branch_header());
         buffer.push_str("\n// Record header\n");
         buffer.push_str(&self.generate_record_header());
         buffer.push_str("\n// Enum header\n");
         buffer.push_str(&self.generate_enum_header());
+        buffer.push_str("\n// Branch header\n");
+        buffer.push_str(&self.generate_branch_header());
         buffer.push_str("\n// Function header\n");
         buffer.push_str(&self.generate_function_header());
         buffer.push_str("\n// Program\n");
@@ -619,7 +631,7 @@ impl Compiler {
             captures.insert(free_name.clone(), free_type.clone());
         }
 
-        let captured_args = captures.keys().cloned().collect::<Vec<String>>();
+        let mut captured_args = captures.keys().cloned().collect::<Vec<String>>();
         let fresh_name = fresh_variable("case");
 
         let compiled_arm = match arms {
@@ -635,6 +647,20 @@ impl Compiler {
 
                     TypedNode::EnumInstance(enum_type, constructor_name, bindings) => {
                         let mut buffer = String::new();
+
+                       /* let named_bindings = bindings
+                            .iter()
+                            .map(|binding| {
+                                if let TypedNode::Variable(_, name) = binding {
+                                    (name.clone(), binding.clone())
+                                } else {
+                                    panic!()
+                                }
+                            })
+                            .collect::<HashMap<String, TypedNode>>();
+                        
+                        // Variables captured by the arm must *not* be a variable binding.
+                        captured_args.retain(|captured| !named_bindings.contains_key(captured));*/
 
                         buffer.push_str(
                             format!(
@@ -675,7 +701,7 @@ impl Compiler {
                         buffer
                     }
 
-                    _ => todo!()
+                    _ => todo!(),
                 }
             }
 

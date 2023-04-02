@@ -1,3 +1,5 @@
+extern panic: (int) -> int 
+
 enum Sequence 
 	Cons(int, Sequence),
 	Nil

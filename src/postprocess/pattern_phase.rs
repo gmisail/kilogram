@@ -31,10 +31,15 @@ impl<'a> PostprocessPhase for PatternPhase<'a> {
             | TypedNode::Str(..)
             | TypedNode::Boolean(..)
             | TypedNode::Get(..)
-            | TypedNode::RecordDeclaration(..)
-            | TypedNode::Extern(..) => root.clone(),
+            | TypedNode::RecordDeclaration(..) => root.clone(),
 
             TypedNode::Group(_, body) => self.transform(body),
+
+            TypedNode::Extern(extern_name, extern_type, body) => TypedNode::Extern(
+                extern_name.clone(),
+                extern_type.clone(),
+                Box::new(self.transform(body)),
+            ),
 
             TypedNode::Let(name, var_type, var_value, body, is_recursive) => TypedNode::Let(
                 name.clone(),
@@ -106,11 +111,20 @@ impl<'a> PostprocessPhase for PatternPhase<'a> {
                     .collect(),
             ),
 
-            TypedNode::CaseOf(data_type, expr, arms) => {
+            TypedNode::CaseOf(_, expr, arms) => {
                 let compiler = PatternCompiler::new(self.enums);
 
-                // TODO: change to more permanent solution
-                let default = TypedNode::Variable(data_type.clone(), String::from("default_case"));
+                // TODO: show error message here at runtime.
+                
+                // Construct call to 'exit(1)'
+                let integer_type = Rc::new(DataType::Integer);
+                let exit_type = DataType::Function(vec![integer_type.clone()], integer_type.clone());
+
+                let default = TypedNode::FunctionCall(
+                    integer_type.clone(),
+                    Box::new(TypedNode::Variable(Rc::new(exit_type), String::from("panic"))), 
+                    vec![TypedNode::Integer(integer_type.clone(), 1)]
+                );
 
                 let patterns = arms
                     .iter()
