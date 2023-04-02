@@ -606,7 +606,18 @@ impl Compiler {
     ///
     /// * `arms`: Arms in a simplfied pattern matching expression.
     fn compile_case_arms(&mut self, expression: &TypedNode, arms: &[MatchArm]) -> String {
-        match arms {
+        let free_vars = find_free(expression);
+
+        // TODO: remove external
+        let mut captures = BTreeMap::new();
+        for (free_name, free_type) in &free_vars {
+            captures.insert(free_name.clone(), free_type.clone());
+        }
+
+        let captured_args = captures.keys().cloned().collect::<Vec<String>>();
+        let fresh_name = fresh_variable("case_branch");
+
+        let compiled_arm = match arms {
             [(arm_cond, arm_body, _), tail @ ..] => {
                 match arm_cond {
                     TypedNode::Variable(var_type, var_name) => {
@@ -653,25 +664,36 @@ impl Compiler {
 
                         buffer.push('}');
 
-                        buffer.push_str(&format!("else {{ {} }}", self.compile_case_arms(expression, tail)));
+                        buffer.push_str(&format!(
+                            "else {{ {} }}",
+                            self.compile_case_arms(expression, tail)
+                        ));
 
                         buffer
-                    },
+                    }
 
-                    _ => String::from("TODO")
+                    _ => String::from("TODO"),
                 }
-            } 
+            }
 
-            [] => todo!()
-        }       
+            [] => todo!(),
+        };
+
+        // This is awful, fix this.
+        let arm_type = arms.first().expect("Expected arm.").1.get_type();
+
+        self.branch_header.push(BranchDefinition {
+            name: fresh_name.clone(),
+            data_type: arm_type,
+            body: compiled_arm,
+            captures,
+        });
+
+        format!("{fresh_name}({})", captured_args.join(", "))
     }
 
     fn compile_case_of(&mut self, expression: &TypedNode, arms: &[MatchArm]) -> String {
-        let mut buffer = String::new();
-
-        buffer.push_str(&self.compile_case_arms(expression, arms));
-
-        buffer
+        self.compile_case_arms(expression, arms)
     }
 
     fn compile_enum_instance(
