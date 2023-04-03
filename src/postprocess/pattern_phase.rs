@@ -115,15 +115,19 @@ impl<'a> PostprocessPhase for PatternPhase<'a> {
                 let compiler = PatternCompiler::new(self.enums);
 
                 // TODO: show error message here at runtime.
-                
+
                 // Construct call to 'exit(1)'
                 let integer_type = Rc::new(DataType::Integer);
-                let exit_type = DataType::Function(vec![integer_type.clone()], integer_type.clone());
+                let exit_type =
+                    DataType::Function(vec![integer_type.clone()], integer_type.clone());
 
                 let default = TypedNode::FunctionCall(
                     integer_type.clone(),
-                    Box::new(TypedNode::Variable(Rc::new(exit_type), String::from("panic"))), 
-                    vec![TypedNode::Integer(integer_type.clone(), 1)]
+                    Box::new(TypedNode::Variable(
+                        Rc::new(exit_type),
+                        String::from("panic"),
+                    )),
+                    vec![TypedNode::Integer(integer_type, 1)],
                 );
 
                 let patterns = arms

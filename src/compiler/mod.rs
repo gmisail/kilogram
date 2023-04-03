@@ -345,8 +345,8 @@ impl Compiler {
 
             let arg_buffer = def
                 .captures
-                .iter()
-                .map(|(_, field_type)| resolver::get_native_type(field_type.clone()))
+                .values()
+                .map(|field_type| resolver::get_native_type(field_type.clone()))
                 .collect::<Vec<String>>()
                 .join(", ");
 
@@ -623,15 +623,20 @@ impl Compiler {
     /// Converts a series of arms into if / else pairs.
     ///
     /// * `arms`: Arms in a simplfied pattern matching expression.
-    fn compile_case_arms(&mut self, expression: &TypedNode, arms: &[MatchArm]) -> String {
-        let free_vars = self.get_free_variables(expression);
+    fn compile_case_arms(
+        &mut self,
+        expression: &TypedNode,
+        arms: &[MatchArm],
+        free_vars: HashMap<String, Rc<DataType>>,
+    ) -> String {
         let mut captures = BTreeMap::new();
 
         for (free_name, free_type) in &free_vars {
             captures.insert(free_name.clone(), free_type.clone());
         }
 
-        let mut captured_args = captures.keys().cloned().collect::<Vec<String>>();
+        let captured_args = captures.keys().cloned().collect::<Vec<String>>();
+
         let fresh_name = fresh_variable("case");
 
         let compiled_arm = match arms {
@@ -647,20 +652,6 @@ impl Compiler {
 
                     TypedNode::EnumInstance(enum_type, constructor_name, bindings) => {
                         let mut buffer = String::new();
-
-                       /* let named_bindings = bindings
-                            .iter()
-                            .map(|binding| {
-                                if let TypedNode::Variable(_, name) = binding {
-                                    (name.clone(), binding.clone())
-                                } else {
-                                    panic!()
-                                }
-                            })
-                            .collect::<HashMap<String, TypedNode>>();
-                        
-                        // Variables captured by the arm must *not* be a variable binding.
-                        captured_args.retain(|captured| !named_bindings.contains_key(captured));*/
 
                         buffer.push_str(
                             format!(
@@ -695,7 +686,7 @@ impl Compiler {
                         // statement
                         buffer.push_str(&format!(
                             " else {{\nreturn {};\n}}\n",
-                            self.compile_case_arms(expression, tail),
+                            self.compile_case_arms(expression, tail, free_vars),
                         ));
 
                         buffer
@@ -708,7 +699,7 @@ impl Compiler {
             [] => todo!(),
         };
 
-        // This is awful, fix this.
+        // TODO: This is awful, fix this.
         let arm_type = arms.first().expect("Expected arm.").1.get_type();
 
         self.branch_header.push(BranchDefinition {
@@ -721,8 +712,13 @@ impl Compiler {
         format!("{fresh_name}({})", captured_args.join(", "))
     }
 
-    fn compile_case_of(&mut self, expression: &TypedNode, arms: &[MatchArm]) -> String {
-        self.compile_case_arms(expression, arms)
+    fn compile_case_of(
+        &mut self,
+        expression: &TypedNode,
+        arms: &[MatchArm],
+        free_vars: HashMap<String, Rc<DataType>>,
+    ) -> String {
+        self.compile_case_arms(expression, arms, free_vars)
     }
 
     fn compile_enum_instance(
@@ -819,7 +815,10 @@ impl Compiler {
                 let free_vars = self.get_free_variables(expression);
                 self.compile_if(if_expr, then_expr, else_expr, free_vars)
             }
-            TypedNode::CaseOf(_, expr, arms) => self.compile_case_of(expr, arms),
+            TypedNode::CaseOf(_, expr, arms) => {
+                let free_vars = self.get_free_variables(expression);
+                self.compile_case_of(expr, arms, free_vars)
+            }
 
             TypedNode::Let(name, var_type, value, body, is_rec) => {
                 self.compile_let(name, var_type, value, body, *is_rec)

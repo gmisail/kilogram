@@ -192,10 +192,16 @@ impl<'c> PatternCompiler<'c> {
             // Prepend these fresh variables to the list of expressions
             fresh_vars.extend(Vec::from(remaining_exprs));
 
+            let mapped_variables = free_names
+                .iter()
+                .zip(fresh_vars.clone())
+                .map(|(fresh_name, fresh_node)| (fresh_name.clone(), fresh_node.get_type()))
+                .collect::<Vec<(_, _)>>();
+
             arms.push((
                 fresh_pattern,
                 self.transform(&fresh_vars, pairs.as_slice(), default.clone()),
-                HashMap::new(),
+                mapped_variables.into_iter().collect(),
             ));
         }
 
@@ -218,10 +224,13 @@ impl<'c> PatternCompiler<'c> {
                 HashMap::new(),
             ));
         } else {
+            let wildcard_name = fresh_variable("wildcard");
+            let wildcard_type = head_expr.get_type();
+
             arms.push((
-                TypedNode::Variable(head_expr.get_type(), fresh_variable("wildcard")),
+                TypedNode::Variable(wildcard_type.clone(), wildcard_name.clone()),
                 default.clone(),
-                HashMap::new(),
+                [(wildcard_name, wildcard_type)].into_iter().collect(),
             ));
         }
 
