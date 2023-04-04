@@ -212,16 +212,30 @@ impl<'c> PatternCompiler<'c> {
 
             let child_exprs = Vec::from(remaining_exprs);
 
-            // TODO: substitute for fresh variable
+            let free_name = fresh_variable("pattern");
+            let free_type = head_expr.get_type();
+
+            let original_name = match var_patterns.first() {
+                Some(Pattern::Variable(pattern_name)) => pattern_name,
+                Some(_) | None => panic!("Expected leading variable."),
+            };
+
+            let mapped_variables: HashMap<String, Rc<DataType>> =
+                [(free_name.clone(), free_type.clone())]
+                    .into_iter()
+                    .collect();
 
             arms.push((
-                var_expr.clone(),
+                TypedNode::Variable(free_type.clone(), free_name.clone()),
                 self.transform(
                     &child_exprs,
-                    &[(child_patterns, var_expr.clone())],
+                    &[(
+                        child_patterns,
+                        substitute(var_expr, &original_name, &free_name),
+                    )],
                     default.clone(),
                 ),
-                HashMap::new(),
+                mapped_variables,
             ));
         } else {
             let wildcard_name = fresh_variable("wildcard");
@@ -234,7 +248,9 @@ impl<'c> PatternCompiler<'c> {
             ));
         }
 
-        TypedNode::CaseOf(head_expr.get_type(), Box::new(head_expr.clone()), arms)
+        let (_, first_arm_body, _) = arms.first().expect("an arm to exist");
+
+        TypedNode::CaseOf(first_arm_body.get_type(), Box::new(head_expr.clone()), arms)
     }
 
     ///

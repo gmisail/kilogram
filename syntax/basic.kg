@@ -1,15 +1,18 @@
-extern panic: (int) -> int 
+extern panic: (int) -> int
+extern print: (string) -> int
+extern int_to_string: (int) -> string
 
-enum Sequence 
+enum Sequence
 	Cons(int, Sequence),
 	Nil
 end
 
-let rec length = function(seq: Sequence): int 
+let rec length = function(seq: Sequence): int
 	case seq of
+		Cons(num, Nil) -> 1,
 		Cons(num, tail) -> 1 + length(tail),
 		Nil -> 0
 	end
 end
 
-length(Cons(1, Cons(2, Cons(3, Nil))))
+print(int_to_string(length(Cons(1, Cons(2, Nil)))))

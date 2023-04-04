@@ -607,12 +607,26 @@ impl Compiler {
     ) -> String {
         let compiled_target = self.compile_expression(expression);
 
-        if let DataType::Enum(_, variants) = &*enum_type {
+        // Resolve enum in case it's a NamedReference, i.e. a reference to itself.
+        let resolved_enum = if let DataType::NamedReference(type_name) = &*enum_type {
+            if self.enums.contains_key(type_name) {
+                self.enums
+                    .get(type_name)
+                    .expect(format!("enum with name {type_name}").as_str())
+                    .clone()
+            } else {
+                panic!()
+            }
+        } else {
+            enum_type.clone()
+        };
+
+        if let DataType::Enum(_, variants) = &*resolved_enum {
             let (index, _variant) = variants
                 .keys()
                 .enumerate()
                 .find(|(_, variant_name)| *variant_name == constructor)
-                .expect("Cannot find variant in enum.");
+                .expect("variant to be in enum.");
 
             format!("{compiled_target}->id == {index}")
         } else {
@@ -636,7 +650,6 @@ impl Compiler {
         }
 
         let captured_args = captures.keys().cloned().collect::<Vec<String>>();
-
         let fresh_name = fresh_variable("case");
 
         let compiled_arm = match arms {
@@ -692,15 +705,15 @@ impl Compiler {
                         buffer
                     }
 
-                    _ => todo!(),
+                    _ => panic!(),
                 }
             }
 
             [] => todo!(),
         };
 
-        // TODO: This is awful, fix this.
-        let arm_type = arms.first().expect("Expected arm.").1.get_type();
+        let (_, first_arm_body, _) = arms.first().expect("Expected arm.");
+        let arm_type = first_arm_body.get_type();
 
         self.branch_header.push(BranchDefinition {
             name: fresh_name.clone(),
