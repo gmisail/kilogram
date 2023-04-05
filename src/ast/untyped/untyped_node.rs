@@ -12,6 +12,7 @@ pub enum UntypedNode {
     Boolean(bool),
     Variable(String),
     Group(Box<UntypedNode>),
+    List(Vec<UntypedNode>),
 
     Get(String, Box<UntypedNode>),
 
@@ -53,6 +54,15 @@ impl Display for UntypedNode {
             UntypedNode::Str(value) => format!("(String, value: '{value}')"),
             UntypedNode::Boolean(value) => format!("(Boolean, value: '{value}')"),
             UntypedNode::Variable(name) => format!("(Variable, name: '{name}')"),
+            UntypedNode::List(elements) => {
+                format!(
+                    "(List, elements: [{:?}]",
+                    elements
+                        .iter()
+                        .map(|element| format!("{element}"))
+                        .collect::<Vec<String>>()
+                )
+            }
 
             UntypedNode::Group(expr) => format!("(Group, value: {expr})"),
 

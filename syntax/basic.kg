@@ -9,10 +9,11 @@ end
 
 let rec length = function(seq: Sequence): int
 	case seq of
-		Cons(num, Nil) -> 1,
 		Cons(num, tail) -> 1 + length(tail),
 		Nil -> 0
 	end
 end
 
-print(int_to_string(length(Cons(1, Cons(2, Nil)))))
+let my_nums = [1, 2, 3]
+
+print(int_to_string(length(Cons(1, Cons(2, Cons(10, Cons(12, Cons(15, Nil))))))))

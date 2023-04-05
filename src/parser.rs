@@ -109,6 +109,7 @@ impl Parser {
                 TokenKind::Identifier(name) => self.parse_identifier(name.clone()),
                 TokenKind::LeftParen => self.parse_group(),
                 TokenKind::LeftBrace => self.parse_anonymous_record(),
+                TokenKind::LeftBracket => self.parse_list(),
                 _ => Err(format!(
                     "Failed to parse UntypedNode beginning with token '{}'",
                     t.kind
@@ -119,6 +120,29 @@ impl Parser {
                 "Failed to load token while parsing primary UntypedNode.",
             )),
         }
+    }
+
+    fn parse_list(&mut self) -> Result<UntypedNode, String> {
+        self.advance_token();
+
+        let mut elements = Vec::new();
+
+        if !self.match_token(&TokenKind::RightBracket) {
+            loop {
+                elements.push(self.parse_expression()?);
+
+                if !self.match_token(&TokenKind::Comma) {
+                    break;
+                }
+
+                // Consume the delimiting comma.
+                self.advance_token();
+            }
+        }
+
+        self.expect_token(&TokenKind::RightBracket)?;
+
+        Ok(UntypedNode::List(elements))
     }
 
     fn parse_anonymous_record(&mut self) -> Result<UntypedNode, String> {

@@ -735,6 +735,8 @@ impl Typechecker {
                 self.add_enum(name, &typed_variants)?;
                 self.resolve_type(body)
             }
+
+            UntypedNode::List(_) => panic!("expected list to be converted to Cons operators."),
         }
     }
 }
