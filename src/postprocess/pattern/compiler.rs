@@ -84,6 +84,44 @@ impl<'c> PatternCompiler<'c> {
         groups
     }
 
+    fn group_mixed(&self, patterns: &[Case]) -> Vec<Vec<Case>> {
+        let mut groups = Vec::new();
+        let mut group_buffer = Vec::new();
+
+        let mut has_variable = false;
+
+        for case @ (case_pattern, _) in patterns {
+            let first_pattern = case_pattern.first().expect("a leading pattern.");
+
+            match first_pattern {
+                &Pattern::Constructor(..) => {
+                    // Indicates that we've recently parsed a variable, meaning
+                    // that we're at the beginning of a new group.
+                    if has_variable {
+                        groups.push(group_buffer.clone());
+                        group_buffer = vec![case.clone()];
+
+                        has_variable = false;
+                    } else {
+                        group_buffer.push(case.clone());
+                    }
+                }
+
+                &Pattern::Variable(..) => {
+                    has_variable = true;
+
+                    group_buffer.push(case.clone());
+                }
+
+                _ => panic!("Unknown pattern type."),
+            };
+        }
+
+        groups.push(group_buffer);
+
+        groups
+    }
+
     ///
     /// From a constructor type and variant, generate a list of well-typed, fresh variables.
     ///
@@ -333,16 +371,35 @@ impl<'c> PatternCompiler<'c> {
         )
     }
 
+    fn transform_from_list(
+        &self,
+        expressions: &[TypedNode],
+        pattern_groups: &[Vec<Case>],
+        default: &TypedNode,
+    ) -> TypedNode {
+        println!("GROUPS: {:#?}", pattern_groups);
+
+        match pattern_groups {
+            [] => default.clone(),
+
+            [first_group, tail @ ..] => self.transform(
+                expressions.clone(),
+                first_group,
+                self.transform_from_list(expressions, tail, default),
+            ),
+        }
+    }
+
     ///
     /// Transforms a match tree with mixed constructors and variables.
     ///
     fn transform_mixed(
         &self,
         expressions: &[TypedNode],
-        patterns: &[(Vec<Pattern>, TypedNode)],
+        patterns: &[Case],
         default: &TypedNode,
     ) -> TypedNode {
-        todo!()
+        self.transform_from_list(expressions, &self.group_mixed(patterns), default)
     }
 
     ///

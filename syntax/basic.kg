@@ -9,7 +9,7 @@ end
 
 let rec length = function(seq: Sequence): int
 	case seq of
-	    Cons(num, Cons(another_num, Nil)) -> 2,
+	   	Cons(num, Cons(another_num, Nil)) -> 2,
 		Cons(num, tail) -> 1 + length(tail),
 	    Cons(num, Nil) -> 1,
 		Nil -> 0
