@@ -20,13 +20,25 @@ fn unify_variant(
             } else if !types.is_empty() && types.len() == arguments.len() {
                 let mut unbound = HashMap::new();
 
-                // TODO: make this more robust, more like a pattern matching system.
-
                 // For now, assume every variable keyword is an unbound variable.
                 for (index, argument) in arguments.iter().enumerate() {
-                    if let UntypedNode::Variable(binding_name) = argument {
-                        unbound.insert(binding_name.clone(), types.get(index).unwrap().clone());
-                    }
+                    match argument {
+                        UntypedNode::Variable(binding_name) => {
+                            unbound.insert(binding_name.clone(), types.get(index).unwrap().clone());
+                        }
+
+                        // In case we have nested Constructors (i.e. FunctionCall), recursively
+                        // unify them.
+                        UntypedNode::FunctionCall(parent, arguments) => {
+                            if let UntypedNode::Variable(name) = &**parent {
+                                unbound.extend(unify_variant(name, variants, arguments)?);
+                            } else {
+                                return Err("Cannot unify non-enum type.".to_string());
+                            };
+                        }
+
+                        _ => panic!("Unifying with unsupported type."),
+                    };
                 }
 
                 Ok(unbound)
