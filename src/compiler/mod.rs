@@ -612,7 +612,7 @@ impl Compiler {
             if self.enums.contains_key(type_name) {
                 self.enums
                     .get(type_name)
-                    .expect(format!("enum with name {type_name}").as_str())
+                    .unwrap_or_else(|| panic!("enum with name {type_name}"))
                     .clone()
             } else {
                 panic!()

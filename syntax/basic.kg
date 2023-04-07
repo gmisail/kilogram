@@ -9,10 +9,19 @@ end
 
 let rec length = function(seq: Sequence): int
 	case seq of
-	   	Cons(num, Cons(another_num, Nil)) -> 2,
-		Cons(num, tail) -> 1 + length(tail),
-	    Cons(num, Nil) -> 1,
-		Nil -> 0
+		Nil -> 0,
+	   	Cons(num, Cons(another_num, Nil)) ->
+			let case_one = print("Case 1")
+			2,
+		Cons(num, tail) ->
+            let case_two = print("Case 2")
+            1 + length(tail),
+	    Cons(num, Nil) ->
+			let case_three = print("Case 3")
+			1,
+		Cons(num, tail) ->
+		    let case_four = print("Case 4")
+			print("Fell through")
 	end
 end
 
