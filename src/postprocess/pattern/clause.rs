@@ -3,8 +3,8 @@ use crate::ast::typed::typed_node::TypedNode;
 use super::Pattern;
 
 /// A test represents a match against a single pattern.
-/// Example: <variable> is <pattern>
-#[derive(Clone)]
+/// Example: <variable> is <pattern>d
+#[derive(Clone, Debug)]
 pub struct Test {
     pub variable: TypedNode,
     pub pattern: Pattern,
@@ -12,10 +12,11 @@ pub struct Test {
 
 /// A clause represents a list of tests as well as the body of a successful match.
 /// Example: [<test>] => <body>
+#[derive(Clone, Debug)]
 pub struct Clause {
     pub tests: Vec<Test>,
     pub body: TypedNode,
-    variables: Vec<Test>,
+    pub variables: Vec<Test>,
 }
 
 impl Clause {
