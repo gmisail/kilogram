@@ -16,5 +16,7 @@ pub trait PostprocessPhase {
 pub fn apply_all(root: &TypedNode, enums: &HashMap<String, Rc<DataType>>) -> TypedNode {
     // For now, only apply the patter compiler. In the future, we'd create a pipeline of
     // operations such that each of the operations pipe its result to the next phase.
-    PatternPhase::new(enums).transform(root)
+
+    // TODO: uncomment this: PatternPhase::new(enums).transform(root)
+    todo!()
 }

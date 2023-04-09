@@ -12,11 +12,15 @@ use super::pattern::Pattern;
 
 pub struct PatternPhase<'a> {
     enums: &'a HashMap<String, Rc<DataType>>,
+    variants: &'a HashMap<String, Rc<DataType>>,
 }
 
 impl<'a> PatternPhase<'a> {
-    pub fn new(enums: &'a HashMap<String, Rc<DataType>>) -> Self {
-        PatternPhase { enums }
+    pub fn new(
+        enums: &'a HashMap<String, Rc<DataType>>,
+        variants: &'a HashMap<String, Rc<DataType>>,
+    ) -> Self {
+        PatternPhase { enums, variants }
     }
 }
 
@@ -112,7 +116,7 @@ impl<'a> PostprocessPhase for PatternPhase<'a> {
             ),
 
             TypedNode::CaseOf(_, expr, arms) => {
-                let compiler = PatternCompiler::new(self.enums);
+                let compiler = PatternCompiler::new(self.enums, self.variants);
 
                 // TODO: show error message here at runtime.
 

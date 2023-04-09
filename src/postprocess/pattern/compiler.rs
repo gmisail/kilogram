@@ -11,24 +11,31 @@ use super::Pattern;
 
 pub struct PatternCompiler<'c> {
     enums: &'c HashMap<String, Rc<DataType>>,
+    variants: &'c HashMap<String, Rc<DataType>>,
 }
 
 impl<'c> PatternCompiler<'c> {
-    pub fn new(enums: &'c HashMap<String, Rc<DataType>>) -> Self {
-        PatternCompiler { enums }
+    pub fn new(
+        enums: &'c HashMap<String, Rc<DataType>>,
+        variants: &'c HashMap<String, Rc<DataType>>,
+    ) -> Self {
+        PatternCompiler { enums, variants }
     }
 
     /// Moves all bare variables from clause patterns to expressions.
     fn move_variables(&self, mut clauses: Vec<Clause>) -> Vec<Clause> {
         for clause in &mut clauses {
-            let mut bare_variables = clause
+            let (mut vars, constr) = clause
                 .tests
                 .iter()
-                .filter(|test| matches!(test.pattern, Pattern::Variable(..)))
                 .cloned()
-                .collect::<Vec<Test>>();
+                .partition(|test| matches!(test.pattern, Pattern::Variable(..)));
 
-            clause.add_variables(&mut bare_variables);
+            // Replace all tests with only the constructors.
+            clause.tests = constr;
+
+            // Move variables out of the tests and into the clause body.
+            clause.add_variables(&mut vars);
         }
 
         clauses
@@ -60,16 +67,30 @@ impl<'c> PatternCompiler<'c> {
                 match pattern {
                     // Case 1: We have a matching Constructor in this clause.
                     Pattern::Constructor(name, arguments) if name == *constr_name => {
+                        let constr_type = self
+                            .variants
+                            .get(&name)
+                            .expect("constructor to exist with variant {name}".into());
+
+                        let constr_variant = match &**constr_type {
+                            DataType::Enum(_, variants) => {
+                                variants.get(&name).expect("variant to exist")
+                            }
+                            _ => panic!("Expected constructor type to be Enum."),
+                        };
+
                         // For each of the Constructor's arguments, bind it to a
                         // free variable.
                         let mut nested_tests = arguments
                             .iter()
-                            .map(|_argument| Test {
+                            .zip(constr_variant)
+                            .map(|(arg, arg_type)| Test {
                                 variable: TypedNode::Variable(
-                                    Rc::from(DataType::Integer),
-                                    "temp".into(),
+                                    // TODO: replace this with actual type of argument.
+                                    arg_type.clone(),
+                                    fresh_variable("var"),
                                 ),
-                                pattern: Pattern::Variable(fresh_variable("var")),
+                                pattern: arg.clone(),
                             })
                             .collect::<Vec<Test>>();
 
@@ -117,31 +138,46 @@ impl<'c> PatternCompiler<'c> {
             return default.clone();
         }
 
+        // Move variables to expressions, only Constructor patterns.
+        let only_constr = self.move_variables(clauses);
+
         // If there are no tests to match against, then it will always match. So,
         // return the expression corresponding to the first clause.
-        let first_clause = clauses.first().expect("has first clause");
+        let first_clause = only_constr.first().expect("has first clause");
         if first_clause.tests.is_empty() {
             return first_clause.body.clone();
         }
 
-        // Move variables to expressions, only Constructor patterns.
-        let only_constr = self.move_variables(clauses);
-
         // TODO: choose constructor using some heuristic, not just the first one.
         let first_constr = only_constr.first().expect("a leading constructor");
         let first_test = first_constr.tests.first().expect("a first test");
-        let first_pattern = first_test.clone().pattern;
+        let Test {
+            pattern: first_pattern,
+            variable: first_var,
+        } = first_test.clone();
 
         if let Pattern::Constructor(constr_name, _arguments) = first_pattern {
+            println!("Matching on: {constr_name}");
+
             let (matching_constr, remaining_constr) =
                 self.group_by_constructor(&constr_name, 0, only_constr);
 
-            println!("MATCHING: {:#?}", matching_constr);
-            println!("REMAINING: {:#?}", remaining_constr);
+            println!(
+                "MATCHING: {:#?}",
+                matching_constr // self.transform(first_var, matching_constr, default.clone())
+            );
+            println!(
+                "REMAINING: {:#?}",
+                remaining_constr /*  self.transform(
+                                     TypedNode::Variable(Rc::from(DataType::Integer), fresh_variable("b")),
+                                     remaining_constr,
+                                     default
+                                 )*/
+            );
 
             todo!()
         } else {
-            panic!()
+            panic!("Expected all tests to be a constructor.")
         }
     }
 }
@@ -161,15 +197,15 @@ mod tests {
     fn leading_constructor() {
         /*
          *   case list of
-         *       Cons(id, Cons(id2, None)) -> case_a
+         *       Cons(id, Cons(id2, Nil)) -> case_a
          *       Cons(wildcard1, wildcard2) -> case_b
-         *       None -> case_c
+         *       Nil -> case_c
          *   end
          *
          * */
         let node_type = Rc::new(DataType::Integer);
         let mut list_variants = BTreeMap::new();
-        list_variants.insert(String::from("None"), vec![]);
+        list_variants.insert(String::from("Nil"), vec![]);
         list_variants.insert(
             String::from("Cons"),
             vec![
@@ -194,7 +230,7 @@ mod tests {
                                 String::from("Cons"),
                                 vec![
                                     Pattern::Variable(String::from("id2")),
-                                    Pattern::Constructor(String::from("None"), vec![]),
+                                    Pattern::Constructor(String::from("Nil"), vec![]),
                                 ],
                             ),
                         ],
@@ -261,9 +297,13 @@ mod tests {
         ];
 
         let mut enums = HashMap::new();
-        enums.insert(String::from("List"), list_type);
+        enums.insert(String::from("List"), list_type.clone());
 
-        let compiler = PatternCompiler::new(&enums);
+        let mut variants = HashMap::new();
+        variants.insert("Cons".into(), list_type.clone());
+        variants.insert("Nil".into(), list_type);
+
+        let compiler = PatternCompiler::new(&enums, &variants);
         let result = compiler.transform(exprs, clauses, TypedNode::Integer(node_type.clone(), 0));
 
         println!("{:?}", result);
