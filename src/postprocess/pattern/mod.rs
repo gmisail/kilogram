@@ -1,7 +1,6 @@
-mod clause;
 mod substitute;
-mod tree;
 
+pub mod clause;
 pub mod compiler;
 
 use crate::ast::typed::typed_node::TypedNode;

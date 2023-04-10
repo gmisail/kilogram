@@ -62,14 +62,14 @@ impl<'c> PatternCompiler<'c> {
         &self,
         constr_name: &String,
         constr_index: usize,
-        clauses: &Vec<Clause>,
+        clauses: &[Clause],
     ) -> (Vec<Clause>, Vec<Clause>) {
         let mut matching_constr = Vec::new();
         let mut remaining_constr = Vec::new();
 
         // TODO: we're always using the first column, try a different heuristic (closer to the one in the paper)
 
-        let new_clauses = clauses.clone();
+        let new_clauses = clauses.to_owned();
 
         for mut clause in new_clauses {
             // Case 3: Missing constructor, i.e. column does not exist.
@@ -87,7 +87,7 @@ impl<'c> PatternCompiler<'c> {
                         let constr_type = self
                             .variants
                             .get(&name)
-                            .expect("constructor to exist with variant {name}".into());
+                            .unwrap_or_else(|| panic!("constructor to exist with variant {name}"));
 
                         let constr_variant = match &**constr_type {
                             DataType::Enum(_, variants) => {
@@ -152,7 +152,7 @@ impl<'c> PatternCompiler<'c> {
         // No clauses => in-exhaustive
         if clauses.is_empty() {
             println!("In-exhaustive pattern match.");
-            return default.clone();
+            return default;
         }
 
         // Move variables to expressions, only Constructor patterns.
@@ -190,13 +190,10 @@ impl<'c> PatternCompiler<'c> {
                 default,
             );
 
-            // println!("MATCHING: {:#?}", matching_arm);
-            // println!("REMAINING: {:#?}", remaining_arm);
-
             let constr_type = self
                 .variants
                 .get(&constr_name)
-                .expect("variant with name {constr_name}".into());
+                .unwrap_or_else(|| panic!("variant with name {constr_name}"));
 
             // AST representation of the patterns that we selected to match against
             let matching_pattern = TypedNode::EnumInstance(

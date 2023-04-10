@@ -2,12 +2,14 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::fresh::generator::fresh_variable;
 use crate::postprocess::pattern::compiler::PatternCompiler;
 use crate::postprocess::PostprocessPhase;
 
 use crate::ast::typed::data_type::DataType;
 use crate::ast::typed::typed_node::TypedNode;
 
+use super::pattern::clause::{Clause, Test};
 use super::pattern::Pattern;
 
 pub struct PatternPhase<'a> {
@@ -134,16 +136,22 @@ impl<'a> PostprocessPhase for PatternPhase<'a> {
                     vec![TypedNode::Integer(integer_type, 1)],
                 );
 
-                let patterns = arms
+                let clauses = arms
                     .iter()
-                    .map(|(arm_cond, arm_body, _)| {
-                        (vec![Pattern::new(arm_cond)], self.transform(arm_body))
+                    .map(|(arm_cond, arm_body, _)| Clause {
+                        tests: vec![Test {
+                            variable: TypedNode::Variable(
+                                (**expr).get_type(),
+                                fresh_variable("var"),
+                            ),
+                            pattern: Pattern::new(arm_cond),
+                        }],
+                        body: self.transform(arm_body),
+                        variables: vec![],
                     })
-                    .collect::<Vec<(Vec<Pattern>, TypedNode)>>();
+                    .collect::<Vec<Clause>>();
 
-                // TODO: compiler.transform(&[(**expr).clone()], &patterns, default)
-
-                todo!()
+                compiler.transform((**expr).clone(), clauses, default)
             }
         }
     }

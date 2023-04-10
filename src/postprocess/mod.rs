@@ -2,7 +2,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::ast::typed::{data_type::DataType, typed_node::TypedNode};
+use crate::ast::typed::{data_type::DataType, enum_type, typed_node::TypedNode};
 
 use self::pattern_phase::PatternPhase;
 
@@ -14,9 +14,8 @@ pub trait PostprocessPhase {
 }
 
 pub fn apply_all(root: &TypedNode, enums: &HashMap<String, Rc<DataType>>) -> TypedNode {
-    // For now, only apply the patter compiler. In the future, we'd create a pipeline of
+    // For now, only apply the pattern compiler. In the future, we'd create a pipeline of
     // operations such that each of the operations pipe its result to the next phase.
 
-    // TODO: uncomment this: PatternPhase::new(enums).transform(root)
-    todo!()
+    PatternPhase::new(enums, &enum_type::create_variant_parent_map(enums)).transform(root)
 }
