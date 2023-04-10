@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::ast::typed::data_type::DataType;
+use crate::ast::typed::enum_type;
 use crate::ast::typed::typed_node::TypedNode;
 use crate::fresh::generator::fresh_variable;
 
@@ -41,11 +42,27 @@ impl<'c> PatternCompiler<'c> {
         clauses
     }
 
+    fn generate_fresh_constructor_arguments(
+        &self,
+        enum_type: &Rc<DataType>,
+        variant_name: &String,
+    ) -> Vec<TypedNode> {
+        let variant_types = enum_type::get_variant_fields(enum_type.clone(), variant_name)
+            .expect("variant to exist with fields");
+
+        // Consider the following constructor: Cons(a_0, a_1)
+        // From this constructor, convert a_0 and a_1 into fresh variables with the same types.
+        variant_types
+            .iter()
+            .map(|variant_type| TypedNode::Variable(variant_type.clone(), fresh_variable("var")))
+            .collect()
+    }
+
     fn group_by_constructor(
         &self,
         constr_name: &String,
         constr_index: usize,
-        clauses: Vec<Clause>,
+        clauses: &Vec<Clause>,
     ) -> (Vec<Clause>, Vec<Clause>) {
         let mut matching_constr = Vec::new();
         let mut remaining_constr = Vec::new();
@@ -128,7 +145,7 @@ impl<'c> PatternCompiler<'c> {
     /// matching expression.
     pub fn transform(
         &self,
-        _expression: TypedNode,
+        expression: TypedNode,
         clauses: Vec<Clause>,
         default: TypedNode,
     ) -> TypedNode {
@@ -149,33 +166,57 @@ impl<'c> PatternCompiler<'c> {
         }
 
         // TODO: choose constructor using some heuristic, not just the first one.
-        let first_constr = only_constr.first().expect("a leading constructor");
-        let first_test = first_constr.tests.first().expect("a first test");
+        let first_test = first_clause.tests.first().expect("a first test");
         let Test {
             pattern: first_pattern,
             variable: first_var,
         } = first_test.clone();
 
         if let Pattern::Constructor(constr_name, _arguments) = first_pattern {
-            println!("Matching on: {constr_name}");
-
+            // Split expression into two arms. So:
+            //
+            //  case a of
+            //      C(a_0, ..., C_n) -> <matching_constr>
+            //      _ ->                <remaining_constr>
+            //  end
+            //
             let (matching_constr, remaining_constr) =
-                self.group_by_constructor(&constr_name, 0, only_constr);
+                self.group_by_constructor(&constr_name, 0, &only_constr);
 
-            println!(
-                "MATCHING: {:#?}",
-                matching_constr // self.transform(first_var, matching_constr, default.clone())
-            );
-            println!(
-                "REMAINING: {:#?}",
-                remaining_constr /*  self.transform(
-                                     TypedNode::Variable(Rc::from(DataType::Integer), fresh_variable("b")),
-                                     remaining_constr,
-                                     default
-                                 )*/
+            let matching_arm = self.transform(first_var, matching_constr, default.clone());
+            let remaining_arm = self.transform(
+                TypedNode::Variable(Rc::from(DataType::Integer), fresh_variable("b")),
+                remaining_constr,
+                default,
             );
 
-            todo!()
+            // println!("MATCHING: {:#?}", matching_arm);
+            // println!("REMAINING: {:#?}", remaining_arm);
+
+            let constr_type = self
+                .variants
+                .get(&constr_name)
+                .expect("variant with name {constr_name}".into());
+
+            // AST representation of the patterns that we selected to match against
+            let matching_pattern = TypedNode::EnumInstance(
+                constr_type.clone(),
+                constr_name.clone(),
+                self.generate_fresh_constructor_arguments(constr_type, &constr_name),
+            );
+
+            let wildcard_pattern =
+                TypedNode::Variable(constr_type.clone(), fresh_variable("wildcard"));
+
+            // Each arm's body has the same type, so just use the type of the first arm.
+            TypedNode::CaseOf(
+                first_clause.body.get_type(),
+                Box::new(expression),
+                vec![
+                    (matching_pattern, matching_arm, HashMap::new()),
+                    (wildcard_pattern, remaining_arm, HashMap::new()),
+                ],
+            )
         } else {
             panic!("Expected all tests to be a constructor.")
         }
@@ -306,6 +347,6 @@ mod tests {
         let compiler = PatternCompiler::new(&enums, &variants);
         let result = compiler.transform(exprs, clauses, TypedNode::Integer(node_type.clone(), 0));
 
-        println!("{:?}", result);
+        println!("{:#?}", result);
     }
 }
