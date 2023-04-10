@@ -10,6 +10,8 @@ use super::clause::{Clause, Test};
 //use super::substitute::{substitute, substitute_all};
 use super::Pattern;
 
+pub type MatchArm = (TypedNode, TypedNode, HashMap<String, Rc<DataType>>);
+
 pub struct PatternCompiler<'c> {
     enums: &'c HashMap<String, Rc<DataType>>,
     variants: &'c HashMap<String, Rc<DataType>>,
@@ -46,16 +48,26 @@ impl<'c> PatternCompiler<'c> {
         &self,
         enum_type: &Rc<DataType>,
         variant_name: &String,
-    ) -> Vec<TypedNode> {
+    ) -> (Vec<String>, Vec<TypedNode>) {
         let variant_types = enum_type::get_variant_fields(enum_type.clone(), variant_name)
             .expect("variant to exist with fields");
 
+        let fresh_names = variant_types
+            .iter()
+            .map(|_| fresh_variable("var"))
+            .collect::<Vec<String>>();
+
         // Consider the following constructor: Cons(a_0, a_1)
         // From this constructor, convert a_0 and a_1 into fresh variables with the same types.
-        variant_types
+        let fresh_variables = variant_types
             .iter()
-            .map(|variant_type| TypedNode::Variable(variant_type.clone(), fresh_variable("var")))
-            .collect()
+            .zip(fresh_names.clone())
+            .map(|(variant_type, variant_name)| {
+                TypedNode::Variable(variant_type.clone(), variant_name)
+            })
+            .collect();
+
+        (fresh_names, fresh_variables)
     }
 
     fn group_by_constructor(
@@ -195,23 +207,38 @@ impl<'c> PatternCompiler<'c> {
                 .get(&constr_name)
                 .unwrap_or_else(|| panic!("variant with name {constr_name}"));
 
+            let (fresh_names, constr_vars) =
+                self.generate_fresh_constructor_arguments(constr_type, &constr_name);
+
             // AST representation of the patterns that we selected to match against
             let matching_pattern = TypedNode::EnumInstance(
                 constr_type.clone(),
                 constr_name.clone(),
-                self.generate_fresh_constructor_arguments(constr_type, &constr_name),
+                constr_vars.clone(),
             );
 
-            let wildcard_pattern =
-                TypedNode::Variable(constr_type.clone(), fresh_variable("wildcard"));
+            let wildcard_name = fresh_variable("wildcard");
+            let wildcard_pattern = TypedNode::Variable(constr_type.clone(), wildcard_name.clone());
 
             // Each arm's body has the same type, so just use the type of the first arm.
             TypedNode::CaseOf(
                 first_clause.body.get_type(),
                 Box::new(expression),
                 vec![
-                    (matching_pattern, matching_arm, HashMap::new()),
-                    (wildcard_pattern, remaining_arm, HashMap::new()),
+                    (
+                        matching_pattern,
+                        matching_arm,
+                        constr_vars
+                            .iter()
+                            .zip(fresh_names)
+                            .map(|(constr_var, var_name)| (var_name.clone(), constr_var.get_type()))
+                            .collect(),
+                    ),
+                    (
+                        wildcard_pattern,
+                        remaining_arm,
+                        [(wildcard_name, constr_type.clone())].into(),
+                    ),
                 ],
             )
         } else {

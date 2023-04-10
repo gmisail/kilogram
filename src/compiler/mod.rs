@@ -13,6 +13,7 @@ use crate::compiler::free::find_free;
 
 use crate::fresh::generator::fresh_variable;
 
+use crate::postprocess::pattern::compiler::MatchArm;
 use crate::typechecker::Typechecker;
 
 use self::emitter::emit_if;
@@ -367,7 +368,7 @@ impl Compiler {
 
             buffer.push_str(&format!("({arg_buffer}){{\n"));
             buffer.push_str(&def.body);
-            buffer.push_str("\n}\n");
+            buffer.push_str("}\n");
         }
 
         buffer
@@ -637,102 +638,102 @@ impl Compiler {
     /// Converts a series of arms into if / else pairs.
     ///
     /// * `arms`: Arms in a simplfied pattern matching expression.
-    // fn compile_case_arms(
-    //     &mut self,
-    //     expression: &TypedNode,
-    //     arms: &[MatchArm],
-    //     free_vars: HashMap<String, Rc<DataType>>,
-    // ) -> String {
-    //     let mut captures = BTreeMap::new();
+    fn compile_case_arms(
+        &mut self,
+        expression: &TypedNode,
+        arms: &[MatchArm],
+        free_vars: HashMap<String, Rc<DataType>>,
+    ) -> String {
+        let mut captures = BTreeMap::new();
 
-    //     for (free_name, free_type) in &free_vars {
-    //         captures.insert(free_name.clone(), free_type.clone());
-    //     }
+        for (free_name, free_type) in &free_vars {
+            captures.insert(free_name.clone(), free_type.clone());
+        }
 
-    //     let captured_args = captures.keys().cloned().collect::<Vec<String>>();
-    //     let fresh_name = fresh_variable("case");
+        let captured_args = captures.keys().cloned().collect::<Vec<String>>();
+        let fresh_name = fresh_variable("case");
 
-    //     let compiled_arm = match arms {
-    //         [(arm_cond, arm_body, _), tail @ ..] => {
-    //             match arm_cond {
-    //                 TypedNode::Variable(var_type, var_name) => self.return_leaf(&TypedNode::Let(
-    //                     var_name.to_string(),
-    //                     var_type.clone(),
-    //                     Box::new(expression.clone()),
-    //                     Box::new(arm_body.clone()),
-    //                     false,
-    //                 )),
+        let compiled_arm = match arms {
+            [(arm_cond, arm_body, _), tail @ ..] => {
+                match arm_cond {
+                    TypedNode::Variable(var_type, var_name) => self.return_leaf(&TypedNode::Let(
+                        var_name.to_string(),
+                        var_type.clone(),
+                        Box::new(expression.clone()),
+                        Box::new(arm_body.clone()),
+                        false,
+                    )),
 
-    //                 TypedNode::EnumInstance(enum_type, constructor_name, bindings) => {
-    //                     let mut buffer = String::new();
+                    TypedNode::EnumInstance(enum_type, constructor_name, bindings) => {
+                        let mut buffer = String::new();
 
-    //                     buffer.push_str(
-    //                         format!(
-    //                             "// {constructor_name}\nif({}){{\n",
-    //                             self.get_expression_variant_check(
-    //                                 expression,
-    //                                 enum_type.clone(),
-    //                                 constructor_name,
-    //                             )
-    //                         )
-    //                         .as_str(),
-    //                     );
+                        buffer.push_str(
+                            format!(
+                                "// {constructor_name}\nif({}){{\n",
+                                self.get_expression_variant_check(
+                                    expression,
+                                    enum_type.clone(),
+                                    constructor_name,
+                                )
+                            )
+                            .as_str(),
+                        );
 
-    //                     let match_on = self.compile_expression(expression);
+                        let match_on = self.compile_expression(expression);
 
-    //                     // Load bindings into scope.
-    //                     for (constructor_id, binding) in bindings.iter().enumerate() {
-    //                         if let TypedNode::Variable(var_type, var_name) = binding {
-    //                             buffer.push_str(&format!(
-    //                                 "{} = {match_on}->{constructor_name}_{constructor_id};\n",
-    //                                 self.resolve_type(var_name, var_type.clone()),
-    //                             ));
-    //                         } else {
-    //                             panic!("Expected binding to be variable.")
-    //                         }
-    //                     }
+                        // Load bindings into scope.
+                        for (constructor_id, binding) in bindings.iter().enumerate() {
+                            if let TypedNode::Variable(var_type, var_name) = binding {
+                                buffer.push_str(&format!(
+                                    "{} = {match_on}->{constructor_name}_{constructor_id};\n",
+                                    self.resolve_type(var_name, var_type.clone()),
+                                ));
+                            } else {
+                                panic!("Expected binding to be variable.")
+                            }
+                        }
 
-    //                     // Now that the bindings are in scope, we can evaluate the arm.
-    //                     buffer.push_str(&format!("{}\n}}", self.return_leaf(arm_body)));
+                        // Now that the bindings are in scope, we can evaluate the arm.
+                        buffer.push_str(&format!("{}\n}}", self.return_leaf(arm_body)));
 
-    //                     // Always produces a call to another branch, so insert the 'return ... ;'
-    //                     // statement
-    //                     buffer.push_str(&format!(
-    //                         " else {{\nreturn {};\n}}\n",
-    //                         self.compile_case_arms(expression, tail, free_vars),
-    //                     ));
+                        // Always produces a call to another branch, so insert the 'return ... ;'
+                        // statement
+                        buffer.push_str(&format!(
+                            " else {{\nreturn {};\n}}\n",
+                            self.compile_case_arms(expression, tail, free_vars),
+                        ));
 
-    //                     buffer
-    //                 }
+                        buffer
+                    }
 
-    //                 _ => panic!(),
-    //             }
-    //         }
+                    _ => panic!(),
+                }
+            }
 
-    //         [] => todo!(),
-    //     };
+            [] => todo!(),
+        };
 
-    //     let (_, first_arm_body, _) = arms.first().expect("Expected arm.");
-    //     let arm_type = first_arm_body.get_type();
+        let (_, first_arm_body, _) = arms.first().expect("Expected arm.");
+        let arm_type = first_arm_body.get_type();
 
-    //     self.branch_header.push(BranchDefinition {
-    //         name: fresh_name.clone(),
-    //         data_type: arm_type,
-    //         body: compiled_arm,
-    //         captures,
-    //     });
+        self.branch_header.push(BranchDefinition {
+            name: fresh_name.clone(),
+            data_type: arm_type,
+            body: compiled_arm,
+            captures,
+        });
 
-    //     format!("{fresh_name}({})", captured_args.join(", "))
-    // }
+        format!("{fresh_name}({})", captured_args.join(", "))
+    }
 
-    // fn compile_case_of(
-    //     &mut self,
-    //     expression: &TypedNode,
-    //     arms: &[MatchArm],
-    //     free_vars: HashMap<String, Rc<DataType>>,
-    // ) -> String {
-    //     self.compile_case_arms(expression, arms, free_vars)
-    // }
+    fn compile_case_of(
+        &mut self,
+        expression: &TypedNode,
+        arms: &[MatchArm],
+        free_vars: HashMap<String, Rc<DataType>>,
+    ) -> String {
+        self.compile_case_arms(expression, arms, free_vars)
+    }
 
     fn compile_enum_instance(
         &mut self,
@@ -830,9 +831,7 @@ impl Compiler {
             }
             TypedNode::CaseOf(_, expr, arms) => {
                 let free_vars = self.get_free_variables(expression);
-
-                todo!("case of")
-                //self.compile_case_of(expr, arms, free_vars)
+                self.compile_case_of(expr, arms, free_vars)
             }
 
             TypedNode::Let(name, var_type, value, body, is_rec) => {
