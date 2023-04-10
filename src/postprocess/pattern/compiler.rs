@@ -89,21 +89,23 @@ impl<'c> PatternCompiler<'c> {
                 matching_constr.push(clause.clone());
                 remaining_constr.push(clause.clone());
             } else {
-                // Which column are we pivoting around?
-                let Test { variable, pattern } = clause.tests.remove(constr_index);
+                // TODO: Which column are we pivoting around?
+                let clause_test = clause.tests.remove(constr_index);
+                let Test { pattern, .. } = &clause_test;
+
                 let mut has_match = false;
 
                 match pattern {
                     // Case 1: We have a matching Constructor in this clause.
-                    Pattern::Constructor(name, arguments) if name == *constr_name => {
+                    Pattern::Constructor(name, arguments) if *name == *constr_name => {
                         let constr_type = self
                             .variants
-                            .get(&name)
+                            .get(name)
                             .unwrap_or_else(|| panic!("constructor to exist with variant {name}"));
 
                         let constr_variant = match &**constr_type {
                             DataType::Enum(_, variants) => {
-                                variants.get(&name).expect("variant to exist")
+                                variants.get(name).expect("variant to exist")
                             }
                             _ => panic!("Expected constructor type to be Enum."),
                         };
@@ -145,7 +147,14 @@ impl<'c> PatternCompiler<'c> {
 
                 // Case 2: Constructor does not match.
                 if !has_match {
-                    remaining_constr.push(clause.clone());
+                    let mut initial_tests = clause.tests.clone();
+                    initial_tests.push(clause_test);
+
+                    remaining_constr.push(Clause {
+                        tests: initial_tests,
+                        body: clause.body.clone(),
+                        variables: clause.variables.clone(),
+                    });
                 }
             }
         }
@@ -185,6 +194,8 @@ impl<'c> PatternCompiler<'c> {
         } = first_test.clone();
 
         if let Pattern::Constructor(constr_name, _arguments) = first_pattern {
+            println!("Matching on {constr_name}...");
+
             // Split expression into two arms. So:
             //
             //  case a of
@@ -195,17 +206,19 @@ impl<'c> PatternCompiler<'c> {
             let (matching_constr, remaining_constr) =
                 self.group_by_constructor(&constr_name, 0, &only_constr);
 
+            println!("REMAINING: {:#?}", remaining_constr);
+
             let matching_arm = self.transform(first_var, matching_constr, default.clone());
-            let remaining_arm = self.transform(
-                TypedNode::Variable(Rc::from(DataType::Integer), fresh_variable("b")),
-                remaining_constr,
-                default,
-            );
 
             let constr_type = self
                 .variants
                 .get(&constr_name)
                 .unwrap_or_else(|| panic!("variant with name {constr_name}"));
+
+            let wildcard_name = fresh_variable("wildcard");
+            let wildcard_node = TypedNode::Variable(constr_type.clone(), wildcard_name.clone());
+
+            let remaining_arm = self.transform(wildcard_node.clone(), remaining_constr, default);
 
             let (fresh_names, constr_vars) =
                 self.generate_fresh_constructor_arguments(constr_type, &constr_name);
@@ -216,9 +229,6 @@ impl<'c> PatternCompiler<'c> {
                 constr_name.clone(),
                 constr_vars.clone(),
             );
-
-            let wildcard_name = fresh_variable("wildcard");
-            let wildcard_pattern = TypedNode::Variable(constr_type.clone(), wildcard_name.clone());
 
             // Each arm's body has the same type, so just use the type of the first arm.
             TypedNode::CaseOf(
@@ -235,7 +245,7 @@ impl<'c> PatternCompiler<'c> {
                             .collect(),
                     ),
                     (
-                        wildcard_pattern,
+                        wildcard_node,
                         remaining_arm,
                         [(wildcard_name, constr_type.clone())].into(),
                     ),
@@ -286,6 +296,14 @@ mod tests {
         let clauses = vec![
             Clause {
                 tests: vec![Test {
+                    variable: TypedNode::Variable(node_type.clone(), String::from("c")),
+                    pattern: Pattern::Constructor(String::from("Nil"), vec![]),
+                }],
+                body: TypedNode::Variable(node_type.clone(), String::from("case_c")),
+                variables: vec![],
+            },
+            Clause {
+                tests: vec![Test {
                     variable: TypedNode::Variable(node_type.clone(), String::from("a")),
                     pattern: Pattern::Constructor(
                         String::from("Cons"),
@@ -318,47 +336,6 @@ mod tests {
                 body: TypedNode::Variable(node_type.clone(), String::from("case_b")),
                 variables: vec![],
             },
-            Clause {
-                tests: vec![Test {
-                    variable: TypedNode::Variable(node_type.clone(), String::from("c")),
-                    pattern: Pattern::Constructor(String::from("Nil"), vec![]),
-                }],
-                body: TypedNode::Variable(node_type.clone(), String::from("case_c")),
-                variables: vec![],
-            },
-            //     vec![Pattern::Constructor(
-            //         String::from("Cons"),
-            //         vec![
-            //             Pattern::Variable(String::from("id")),
-            //             Pattern::Constructor(
-            //                 String::from("Cons"),
-            //                 vec![
-            //                     Pattern::Variable(String::from("id2")),
-            //                     Pattern::Constructor(String::from("None"), vec![]),
-            //                 ],
-            //             ),
-            //         ],
-            //     )],
-            //     TypedNode::Variable(node_type.clone(), String::from("case_a")),
-            // ),
-            // (
-            //     vec![Pattern::Constructor(
-            //         String::from("Cons"),
-            //         vec![
-            //             Pattern::Variable(String::from("wildcard1")),
-            //             Pattern::Variable(String::from("wildcard2")),
-            //         ],
-            //     )],
-            //     TypedNode::Variable(node_type.clone(), String::from("case_b")),
-            // ),
-            // (
-            //     vec![Pattern::Constructor(String::from("None"), vec![])],
-            //     TypedNode::Variable(node_type.clone(), String::from("case_c")),
-            // ),
-            // (
-            //     vec![Pattern::Variable(String::from("rest"))],
-            //     TypedNode::Variable(node_type.clone(), String::from("case_d")),
-            // ),
         ];
 
         let mut enums = HashMap::new();

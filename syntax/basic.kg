@@ -9,7 +9,9 @@ end
 
 let rec length = function(seq: Sequence): int
 	case seq of
-		Nil -> 0,
+		Nil ->
+		    let case_five = print("Case 5")
+			0,
 	   	Cons(num, Cons(another_num, Nil)) ->
 			let case_one = print("Case 1")
 			2,
