@@ -52,7 +52,7 @@ fn compile(file: &str) -> Result<(), String> {
     let start_comp = Instant::now();
     let mut compiler = Compiler::new(checker);
     let source = compiler.compile(&postprocessed_node);
-    println!("Finished compilng in {:?}", start_comp.elapsed());
+    println!("Finished compiling in {:?}", start_comp.elapsed());
 
     fs::write("./out.c", source).expect("Failed to write file.");
 

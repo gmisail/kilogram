@@ -221,22 +221,26 @@ impl Scanner for ScannerContext {
         let literal = String::from_utf8(self.input[self.start..self.current].to_vec()).unwrap();
         let length = literal.len();
 
-        match self.keywords.get(literal.as_str()) {
-            Some(kind) => Ok(Token {
-                kind: kind.clone(),
-                line: self.line,
-                relative: self.index - length,
-                absolute: self.current - length,
-                length,
-            }),
+        if literal.starts_with("_kg_") {
+            Err("Keywords beginning with '_kg_' are reserved for the compiler.")
+        } else {
+            match self.keywords.get(literal.as_str()) {
+                Some(kind) => Ok(Token {
+                    kind: kind.clone(),
+                    line: self.line,
+                    relative: self.index - length,
+                    absolute: self.current - length,
+                    length,
+                }),
 
-            None => Ok(Token {
-                kind: TokenKind::Identifier(literal),
-                line: self.line,
-                relative: self.index - length,
-                absolute: self.current - length, // TODO: use actual absolute position
-                length,
-            }),
+                None => Ok(Token {
+                    kind: TokenKind::Identifier(literal),
+                    line: self.line,
+                    relative: self.index - length,
+                    absolute: self.current - length, // TODO: use actual absolute position
+                    length,
+                }),
+            }
         }
     }
 
