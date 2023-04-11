@@ -1,443 +1,340 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::ast::typed::data_type::DataType;
+use crate::ast::typed::enum_type;
+use crate::ast::typed::typed_node::TypedNode;
 use crate::fresh::generator::fresh_variable;
 
-use crate::ast::typed::data_type::DataType;
-use crate::ast::typed::typed_node::TypedNode;
-
-use super::substitute::{substitute, substitute_all};
+use super::clause::{generate_let_block, Clause, Test};
 use super::Pattern;
 
-type Case = (Vec<Pattern>, TypedNode);
 pub type MatchArm = (TypedNode, TypedNode, HashMap<String, Rc<DataType>>);
 
 pub struct PatternCompiler<'c> {
     enums: &'c HashMap<String, Rc<DataType>>,
+    variants: &'c HashMap<String, Rc<DataType>>,
 }
 
 impl<'c> PatternCompiler<'c> {
-    pub fn new(enums: &'c HashMap<String, Rc<DataType>>) -> Self {
-        PatternCompiler { enums }
+    pub fn new(
+        enums: &'c HashMap<String, Rc<DataType>>,
+        variants: &'c HashMap<String, Rc<DataType>>,
+    ) -> Self {
+        PatternCompiler { enums, variants }
     }
 
-    fn is_variable_or_wildcard(&self, pattern: &Pattern) -> bool {
-        matches!(pattern, Pattern::Variable(..) | Pattern::Wildcard)
-    }
-
-    fn is_mixed(&self, patterns: &[Case]) -> bool {
-        let mut has_variable = false;
-
-        for (case_pattern, _) in patterns {
-            let first_pattern = case_pattern.first().expect("a leading pattern.");
-
-            // If the first pattern is a constructor, check if we've already
-            // found a variable. If so, that means we have a mixed pattern. Otherwise,
-            // keep checking.
-            match first_pattern {
-                &Pattern::Constructor(..) => {
-                    if has_variable {
-                        return true;
-                    }
-                }
-
-                &Pattern::Variable(..) => {
-                    has_variable = true;
-                }
-
-                _ => panic!("Unknown pattern type."),
-            };
-        }
-
-        false
-    }
-
-    fn has_leading_constructor(&self, patterns: &[(Vec<Pattern>, TypedNode)]) -> bool {
-        match patterns.first() {
-            Some((case_patterns, _)) => case_patterns
-                .first()
-                .map_or(false, |pattern| !self.is_variable_or_wildcard(pattern)),
-            None => false,
-        }
-    }
-
-    ///
-    /// Given a list of cases, group by the leading constructor (if it has one.)
-    ///
-    fn group_by_constructor<'a>(
-        &'a self,
-        constructors: &Vec<&'a Case>,
-    ) -> BTreeMap<&String, Vec<&'a Case>> {
-        let mut groups = BTreeMap::new();
-
-        for constructor in constructors {
-            let (case_patterns, _) = constructor;
-
-            if let Some(Pattern::Constructor(name, _)) = case_patterns.first() {
-                groups
-                    .entry(name)
-                    .or_insert_with(Vec::new)
-                    .push(*constructor);
-            }
-        }
-
-        groups
-    }
-
-    fn group_mixed(&self, patterns: &[Case]) -> Vec<Vec<Case>> {
-        let mut groups = Vec::new();
-        let mut group_buffer = Vec::new();
-
-        let mut has_variable = false;
-
-        for case @ (case_pattern, _) in patterns {
-            let first_pattern = case_pattern.first().expect("a leading pattern.");
-
-            match first_pattern {
-                &Pattern::Constructor(..) => {
-                    // Indicates that we've recently parsed a variable, meaning
-                    // that we're at the beginning of a new group.
-                    if has_variable {
-                        groups.push(group_buffer.clone());
-                        group_buffer = vec![case.clone()];
-
-                        has_variable = false;
-                    } else {
-                        group_buffer.push(case.clone());
-                    }
-                }
-
-                &Pattern::Variable(..) => {
-                    has_variable = true;
-
-                    group_buffer.push(case.clone());
-                }
-
-                _ => panic!("Unknown pattern type."),
-            };
-        }
-
-        groups.push(group_buffer);
-
-        groups
-    }
-
-    ///
-    /// From a constructor type and variant, generate a list of well-typed, fresh variables.
-    ///
-    fn generate_fresh_variables_from_constructor(
-        &self,
-        constructor_type: Rc<DataType>,
-        variant_name: &String,
-    ) -> (Vec<String>, Vec<TypedNode>) {
-        match &*constructor_type {
-            DataType::Enum(_, variants) => {
-                let variant_types = variants.get(variant_name).unwrap();
-
-                let fresh_names: Vec<String> = variant_types
-                    .iter()
-                    .map(|_| fresh_variable("pattern"))
-                    .collect();
-
-                let fresh_variables = variant_types
-                    .iter()
-                    .zip(fresh_names.clone())
-                    .map(|(variant_type, fresh_name)| {
-                        TypedNode::Variable(variant_type.clone(), fresh_name)
-                    })
-                    .collect::<Vec<TypedNode>>();
-
-                (fresh_names, fresh_variables)
-            }
-
-            DataType::NamedReference(parent) => {
-                if let Some(parent_constr) = self.enums.get(parent) {
-                    self.generate_fresh_variables_from_constructor(
-                        parent_constr.clone(),
-                        variant_name,
-                    )
-                } else {
-                    panic!("Self-reference to {parent} does not exist.")
-                }
-            }
-
-            _ => panic!("Unrecognized constructor"),
-        }
-    }
-
-    fn substitute_constructor_arguments(
-        &self,
-        patterns: &[Pattern],
-        body: &TypedNode,
-        fresh_names: &[String],
-    ) -> TypedNode {
-        // From a list of patterns, find the variables that need to be substituted and what to
-        // substitute them with.
-        let fresh_mappings = patterns
-            .iter()
-            .zip(fresh_names)
-            .filter(|(pattern, _)| matches!(pattern, Pattern::Variable(..)))
-            .map(|(pattern, fresh)| {
-                if let Pattern::Variable(var_name) = pattern {
-                    (var_name.clone(), fresh.clone())
-                } else {
-                    panic!()
-                }
-            })
-            .collect::<Vec<(String, String)>>();
-
-        // Convert list of [(old, new)] to a mapping of { old => new }.
-        let substitutions: HashMap<String, String> = fresh_mappings.into_iter().collect();
-
-        // Substitute all instances of "old" in tree "body" with variable "new".
-        substitute_all(body, &substitutions)
-    }
-
-    ///
-    /// Simplify a case-tree with leading constructors, optionally followed by variable cases.
-    ///
-    fn transform_leading_constructors(
-        &self,
-        expressions: &[TypedNode],
-        patterns: &[(Vec<Pattern>, TypedNode)],
-        default: &TypedNode,
-    ) -> TypedNode {
-        // Split patterns into those with and without leading constructors
-        let (constructors, variables): (Vec<&Case>, Vec<&Case>) =
-            patterns.iter().partition(|(case_patterns, _)| {
-                matches!(case_patterns.first(), Some(Pattern::Constructor(..)))
-            });
-
-        let constructor_groups = self.group_by_constructor(&constructors);
-        let (head_expr, remaining_exprs) = expressions.split_first().unwrap();
-        let mut arms = Vec::new();
-
-        for (group_name, group) in constructor_groups {
-            let mut pairs = Vec::new();
-
-            for (group_patterns, group_expression) in group {
-                let mut child_patterns = group_patterns.clone();
-                let leading_constr = child_patterns.remove(0);
-
-                if let Pattern::Constructor(_, params) = leading_constr {
-                    let mut unwrapped_params = params.clone();
-                    unwrapped_params.extend(child_patterns);
-
-                    pairs.push((unwrapped_params, group_expression.clone()));
-                } else {
-                    panic!();
-                }
-            }
-
-            // Create fresh variables from the arguments of the constructor.
-            let constructor_type = head_expr.get_type();
-            let (free_names, mut fresh_vars) = self
-                .generate_fresh_variables_from_constructor(constructor_type.clone(), group_name);
-
-            // Generate a generic constructor that we can match against
-            let fresh_pattern =
-                TypedNode::EnumInstance(constructor_type, group_name.clone(), fresh_vars.clone());
-
-            // Substitute the free variable if necessary.
-            pairs = pairs
+    /// Moves all bare variables from clause patterns to expressions.
+    fn move_variables(&self, mut clauses: Vec<Clause>) -> Vec<Clause> {
+        for clause in &mut clauses {
+            let (vars, constr) = clause
+                .tests
                 .iter()
                 .cloned()
-                .map(|(arm_patterns, arm_body)| {
-                    (
-                        arm_patterns.clone(),
-                        self.substitute_constructor_arguments(
-                            &arm_patterns,
-                            &arm_body,
-                            &free_names,
-                        ),
-                    )
-                })
-                .collect();
+                .partition(|test| matches!(test.pattern, Pattern::Variable(..)));
 
-            // Prepend these fresh variables to the list of expressions
-            fresh_vars.extend(Vec::from(remaining_exprs));
+            // Replace all tests with only the constructors.
+            clause.tests = constr;
 
-            let mapped_variables = free_names
-                .iter()
-                .zip(fresh_vars.clone())
-                .map(|(fresh_name, fresh_node)| (fresh_name.clone(), fresh_node.get_type()))
-                .collect::<Vec<(_, _)>>();
-
-            arms.push((
-                fresh_pattern,
-                self.transform(&fresh_vars, pairs.as_slice(), default.clone()),
-                mapped_variables.into_iter().collect(),
-            ));
+            // Move variables out of the tests and into the clause body.
+            clause.body = generate_let_block(&vars, clause.body.clone());
         }
 
-        // Find the first variable pattern; the first one is the only one that will match.
-        if let Some((var_patterns, var_expr)) = &variables.first() {
-            let mut child_patterns = var_patterns.clone();
-            child_patterns.remove(0);
-
-            let child_exprs = Vec::from(remaining_exprs);
-
-            let free_name = fresh_variable("pattern");
-            let free_type = head_expr.get_type();
-
-            let original_name = match var_patterns.first() {
-                Some(Pattern::Variable(pattern_name)) => pattern_name,
-                Some(_) | None => panic!("Expected leading variable."),
-            };
-
-            let mapped_variables: HashMap<String, Rc<DataType>> =
-                [(free_name.clone(), free_type.clone())]
-                    .into_iter()
-                    .collect();
-
-            arms.push((
-                TypedNode::Variable(free_type.clone(), free_name.clone()),
-                self.transform(
-                    &child_exprs,
-                    &[(
-                        child_patterns,
-                        substitute(var_expr, &original_name, &free_name),
-                    )],
-                    default.clone(),
-                ),
-                mapped_variables,
-            ));
-        } else {
-            let wildcard_name = fresh_variable("wildcard");
-            let wildcard_type = head_expr.get_type();
-
-            arms.push((
-                TypedNode::Variable(wildcard_type.clone(), wildcard_name.clone()),
-                default.clone(),
-                [(wildcard_name, wildcard_type)].into_iter().collect(),
-            ));
-        }
-
-        let (_, first_arm_body, _) = arms.first().expect("an arm to exist");
-
-        TypedNode::CaseOf(first_arm_body.get_type(), Box::new(head_expr.clone()), arms)
+        clauses
     }
 
-    ///
-    /// Simplify a case-tree where each case has a leading variable.
-    ///
-    fn transform_leading_variables(
+    fn generate_fresh_constructor_arguments(
         &self,
-        expressions: &[TypedNode],
-        patterns: &[(Vec<Pattern>, TypedNode)],
-        default: &TypedNode,
-    ) -> TypedNode {
-        let (head_expr, tail_exprs) = expressions
-            .split_first()
-            .expect("Expected first expression to be variable.");
-        let head_name = match head_expr {
-            TypedNode::Variable(_, head_name) => head_name,
-            _ => panic!(),
-        };
+        enum_type: &Rc<DataType>,
+        variant_name: &String,
+    ) -> (Vec<String>, Vec<TypedNode>) {
+        let variant_types = enum_type::get_variant_fields(enum_type.clone(), variant_name)
+            .expect("variant to exist with fields");
 
-        // Fresh name to represent the expression.
-        let fresh_name = fresh_variable("var");
-
-        let new_patterns = patterns
+        let fresh_names = variant_types
             .iter()
-            .map(|(case_patterns, case_expr)| {
-                if let Some((_, tail)) = case_patterns.split_first() {
-                    (tail.to_vec(), substitute(case_expr, head_name, &fresh_name))
-                } else {
-                    panic!()
-                }
+            .map(|_| fresh_variable("var"))
+            .collect::<Vec<String>>();
+
+        // Consider the following constructor: Cons(a_0, a_1)
+        // From this constructor, convert a_0 and a_1 into fresh variables with the same types.
+        let fresh_variables = variant_types
+            .iter()
+            .zip(fresh_names.clone())
+            .map(|(variant_type, variant_name)| {
+                TypedNode::Variable(variant_type.clone(), variant_name)
             })
-            .collect::<Vec<Case>>();
+            .collect();
 
-        // Since we only have variables, the first will match; thus, generate a case expression on
-        // the expression 'e' with only one arm:
-        //
-        //    case e of
-        //        fresh => body
-        //    end
-        //
-        // We can simplify this further by simply introducing 'fresh' as a variable. So, this
-        // expression reduces to:
-        //
-        //    let fresh = e
-        //    body
-        //
-        TypedNode::Let(
-            fresh_name,
-            head_expr.get_type(),
-            Box::new(head_expr.clone()),
-            Box::new(self.transform(tail_exprs, &new_patterns, default.clone())),
-            false,
-        )
+        (fresh_names, fresh_variables)
     }
 
-    fn transform_from_list(
+    fn group_by_constructor(
         &self,
-        expressions: &[TypedNode],
-        pattern_groups: &[Vec<Case>],
-        default: &TypedNode,
-    ) -> TypedNode {
-        println!("GROUPS: {:#?}", pattern_groups);
+        constr_name: &String,
+        constr_index: usize,
+        constr_bindings: &[String],
+        clauses: &[Clause],
+    ) -> (Vec<Clause>, Vec<Clause>) {
+        let mut matching_constr = Vec::new();
+        let mut remaining_constr = Vec::new();
 
-        match pattern_groups {
-            [] => default.clone(),
+        let new_clauses = clauses.to_owned();
 
-            [first_group, tail @ ..] => self.transform(
-                expressions.clone(),
-                first_group,
-                self.transform_from_list(expressions, tail, default),
-            ),
+        for mut clause in new_clauses {
+            // Case 3: Missing constructor, i.e. column does not exist.
+            if clause.tests.get(constr_index).is_none() {
+                matching_constr.push(clause.clone());
+                remaining_constr.push(clause.clone());
+            } else {
+                // TODO: Which column are we pivoting around?
+                let clause_test = clause.tests.get(constr_index).expect("test to exist");
+                let Test { pattern, .. } = &clause_test;
+
+                let mut has_match = false;
+
+                match pattern {
+                    // Case 1: We have a matching Constructor in this clause.
+                    Pattern::Constructor(name, arguments) if *name == *constr_name => {
+                        let constr_type = self
+                            .variants
+                            .get(name)
+                            .unwrap_or_else(|| panic!("constructor to exist with variant {name}"));
+
+                        let constr_variant = match &**constr_type {
+                            DataType::Enum(_, variants) => {
+                                variants.get(name).expect("variant to exist")
+                            }
+                            _ => panic!("Expected constructor type to be Enum."),
+                        };
+
+                        // For each of the Constructor's arguments, bind it to the free variable
+                        // associated with its argument.
+                        let mut nested_tests = Vec::new();
+                        for ((arg_pattern, arg_type), bound_name) in
+                            arguments.iter().zip(constr_variant).zip(constr_bindings)
+                        {
+                            nested_tests.push(Test {
+                                variable: TypedNode::Variable(arg_type.clone(), bound_name.clone()),
+                                pattern: arg_pattern.clone(),
+                            });
+                        }
+
+                        clause.tests.remove(constr_index);
+
+                        // Add remaining tests in clause.
+                        for test in &clause.tests {
+                            nested_tests.push(test.clone());
+                        }
+
+                        let nested_clause = Clause {
+                            tests: nested_tests,
+                            body: clause.body.clone(),
+                            variables: Vec::new(),
+                        };
+
+                        matching_constr.push(nested_clause);
+                        has_match = true;
+                    }
+
+                    _ => {
+                        has_match = false;
+                    }
+                }
+
+                // Case 2: Constructor does not match.
+                if !has_match {
+                    remaining_constr.push(clause);
+                }
+            }
         }
+
+        (matching_constr, remaining_constr)
     }
 
-    ///
-    /// Transforms a match tree with mixed constructors and variables.
-    ///
-    fn transform_mixed(
-        &self,
-        expressions: &[TypedNode],
-        patterns: &[Case],
-        default: &TypedNode,
-    ) -> TypedNode {
-        self.transform_from_list(expressions, &self.group_mixed(patterns), default)
-    }
-
-    ///
-    /// From a list of expressions & patterns, desugar the pattern match such that we only match against primitives.
-    ///
+    /// Transforms a complex match expression into a simplified
+    /// matching expression.
     pub fn transform(
         &self,
-        expressions: &[TypedNode],
-        patterns: &[Case],
+        expression: TypedNode,
+        clauses: Vec<Clause>,
         default: TypedNode,
     ) -> TypedNode {
-        // Ensure that we:
-        //   a) have at least one pattern
-        //   b) the number of expressions is equal to the width of the pattern matrix
-        assert!(!patterns.is_empty());
-        assert!(patterns
-            .iter()
-            .all(|(case_patterns, _)| { expressions.len() == case_patterns.len() }));
-
-        // Cases:
-        // - No more expressions to match against.
-        // - Every pattern has a leading wildcard or variable.
-        // - There is a series of constructors followed by a list of variables.
-        // - There is a mix of constructors and variables.
-        if expressions.is_empty() {
-            patterns.first().unwrap().1.clone()
-        } else if patterns.iter().all(|(pat, _)| {
-            pat.first().map_or(false, |leading_pattern| {
-                self.is_variable_or_wildcard(leading_pattern)
-            })
-        }) {
-            self.transform_leading_variables(expressions, patterns, &default)
-        } else if self.is_mixed(patterns) {
-            self.transform_mixed(expressions, patterns, &default)
-        } else if self.has_leading_constructor(patterns) {
-            self.transform_leading_constructors(expressions, patterns, &default)
-        } else {
-            panic!("Unhandled case in pattern matching compiler.")
+        // No clauses => in-exhaustive
+        if clauses.is_empty() {
+            return default;
         }
+
+        // Move variables to expressions, only Constructor patterns.
+        let only_constr = self.move_variables(clauses);
+
+        // If there are no tests to match against, then it will always match. So,
+        // return the expression corresponding to the first clause.
+        let first_clause = only_constr.first().expect("has first clause");
+        if first_clause.tests.is_empty() {
+            return first_clause.body.clone();
+        }
+
+        // TODO: choose constructor using some heuristic, not just the first one.
+        let first_test = first_clause.tests.first().expect("a first test");
+        let Test {
+            pattern: first_pattern,
+            variable: first_var,
+        } = first_test.clone();
+
+        if let Pattern::Constructor(constr_name, _arguments) = first_pattern {
+            let constr_type = self
+                .variants
+                .get(&constr_name)
+                .unwrap_or_else(|| panic!("variant with name {constr_name}"));
+
+            let (fresh_names, constr_vars) =
+                self.generate_fresh_constructor_arguments(constr_type, &constr_name);
+
+            // Split expression into two arms. So:
+            //
+            //  case a of
+            //      C(a_0, ..., C_n) -> <matching_constr>
+            //      _ ->                <remaining_constr>
+            //  end
+            //
+            let (matching_constr, remaining_constr) =
+                self.group_by_constructor(&constr_name, 0, &fresh_names, &only_constr);
+
+            // TODO: we're always using the first column, try a different heuristic (closer to the one in the paper)
+
+            let matching_arm = self.transform(first_var, matching_constr, default.clone());
+
+            let wildcard_name = fresh_variable("wildcard");
+            let wildcard_node = TypedNode::Variable(constr_type.clone(), wildcard_name.clone());
+
+            let remaining_arm = self.transform(wildcard_node.clone(), remaining_constr, default);
+
+            // AST representation of the patterns that we selected to match against
+            let matching_pattern = TypedNode::EnumInstance(
+                constr_type.clone(),
+                constr_name.clone(),
+                constr_vars.clone(),
+            );
+
+            // Each arm's body has the same type, so just use the type of the first arm.
+            TypedNode::CaseOf(
+                first_clause.body.get_type(),
+                Box::new(expression),
+                vec![
+                    (
+                        matching_pattern,
+                        matching_arm,
+                        constr_vars
+                            .iter()
+                            .zip(fresh_names)
+                            .map(|(constr_var, var_name)| (var_name, constr_var.get_type()))
+                            .collect(),
+                    ),
+                    (
+                        wildcard_node,
+                        remaining_arm,
+                        [(wildcard_name, constr_type.clone())].into(),
+                    ),
+                ],
+            )
+        } else {
+            panic!("Expected all tests to be a constructor.")
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{BTreeMap, HashMap};
+    use std::rc::Rc;
+
+    use crate::postprocess::pattern::clause::{Clause, Test};
+    use crate::{
+        ast::typed::{data_type::DataType, typed_node::TypedNode},
+        postprocess::pattern::{compiler::PatternCompiler, Pattern},
+    };
+
+    #[test]
+    fn leading_constructor() {
+        /*
+         *   case list of
+         *       Cons(id, Cons(id2, Nil)) -> case_a
+         *       Cons(wildcard1, wildcard2) -> case_b
+         *       Nil -> case_c
+         *   end
+         *
+         * */
+        let node_type = Rc::new(DataType::Integer);
+        let mut list_variants = BTreeMap::new();
+        list_variants.insert(String::from("Nil"), vec![]);
+        list_variants.insert(
+            String::from("Cons"),
+            vec![
+                node_type.clone(),
+                Rc::new(DataType::NamedReference(String::from("List"))),
+            ],
+        );
+
+        let list_type = Rc::new(DataType::Enum(String::from("List"), list_variants));
+
+        let exprs = TypedNode::Variable(list_type.clone(), String::from("list"));
+
+        let clauses = vec![
+            Clause {
+                tests: vec![Test {
+                    variable: TypedNode::Variable(node_type.clone(), String::from("c")),
+                    pattern: Pattern::Constructor(String::from("Nil"), vec![]),
+                }],
+                body: TypedNode::Variable(node_type.clone(), String::from("case_c")),
+                variables: vec![],
+            },
+            Clause {
+                tests: vec![Test {
+                    variable: TypedNode::Variable(node_type.clone(), String::from("a")),
+                    pattern: Pattern::Constructor(
+                        String::from("Cons"),
+                        vec![
+                            Pattern::Variable(String::from("id")),
+                            Pattern::Constructor(
+                                String::from("Cons"),
+                                vec![
+                                    Pattern::Variable(String::from("id2")),
+                                    Pattern::Constructor(String::from("Nil"), vec![]),
+                                ],
+                            ),
+                        ],
+                    ),
+                }],
+                body: TypedNode::Variable(node_type.clone(), String::from("case_a")),
+                variables: vec![],
+            },
+            Clause {
+                tests: vec![Test {
+                    variable: TypedNode::Variable(node_type.clone(), String::from("b")),
+                    pattern: Pattern::Constructor(
+                        String::from("Cons"),
+                        vec![
+                            Pattern::Variable(String::from("wildcard1")),
+                            Pattern::Variable(String::from("wildcard2")),
+                        ],
+                    ),
+                }],
+                body: TypedNode::Variable(node_type.clone(), String::from("case_b")),
+                variables: vec![],
+            },
+        ];
+
+        let mut enums = HashMap::new();
+        enums.insert(String::from("List"), list_type.clone());
+
+        let mut variants = HashMap::new();
+        variants.insert("Cons".into(), list_type.clone());
+        variants.insert("Nil".into(), list_type);
+
+        let compiler = PatternCompiler::new(&enums, &variants);
+        let result = compiler.transform(exprs, clauses, TypedNode::Integer(node_type.clone(), 0));
+
+        println!("{:#?}", result);
     }
 }

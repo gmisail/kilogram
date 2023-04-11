@@ -2,21 +2,27 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::fresh::generator::fresh_variable;
 use crate::postprocess::pattern::compiler::PatternCompiler;
 use crate::postprocess::PostprocessPhase;
 
 use crate::ast::typed::data_type::DataType;
 use crate::ast::typed::typed_node::TypedNode;
 
+use super::pattern::clause::{Clause, Test};
 use super::pattern::Pattern;
 
 pub struct PatternPhase<'a> {
     enums: &'a HashMap<String, Rc<DataType>>,
+    variants: &'a HashMap<String, Rc<DataType>>,
 }
 
 impl<'a> PatternPhase<'a> {
-    pub fn new(enums: &'a HashMap<String, Rc<DataType>>) -> Self {
-        PatternPhase { enums }
+    pub fn new(
+        enums: &'a HashMap<String, Rc<DataType>>,
+        variants: &'a HashMap<String, Rc<DataType>>,
+    ) -> Self {
+        PatternPhase { enums, variants }
     }
 }
 
@@ -112,7 +118,7 @@ impl<'a> PostprocessPhase for PatternPhase<'a> {
             ),
 
             TypedNode::CaseOf(_, expr, arms) => {
-                let compiler = PatternCompiler::new(self.enums);
+                let compiler = PatternCompiler::new(self.enums, self.variants);
 
                 // TODO: show error message here at runtime.
 
@@ -130,14 +136,29 @@ impl<'a> PostprocessPhase for PatternPhase<'a> {
                     vec![TypedNode::Integer(integer_type, 1)],
                 );
 
-                let patterns = arms
-                    .iter()
-                    .map(|(arm_cond, arm_body, _)| {
-                        (vec![Pattern::new(arm_cond)], self.transform(arm_body))
-                    })
-                    .collect::<Vec<(Vec<Pattern>, TypedNode)>>();
+                let fresh_name = fresh_variable("var");
 
-                compiler.transform(&[(**expr).clone()], &patterns, default)
+                let clauses = arms
+                    .iter()
+                    .map(|(arm_cond, arm_body, _)| Clause {
+                        tests: vec![Test {
+                            variable: TypedNode::Variable((**expr).get_type(), fresh_name.clone()),
+                            pattern: Pattern::new(arm_cond),
+                        }],
+                        body: self.transform(arm_body),
+                        variables: vec![],
+                    })
+                    .collect::<Vec<Clause>>();
+
+                let compiled_match = compiler.transform((**expr).clone(), clauses, default);
+
+                TypedNode::Let(
+                    fresh_name,
+                    (**expr).get_type(),
+                    expr.clone(),
+                    Box::new(compiled_match),
+                    false,
+                )
             }
         }
     }

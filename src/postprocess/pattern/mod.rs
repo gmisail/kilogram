@@ -1,18 +1,14 @@
 mod substitute;
 
+pub mod clause;
 pub mod compiler;
 
 use crate::ast::typed::typed_node::TypedNode;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Pattern {
-    // Cons(10, Nil), Nil
     Constructor(String, Vec<Pattern>),
-
-    // x, y, z
     Variable(String),
-
-    // _
     Wildcard,
 }
 

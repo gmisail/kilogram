@@ -5,7 +5,7 @@ use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
 use crate::ast::typed::data_type::DataType;
 use crate::ast::typed::typed_node::TypedNode;
 
-use crate::postprocess::pattern::compiler::MatchArm;
+//use crate::postprocess::pattern::compiler::MatchArm;
 
 use crate::compiler::builder::enum_builder::EnumBuilder;
 use crate::compiler::builder::struct_builder::StructBuilder;
@@ -13,6 +13,7 @@ use crate::compiler::free::find_free;
 
 use crate::fresh::generator::fresh_variable;
 
+use crate::postprocess::pattern::compiler::MatchArm;
 use crate::typechecker::Typechecker;
 
 use self::emitter::emit_if;
@@ -367,7 +368,7 @@ impl Compiler {
 
             buffer.push_str(&format!("({arg_buffer}){{\n"));
             buffer.push_str(&def.body);
-            buffer.push_str("\n}\n");
+            buffer.push_str("}\n");
         }
 
         buffer
@@ -612,7 +613,7 @@ impl Compiler {
             if self.enums.contains_key(type_name) {
                 self.enums
                     .get(type_name)
-                    .expect(format!("enum with name {type_name}").as_str())
+                    .unwrap_or_else(|| panic!("enum with name {type_name}"))
                     .clone()
             } else {
                 panic!()
