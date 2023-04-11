@@ -9,9 +9,34 @@ end
 
 let rec length = function(seq: Sequence): int
 	case seq of
-		Nil -> 0,
-		Cons(num, tail) -> 1 + length(tail)
+		Cons(num, tail) -> 1 + length(tail),
+		Nil -> 0
 	end
 end
 
-print(int_to_string(length(Cons(1, Cons(2, Cons(10, Cons(12, Cons(15, Nil))))))))
+let rec map = function(seq: Sequence, f: (int) -> int): Sequence
+    case seq of
+        Cons(num, tail) -> Cons(f(num), map(tail, f)),
+        Nil -> Nil
+    end
+end
+
+let rec print_list = function(seq: Sequence): int
+    case seq of
+        Cons(num, tail) ->
+            let res = print(int_to_string(num))
+            print_list(tail),
+        Nil -> 0
+    end
+end
+
+let initial_list = Cons(1, Cons(2, Cons(3, Cons(4, Cons(5, Nil)))))
+
+print_list(
+    map(
+        initial_list,
+        function(i: int): int
+            i * 5
+        end
+    )
+)

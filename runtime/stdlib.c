@@ -7,8 +7,6 @@
 int panic(int code) {
   printf("Exited unexpectedly...\n");
   exit(code);
-
-  return code;
 }
 
 KiloString *int_to_string(int num) {

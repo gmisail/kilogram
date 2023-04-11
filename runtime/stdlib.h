@@ -3,11 +3,11 @@
 
 #include "string.h"
 
-int print(KiloString*);
+int print(KiloString *);
 int panic(int);
 
-KiloString* input(KiloString*);
+KiloString *input(KiloString *);
 
-KiloString* int_to_string(int);
+KiloString *int_to_string(int);
 
 #endif
