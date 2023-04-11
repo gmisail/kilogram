@@ -136,14 +136,13 @@ impl<'a> PostprocessPhase for PatternPhase<'a> {
                     vec![TypedNode::Integer(integer_type, 1)],
                 );
 
+                let fresh_name = fresh_variable("var");
+
                 let clauses = arms
                     .iter()
                     .map(|(arm_cond, arm_body, _)| Clause {
                         tests: vec![Test {
-                            variable: TypedNode::Variable(
-                                (**expr).get_type(),
-                                fresh_variable("var"),
-                            ),
+                            variable: TypedNode::Variable((**expr).get_type(), fresh_name.clone()),
                             pattern: Pattern::new(arm_cond),
                         }],
                         body: self.transform(arm_body),
@@ -151,7 +150,15 @@ impl<'a> PostprocessPhase for PatternPhase<'a> {
                     })
                     .collect::<Vec<Clause>>();
 
-                compiler.transform((**expr).clone(), clauses, default)
+                let compiled_match = compiler.transform((**expr).clone(), clauses, default);
+
+                TypedNode::Let(
+                    fresh_name,
+                    (**expr).get_type(),
+                    expr.clone(),
+                    Box::new(compiled_match),
+                    false,
+                )
             }
         }
     }

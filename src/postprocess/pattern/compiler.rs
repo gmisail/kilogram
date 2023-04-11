@@ -6,8 +6,7 @@ use crate::ast::typed::enum_type;
 use crate::ast::typed::typed_node::TypedNode;
 use crate::fresh::generator::fresh_variable;
 
-use super::clause::{Clause, Test};
-//use super::substitute::{substitute, substitute_all};
+use super::clause::{generate_let_block, Clause, Test};
 use super::Pattern;
 
 pub type MatchArm = (TypedNode, TypedNode, HashMap<String, Rc<DataType>>);
@@ -28,7 +27,7 @@ impl<'c> PatternCompiler<'c> {
     /// Moves all bare variables from clause patterns to expressions.
     fn move_variables(&self, mut clauses: Vec<Clause>) -> Vec<Clause> {
         for clause in &mut clauses {
-            let (mut vars, constr) = clause
+            let (vars, constr) = clause
                 .tests
                 .iter()
                 .cloned()
@@ -38,7 +37,7 @@ impl<'c> PatternCompiler<'c> {
             clause.tests = constr;
 
             // Move variables out of the tests and into the clause body.
-            clause.add_variables(&mut vars);
+            clause.body = generate_let_block(&vars, clause.body.clone());
         }
 
         clauses
@@ -74,12 +73,11 @@ impl<'c> PatternCompiler<'c> {
         &self,
         constr_name: &String,
         constr_index: usize,
+        constr_bindings: &[String],
         clauses: &[Clause],
     ) -> (Vec<Clause>, Vec<Clause>) {
         let mut matching_constr = Vec::new();
         let mut remaining_constr = Vec::new();
-
-        // TODO: we're always using the first column, try a different heuristic (closer to the one in the paper)
 
         let new_clauses = clauses.to_owned();
 
@@ -90,7 +88,7 @@ impl<'c> PatternCompiler<'c> {
                 remaining_constr.push(clause.clone());
             } else {
                 // TODO: Which column are we pivoting around?
-                let clause_test = clause.tests.remove(constr_index);
+                let clause_test = clause.tests.get(constr_index).expect("test to exist");
                 let Test { pattern, .. } = &clause_test;
 
                 let mut has_match = false;
@@ -110,20 +108,19 @@ impl<'c> PatternCompiler<'c> {
                             _ => panic!("Expected constructor type to be Enum."),
                         };
 
-                        // For each of the Constructor's arguments, bind it to a
-                        // free variable.
-                        let mut nested_tests = arguments
-                            .iter()
-                            .zip(constr_variant)
-                            .map(|(arg, arg_type)| Test {
-                                variable: TypedNode::Variable(
-                                    // TODO: replace this with actual type of argument.
-                                    arg_type.clone(),
-                                    fresh_variable("var"),
-                                ),
-                                pattern: arg.clone(),
-                            })
-                            .collect::<Vec<Test>>();
+                        // For each of the Constructor's arguments, bind it to the free variable
+                        // associated with its argument.
+                        let mut nested_tests = Vec::new();
+                        for ((arg_pattern, arg_type), bound_name) in
+                            arguments.iter().zip(constr_variant).zip(constr_bindings)
+                        {
+                            nested_tests.push(Test {
+                                variable: TypedNode::Variable(arg_type.clone(), bound_name.clone()),
+                                pattern: arg_pattern.clone(),
+                            });
+                        }
+
+                        clause.tests.remove(constr_index);
 
                         // Add remaining tests in clause.
                         for test in &clause.tests {
@@ -147,14 +144,7 @@ impl<'c> PatternCompiler<'c> {
 
                 // Case 2: Constructor does not match.
                 if !has_match {
-                    let mut initial_tests = clause.tests.clone();
-                    initial_tests.push(clause_test);
-
-                    remaining_constr.push(Clause {
-                        tests: initial_tests,
-                        body: clause.body.clone(),
-                        variables: clause.variables.clone(),
-                    });
+                    remaining_constr.push(clause);
                 }
             }
         }
@@ -172,7 +162,6 @@ impl<'c> PatternCompiler<'c> {
     ) -> TypedNode {
         // No clauses => in-exhaustive
         if clauses.is_empty() {
-            println!("In-exhaustive pattern match.");
             return default;
         }
 
@@ -194,7 +183,13 @@ impl<'c> PatternCompiler<'c> {
         } = first_test.clone();
 
         if let Pattern::Constructor(constr_name, _arguments) = first_pattern {
-            println!("Matching on {constr_name}...");
+            let constr_type = self
+                .variants
+                .get(&constr_name)
+                .unwrap_or_else(|| panic!("variant with name {constr_name}"));
+
+            let (fresh_names, constr_vars) =
+                self.generate_fresh_constructor_arguments(constr_type, &constr_name);
 
             // Split expression into two arms. So:
             //
@@ -204,24 +199,16 @@ impl<'c> PatternCompiler<'c> {
             //  end
             //
             let (matching_constr, remaining_constr) =
-                self.group_by_constructor(&constr_name, 0, &only_constr);
+                self.group_by_constructor(&constr_name, 0, &fresh_names, &only_constr);
 
-            println!("REMAINING: {:#?}", remaining_constr);
+            // TODO: we're always using the first column, try a different heuristic (closer to the one in the paper)
 
             let matching_arm = self.transform(first_var, matching_constr, default.clone());
-
-            let constr_type = self
-                .variants
-                .get(&constr_name)
-                .unwrap_or_else(|| panic!("variant with name {constr_name}"));
 
             let wildcard_name = fresh_variable("wildcard");
             let wildcard_node = TypedNode::Variable(constr_type.clone(), wildcard_name.clone());
 
             let remaining_arm = self.transform(wildcard_node.clone(), remaining_constr, default);
-
-            let (fresh_names, constr_vars) =
-                self.generate_fresh_constructor_arguments(constr_type, &constr_name);
 
             // AST representation of the patterns that we selected to match against
             let matching_pattern = TypedNode::EnumInstance(
@@ -241,7 +228,7 @@ impl<'c> PatternCompiler<'c> {
                         constr_vars
                             .iter()
                             .zip(fresh_names)
-                            .map(|(constr_var, var_name)| (var_name.clone(), constr_var.get_type()))
+                            .map(|(constr_var, var_name)| (var_name, constr_var.get_type()))
                             .collect(),
                     ),
                     (

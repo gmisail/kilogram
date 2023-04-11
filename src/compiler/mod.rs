@@ -732,8 +732,6 @@ impl Compiler {
         arms: &[MatchArm],
         free_vars: HashMap<String, Rc<DataType>>,
     ) -> String {
-        println!("ARMS: {:#?}", arms);
-
         self.compile_case_arms(expression, arms, free_vars)
     }
 
