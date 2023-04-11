@@ -14,7 +14,7 @@ end
 let rec length(seq: Sequence): int
     case seq of 
         Cons(num, next) -> 1 + length(next),
-	    Nil -> 0
+	Nil -> 0
     end
 end
 
