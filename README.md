@@ -11,7 +11,7 @@ enum Sequence
     Cons(int, Sequence)
 end
 
-let rec length(seq: Sequence): int
+let rec length = function(seq: Sequence): int
     case seq of 
         Cons(num, next) -> 1 + length(next),
 	Nil -> 0
