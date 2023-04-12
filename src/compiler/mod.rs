@@ -381,6 +381,7 @@ impl Compiler {
 
         buffer.push_str("#include <stdio.h>\n");
         buffer.push_str("#include <stdlib.h>\n");
+        buffer.push_str("#include <stdbool.h>\n");
 
         buffer.push_str("#include \"runtime/string.h\"\n");
         buffer.push_str("#include \"runtime/object.h\"\n");

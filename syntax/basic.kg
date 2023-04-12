@@ -21,6 +21,16 @@ let rec map = function(seq: Sequence, f: (int) -> int): Sequence
     end
 end
 
+let rec filter = function(seq: Sequence, f: (int) -> bool): Sequence 
+	case seq of
+		Cons(num, tail) -> 
+			let filtered_tail = filter(tail, f)
+			if f(num) then Cons(num, filtered_tail) 
+			else filtered_tail,
+		Nil -> seq
+	end
+end
+
 let rec print_list = function(seq: Sequence): int
     case seq of
         Cons(num, tail) ->
@@ -33,10 +43,10 @@ end
 let initial_list = Cons(1, Cons(2, Cons(3, Cons(4, Cons(5, Nil)))))
 
 print_list(
-    map(
+    filter(
         initial_list,
-        function(i: int): int
-            i * 5
+        function(i: int): bool 
+            i == 3 
         end
     )
 )
