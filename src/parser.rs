@@ -5,6 +5,7 @@ use crate::ast::untyped::untyped_node::UntypedNode;
 use super::scanner;
 use super::token::{Token, TokenKind};
 
+use std::collections::HashSet;
 use std::mem;
 
 struct Parser {
@@ -571,6 +572,45 @@ impl Parser {
             // Consume 'function' keyword.
             self.advance_token();
 
+            // Attempt parsing type parameters, if they exist.
+            let mut type_params = Vec::new();
+
+            if self.match_token(&TokenKind::Less) {
+                self.advance_token();
+
+                loop {
+                    let identifier = self.expect_token(&TokenKind::Identifier("".to_string()))?;
+                    let type_param = match identifier {
+                        Some(t) => match &t.kind {
+                            TokenKind::Identifier(literal) => literal.clone(),
+                            _ => {
+                                return Err(format!(
+                                    "Expected type parameter, got {} instead.",
+                                    t.kind
+                                ))
+                            }
+                        },
+                        None => {
+                            return Err(
+                                "Reached end of input while parsing type parameter.".to_string()
+                            )
+                        }
+                    };
+
+                    type_params.push(type_param);
+
+                    if self.match_token(&TokenKind::Comma) {
+                        self.advance_token();
+                    } else {
+                        self.expect_token(&TokenKind::Greater)?;
+
+                        break;
+                    }
+                }
+            }
+
+            println!("TYPE PARAMS: {:?}", type_params);
+
             self.expect_token(&TokenKind::LeftParen)?;
 
             let mut arguments = vec![];
@@ -622,6 +662,7 @@ impl Parser {
 
             Ok(UntypedNode::Function(
                 "anonymous".to_string(),
+                type_params,
                 function_type,
                 arguments,
                 Box::new(function_body),
