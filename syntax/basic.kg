@@ -7,9 +7,6 @@ enum Sequence
 	Nil
 end
 
-let identity = function<T>(val: T): T 
-	val
-end
 
 let rec length = function(seq: Sequence): int
 	case seq of

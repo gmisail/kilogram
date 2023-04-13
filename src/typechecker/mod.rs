@@ -171,6 +171,11 @@ impl Typechecker {
                 "string" => Ok(self.primitives.get("string").unwrap().clone()),
                 "bool" => Ok(self.primitives.get("bool").unwrap().clone()),
 
+                // All type parameters must start with '
+                name if name.starts_with('\'') => {
+                    Ok(Rc::new(DataType::TypeParameter(name.to_string())))
+                }
+
                 // First, check if it is an Enum type.
                 name if self.enums.contains_key(name) => self.get_enum(&name.to_string()),
 
@@ -595,6 +600,10 @@ impl Typechecker {
                     }
                 }
 
+                // If we're working with a function that has type parameters, we'll need
+                // to store what types the type parameters are bound to.
+                let mut type_param_bindings: HashMap<String, Rc<DataType>> = HashMap::new();
+
                 // Verify that the parameter & argument types match.
                 let (func_type, func_node) = self.resolve_type(parent)?;
 
@@ -605,7 +614,21 @@ impl Typechecker {
                         for (target_type, parameter) in arguments.iter().zip(parameters) {
                             let (resolved_type, resolved_node) = self.resolve_type(parameter)?;
 
-                            if *target_type != resolved_type {
+                            // This parameter is generic, check to make sure it's consistent.
+                            if let DataType::TypeParameter(type_param) = &**target_type {
+                                let bind_result = type_param_bindings
+                                    .insert(type_param.clone(), resolved_type.clone());
+
+                                // This type parameter is already bound to a type, let's make sure
+                                // that it's consistent, i.e. we're using the same type.
+                                if let Some(existing_binding) = bind_result {
+                                    if existing_binding != resolved_type {
+                                        return Err(format!(
+                                            "Cannot substitute type {resolved_type} for type parameter {type_param}, expected type {existing_binding}." 
+                                        ));
+                                    }
+                                }
+                            } else if *target_type != resolved_type {
                                 return Err(format!(
                                     "Invalid parameter type, expected {target_type} but got {resolved_type}."
                                 ));
@@ -614,10 +637,25 @@ impl Typechecker {
                             typed_arguments.push(resolved_node);
                         }
 
+                        // In case the function returns a generic type, fetch what the it is bound
+                        // to.
+                        let resolved_return_type =
+                            if let DataType::TypeParameter(return_type_param) = &**return_type {
+                                match type_param_bindings.get(return_type_param) {
+                                Some(actual_return_type) => actual_return_type.clone(),
+                                None => return Err(
+                                    "Type parameter {return_type_param} is unbound in return type."
+                                        .into(),
+                                ),
+                            }
+                            } else {
+                                return_type.clone()
+                            };
+
                         Ok((
-                            return_type.clone(),
+                            resolved_return_type.clone(),
                             TypedNode::FunctionCall(
-                                return_type.clone(),
+                                resolved_return_type,
                                 Box::new(func_node),
                                 typed_arguments,
                             ),

@@ -1,0 +1,7 @@
+let identity = function(val: 'T, val2: 'T, val3: 'S): 'T 
+	val
+end
+
+let int_type: int = identity(10, 20, "hello")
+
+int_type

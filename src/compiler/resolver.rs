@@ -35,6 +35,8 @@ pub fn get_native_type(internal_type: Rc<DataType>) -> String {
         DataType::Str => "KiloString*".to_string(),
         DataType::Boolean => "bool".to_string(),
 
+        DataType::TypeParameter(type_param) => todo!("type not supported: {}", type_param),
+
         DataType::NamedReference(name) => {
             format!("{name}*")
         }

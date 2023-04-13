@@ -271,7 +271,7 @@ impl Scanner for ScannerContext {
                 Some(c) => match c {
                     // check for keywords, identifier, or number
                     ch if ch.is_numeric() => self.scan_number(),
-                    ch if ch.is_alphabetic() || ch == '_' => self.scan_identifier(),
+                    ch if ch.is_alphabetic() || ch == '_' || ch == '\'' => self.scan_identifier(),
                     '"' => self.scan_string(),
 
                     // check single-character tokens

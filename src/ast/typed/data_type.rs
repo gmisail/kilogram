@@ -9,6 +9,8 @@ pub enum DataType {
     Str,
     Boolean,
 
+    TypeParameter(String),
+
     NamedReference(String),
     Enum(String, BTreeMap<String, Vec<Rc<DataType>>>),
     Function(Vec<Rc<DataType>>, Rc<DataType>),
@@ -74,6 +76,8 @@ impl Display for DataType {
                 DataType::Float => "float".to_string(),
                 DataType::Boolean => "bool".to_string(),
                 DataType::Str => "string".to_string(),
+
+                DataType::TypeParameter(type_param) => type_param.into(),
 
                 DataType::Enum(name, _) => name.clone(),
 
