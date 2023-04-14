@@ -16,6 +16,7 @@ use crate::fresh::generator::fresh_variable;
 use crate::postprocess::pattern::compiler::MatchArm;
 use crate::typechecker::Typechecker;
 
+use self::builder::box_builder;
 use self::emitter::emit_if;
 use self::emitter::{emit_binary, emit_unary};
 
@@ -47,7 +48,7 @@ pub struct Compiler {
     // Stores all branches.
     branch_header: Vec<BranchDefinition>,
 
-    box_header: HashSet<Rc<DataType>>,
+    box_header: HashSet<DataType>,
 
     // Set of external function names.
     external_function: HashSet<String>,
@@ -182,6 +183,16 @@ impl Compiler {
 
             buffer.push_str(&builder.build());
             buffer.push_str(&builder.build_constructors());
+        }
+
+        buffer
+    }
+
+    fn generate_box_header(&self) -> String {
+        let mut buffer = String::new();
+
+        for box_type in &self.box_header {
+            buffer.push_str(&box_builder::generate_box_constructor(Rc::new(box_type.clone())));
         }
 
         buffer
@@ -395,6 +406,8 @@ impl Compiler {
         buffer.push_str(&self.generate_record_header());
         buffer.push_str("\n// Enum header\n");
         buffer.push_str(&self.generate_enum_header());
+        buffer.push_str("\n// Box constructor header\n");
+        buffer.push_str(&self.generate_box_header());
         buffer.push_str("\n// Branch header\n");
         buffer.push_str(&self.generate_branch_header());
         buffer.push_str("\n// Function header\n");
@@ -562,10 +575,13 @@ impl Compiler {
             .iter()
             .zip(expected_arguments)
             .map(|(actual, expected)| {
+
                 let compiled_arg = self.compile_expression(actual);
 
                 if let DataType::TypeParameter(_) = &**expected {
                     let actual_type = actual.get_type();
+                    self.box_header.insert((*actual_type).clone());
+
                     let native_type = resolver::get_native_type_as_name(
                         &resolver::get_native_type(actual_type)
                     );

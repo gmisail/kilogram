@@ -9,9 +9,9 @@ pub fn generate_box_constructor(var_type: Rc<DataType>) -> String {
     let signature = format!("void* _kg_box_{type_name}({resolved_type} data)");
 
     let mut body = String::new(); 
-    body.push_str(&format!("{resolved_type}* tmp = ({resolved_type}*) malloc(sizeof(resolved_type));"));
-    body.push_str(&format!("*tmp = data;"));
+    body.push_str(&format!("{resolved_type}* tmp = ({resolved_type}*) malloc(sizeof({resolved_type}));\n"));
+    body.push_str(&format!("*tmp = data;\n"));
     body.push_str(&format!("return (void*) temp;"));
 
-    format!("{signature}{{\n{body}\n}}")
+    format!("{signature}{{\n{body}\n}}\n")
 }
