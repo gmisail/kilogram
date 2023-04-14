@@ -86,7 +86,7 @@ pub fn find_free(node: &TypedNode) -> HashMap<String, Rc<DataType>> {
             free
         }
 
-        TypedNode::FunctionCall(_, name, arguments) => {
+        TypedNode::FunctionCall(_, name, arguments, _) => {
             let mut free = HashMap::new();
             free.extend(find_free(name));
 

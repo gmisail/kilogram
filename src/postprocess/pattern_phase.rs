@@ -89,14 +89,17 @@ impl<'a> PostprocessPhase for PatternPhase<'a> {
                 Box::new(self.transform(body)),
             ),
 
-            TypedNode::FunctionCall(return_type, func, arguments) => TypedNode::FunctionCall(
-                return_type.clone(),
-                Box::new(self.transform(func)),
-                arguments
-                    .iter()
-                    .map(|argument| self.transform(argument))
-                    .collect(),
-            ),
+            TypedNode::FunctionCall(return_type, func, arguments, type_params) => {
+                TypedNode::FunctionCall(
+                    return_type.clone(),
+                    Box::new(self.transform(func)),
+                    arguments
+                        .iter()
+                        .map(|argument| self.transform(argument))
+                        .collect(),
+                    type_params.clone(),
+                )
+            }
 
             TypedNode::EnumInstance(enum_type, name, variants) => TypedNode::EnumInstance(
                 enum_type.clone(),
@@ -134,6 +137,7 @@ impl<'a> PostprocessPhase for PatternPhase<'a> {
                         String::from("panic"),
                     )),
                     vec![TypedNode::Integer(integer_type, 1)],
+                    HashMap::new(),
                 );
 
                 let fresh_name = fresh_variable("var");

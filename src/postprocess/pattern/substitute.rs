@@ -69,14 +69,17 @@ pub fn substitute_all(root: &TypedNode, substitutions: &HashMap<String, String>)
             Box::new(substitute_all(body, substitutions)),
         ),
 
-        TypedNode::FunctionCall(return_type, func, arguments) => TypedNode::FunctionCall(
-            return_type.clone(),
-            Box::new(substitute_all(func, substitutions)),
-            arguments
-                .iter()
-                .map(|argument| substitute_all(argument, substitutions))
-                .collect(),
-        ),
+        TypedNode::FunctionCall(return_type, func, arguments, type_params) => {
+            TypedNode::FunctionCall(
+                return_type.clone(),
+                Box::new(substitute_all(func, substitutions)),
+                arguments
+                    .iter()
+                    .map(|argument| substitute_all(argument, substitutions))
+                    .collect(),
+                type_params.clone(),
+            )
+        }
 
         TypedNode::EnumInstance(enum_type, name, variants) => TypedNode::EnumInstance(
             enum_type.clone(),

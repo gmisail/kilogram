@@ -192,7 +192,9 @@ impl Compiler {
         let mut buffer = String::new();
 
         for box_type in &self.box_header {
-            buffer.push_str(&box_builder::generate_box_constructor(Rc::new(box_type.clone())));
+            buffer.push_str(&box_builder::generate_box_constructor(Rc::new(
+                box_type.clone(),
+            )));
         }
 
         buffer
@@ -564,26 +566,32 @@ impl Compiler {
     ///
     /// * `name`:
     /// * `arguments`:
-    fn compile_function_call(&mut self, name: &TypedNode, arguments: &[TypedNode]) -> String {
+    fn compile_function_call(
+        &mut self,
+        name: &TypedNode,
+        arguments: &[TypedNode],
+        type_params: &HashMap<String, Rc<DataType>>,
+    ) -> String {
         let function_type = name.get_type();
-        let expected_arguments = match &*function_type {
-            DataType::Function(func_arguments, _) => func_arguments,
-            _ => panic!("Expected function call to be of type function.")
+        let (expected_arguments, expected_return_type) = match &*function_type {
+            DataType::Function(func_arguments, func_return_type) => {
+                (func_arguments, func_return_type)
+            }
+            _ => panic!("Expected function call to be of type function."),
         };
 
         let argument_list: Vec<String> = arguments
             .iter()
             .zip(expected_arguments)
             .map(|(actual, expected)| {
-
                 let compiled_arg = self.compile_expression(actual);
 
-                if let DataType::TypeParameter(_) = &**expected {
-                    let actual_type = actual.get_type();
-                    self.box_header.insert((*actual_type).clone());
+                if let DataType::TypeParameter(name) = &**expected {
+                    let substituted_type = type_params.get(name).expect("type parameter to exist");
+                    self.box_header.insert((**substituted_type).clone());
 
                     let native_type = resolver::get_native_type_as_name(
-                        &resolver::get_native_type(actual_type)
+                        &resolver::get_native_type(substituted_type.clone()),
                     );
                     format!("_kg_box_{native_type}({compiled_arg})")
                 } else {
@@ -605,10 +613,24 @@ impl Compiler {
             let func_type = resolver::get_function_pointer("".to_string(), base_type.clone());
             let function = self.compile_expression(name);
 
-            format!(
+            let compiled_call = format!(
                 "(({func_type}) {function}->body)({}, {function}->env)",
                 argument_list.join(", "),
-            )
+            );
+
+            if let DataType::TypeParameter(name) = &**expected_return_type {
+                let substituted_type = type_params.get(name).expect("type parameter to exist");
+                let compiled_type = resolver::get_native_type_as_name(&resolver::get_native_type(
+                    substituted_type.clone(),
+                ));
+
+                // In case the value we're returning is a type parameter, we must first convert the
+                // void* pointer to the expected pointer type. Then, we must dereference this
+                // pointer to get the actual value returned.
+                format!("*(({compiled_type}*) {compiled_call})")
+            } else {
+                compiled_call
+            }
         } else {
             let base_expr = self.compile_expression(name);
             format!("{base_expr}({})", argument_list.join(", "))
@@ -886,8 +908,8 @@ impl Compiler {
                 format!("{}->{name}", self.compile_expression(parent))
             }
 
-            TypedNode::FunctionCall(_, name, arguments) => {
-                self.compile_function_call(name, arguments)
+            TypedNode::FunctionCall(_, name, arguments, type_params) => {
+                self.compile_function_call(name, arguments, type_params)
             }
 
             // Just ignore record declarations, already handled in the record header.

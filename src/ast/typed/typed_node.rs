@@ -23,7 +23,12 @@ pub enum TypedNode {
     RecordInstance(String, Vec<(String, TypedNode)>),
 
     Let(String, Rc<DataType>, Box<TypedNode>, Box<TypedNode>, bool),
-    FunctionCall(Rc<DataType>, Box<TypedNode>, Vec<TypedNode>),
+    FunctionCall(
+        Rc<DataType>,
+        Box<TypedNode>,
+        Vec<TypedNode>,
+        HashMap<String, Rc<DataType>>,
+    ),
 
     Unary(Rc<DataType>, Box<TypedNode>, UnaryOperator),
     Binary(Rc<DataType>, Box<TypedNode>, BinaryOperator, Box<TypedNode>),
@@ -67,7 +72,7 @@ impl TypedNode {
             | TypedNode::Logical(t, _, _, _)
             | TypedNode::If(t, _, _, _)
             | TypedNode::Extern(_, t, _)
-            | TypedNode::FunctionCall(t, _, _)
+            | TypedNode::FunctionCall(t, _, _, _)
             | TypedNode::EnumInstance(t, _, _)
             | TypedNode::CaseOf(t, _, _) => t.clone(),
 

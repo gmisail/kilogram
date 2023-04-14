@@ -658,6 +658,7 @@ impl Typechecker {
                                 resolved_return_type,
                                 Box::new(func_node),
                                 typed_arguments,
+                                type_param_bindings,
                             ),
                         ))
                     }
