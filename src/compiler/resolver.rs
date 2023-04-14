@@ -35,7 +35,7 @@ pub fn get_native_type(internal_type: Rc<DataType>) -> String {
         DataType::Str => "KiloString*".to_string(),
         DataType::Boolean => "bool".to_string(),
 
-        DataType::TypeParameter(type_param) => todo!("type not supported: {}", type_param),
+        DataType::TypeParameter(_) => "void*".into(), //todo!("type not supported: {}", type_param),
 
         DataType::NamedReference(name) => {
             format!("{name}*")
@@ -46,4 +46,10 @@ pub fn get_native_type(internal_type: Rc<DataType>) -> String {
         DataType::Function(_, _) => "KiloFunction*".to_string(),
         DataType::Record(name, _) => format!("{name}*"),
     }
+}
+
+/// In case we want to use the native type as a name (say, in a function name), we need
+/// to remove "illegal" characters like '*'
+pub fn get_native_type_as_name(native_type: &String) -> String {
+    native_type.replace("*", "_ptr")
 }

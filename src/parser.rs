@@ -5,6 +5,7 @@ use crate::ast::untyped::untyped_node::UntypedNode;
 use super::scanner;
 use super::token::{Token, TokenKind};
 
+use std::collections::HashSet;
 use std::mem;
 
 struct Parser {

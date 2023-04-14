@@ -47,6 +47,8 @@ pub struct Compiler {
     // Stores all branches.
     branch_header: Vec<BranchDefinition>,
 
+    box_header: HashSet<Rc<DataType>>,
+
     // Set of external function names.
     external_function: HashSet<String>,
 
@@ -70,6 +72,7 @@ impl Compiler {
         Compiler {
             function_header: Vec::new(),
             branch_header: Vec::new(),
+            box_header: HashSet::new(),
             external_function: HashSet::new(),
             stack: Vec::new(),
             type_casts: HashSet::new(),
@@ -549,9 +552,28 @@ impl Compiler {
     /// * `name`:
     /// * `arguments`:
     fn compile_function_call(&mut self, name: &TypedNode, arguments: &[TypedNode]) -> String {
+        let function_type = name.get_type();
+        let expected_arguments = match &*function_type {
+            DataType::Function(func_arguments, _) => func_arguments,
+            _ => panic!("Expected function call to be of type function.")
+        };
+
         let argument_list: Vec<String> = arguments
             .iter()
-            .map(|arg| self.compile_expression(arg))
+            .zip(expected_arguments)
+            .map(|(actual, expected)| {
+                let compiled_arg = self.compile_expression(actual);
+
+                if let DataType::TypeParameter(_) = &**expected {
+                    let actual_type = actual.get_type();
+                    let native_type = resolver::get_native_type_as_name(
+                        &resolver::get_native_type(actual_type)
+                    );
+                    format!("_kg_box_{native_type}({compiled_arg})")
+                } else {
+                    compiled_arg
+                }
+            })
             .collect();
 
         let (base_type, is_extern) = match name {
