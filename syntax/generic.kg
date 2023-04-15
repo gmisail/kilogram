@@ -1,7 +1,10 @@
+extern print: (string) -> int
+extern int_to_string: (int) -> string
+
 let identity = function(val: 'T, val2: 'T, val3: 'S): 'T 
-	val
+	val3
 end
 
 let int_type: int = identity(10, 20, "hello")
 
-int_type
+print(int_to_string(int_type))

@@ -58,6 +58,11 @@ impl PartialEq for DataType {
             },
 
             // TODO: add enum
+            DataType::TypeParameter(first_param) => match other {
+                DataType::TypeParameter(second_param) => first_param == second_param,
+
+                _ => false,
+            },
 
             // Left must be a primitive type; just compare
             // the enum names since there are no subfields.

@@ -582,7 +582,7 @@ impl Typechecker {
                         ),
                     ))
                 } else {
-                    Err("Function return type and actual type returned do not match.".to_string())
+                    Err(format!("Function is expected to return type {return_type} but instead returns {body_type}."))
                 }
             }
 
@@ -639,18 +639,24 @@ impl Typechecker {
 
                         // In case the function returns a generic type, fetch what the it is bound
                         // to.
-                        let resolved_return_type =
-                            if let DataType::TypeParameter(return_type_param) = &**return_type {
-                                match type_param_bindings.get(return_type_param) {
+                        let resolved_return_type = if let DataType::TypeParameter(
+                            return_type_param,
+                        ) = &**return_type
+                        {
+                            let actual_return_type = match type_param_bindings
+                                .get(return_type_param)
+                            {
                                 Some(actual_return_type) => actual_return_type.clone(),
                                 None => return Err(
                                     "Type parameter {return_type_param} is unbound in return type."
                                         .into(),
                                 ),
-                            }
-                            } else {
-                                return_type.clone()
                             };
+
+                            actual_return_type
+                        } else {
+                            return_type.clone()
+                        };
 
                         Ok((
                             resolved_return_type.clone(),
