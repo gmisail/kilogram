@@ -1,10 +1,16 @@
 extern print: (string) -> int
 extern int_to_string: (int) -> string
 
+enum List('T)
+	Cons('T, List),
+	Nil
+end
+
 let identity = function(val: 'T, val2: 'T, val3: 'S): 'T 
-	val3
+	val2
 end
 
 let int_type: int = identity(10, 20, "hello")
+let bool_type: bool = identity(true, false, 123)
 
 print(int_to_string(int_type))

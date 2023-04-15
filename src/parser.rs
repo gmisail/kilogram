@@ -136,6 +136,8 @@ impl Parser {
                     break;
                 }
 
+                // TODO: what happens if the list is empty?
+
                 // Consume the delimiting comma.
                 self.advance_token();
             }
@@ -649,6 +651,39 @@ impl Parser {
                 }
             };
 
+            let mut type_params = HashSet::new();
+
+            if self.match_token(&TokenKind::LeftParen) {
+                self.advance_token();
+
+                loop {
+                    let identifier = self.expect_token(&TokenKind::Identifier("".to_string()))?;
+                    let type_param = match identifier {
+                        Some(t) => match &t.kind {
+                            TokenKind::Identifier(literal) => literal.clone(),
+                            _ => {
+                                return Err(format!("Expected identifier, got {} instead.", t.kind))
+                            }
+                        },
+                        None => {
+                            return Err(
+                                "Reached end of input while parsing UntypedNode.".to_string()
+                            )
+                        }
+                    };
+
+                    type_params.insert(type_param);
+
+                    if self.match_token(&TokenKind::RightParen) {
+                        self.advance_token();
+
+                        break;
+                    } else {
+                        self.expect_token(&TokenKind::Comma)?;
+                    }
+                }
+            }
+
             let mut enum_types = Vec::new();
 
             if !self.match_token(&TokenKind::End) {
@@ -706,6 +741,8 @@ impl Parser {
             if enum_types.is_empty() {
                 return Err(format!("Enum {enum_name} defined with no options."));
             }
+
+            println!("{:?}", type_params);
 
             let body = self.parse_expression()?;
 
