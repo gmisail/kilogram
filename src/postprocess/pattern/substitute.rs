@@ -81,13 +81,14 @@ pub fn substitute_all(root: &TypedNode, substitutions: &HashMap<String, String>)
             )
         }
 
-        TypedNode::EnumInstance(enum_type, name, variants) => TypedNode::EnumInstance(
+        TypedNode::EnumInstance(enum_type, name, variants, type_params) => TypedNode::EnumInstance(
             enum_type.clone(),
             name.clone(),
             variants
                 .iter()
                 .map(|variant| substitute_all(variant, substitutions))
                 .collect(),
+            type_params.clone(),
         ),
 
         TypedNode::RecordInstance(name, fields) => TypedNode::RecordInstance(

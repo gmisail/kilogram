@@ -168,7 +168,8 @@ impl Compiler {
         for (enum_name, enum_def) in &self.enums {
             let mut builder = EnumBuilder::new(enum_name.clone());
 
-            if let DataType::Enum(_, enum_variants) = &**enum_def {
+            // TODO: revisit
+            if let DataType::Enum(_, enum_variants, ..) = &**enum_def {
                 for (variant_name, variant_types) in enum_variants {
                     let mut resolved_variant_types = Vec::new();
 
@@ -683,7 +684,7 @@ impl Compiler {
             enum_type.clone()
         };
 
-        if let DataType::Enum(_, variants) = &*resolved_enum {
+        if let DataType::Enum(_, variants, ..) = &*resolved_enum {
             let (index, _variant) = variants
                 .keys()
                 .enumerate()
@@ -725,7 +726,7 @@ impl Compiler {
                         false,
                     )),
 
-                    TypedNode::EnumInstance(enum_type, constructor_name, bindings) => {
+                    TypedNode::EnumInstance(enum_type, constructor_name, bindings, _) => {
                         let mut buffer = String::new();
 
                         buffer.push_str(
@@ -802,7 +803,7 @@ impl Compiler {
         variant_name: &String,
         variant_arguments: &[TypedNode],
     ) -> String {
-        if let DataType::Enum(enum_name, _) = &**enum_type {
+        if let DataType::Enum(enum_name, ..) = &**enum_type {
             let mut arguments = Vec::new();
 
             for argument in variant_arguments {
@@ -926,7 +927,7 @@ impl Compiler {
                 self.compile_expression(body)
             }
 
-            TypedNode::EnumInstance(enum_type, variant, variant_arguments) => {
+            TypedNode::EnumInstance(enum_type, variant, variant_arguments, type_params) => {
                 self.compile_enum_instance(enum_type, variant, variant_arguments)
             }
         }

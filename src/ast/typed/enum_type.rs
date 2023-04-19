@@ -8,7 +8,7 @@ use super::data_type::DataType;
 /// Get variants from a type, if it has them.
 pub fn get_variants(enum_type: Rc<DataType>) -> Option<BTreeMap<String, Vec<Rc<DataType>>>> {
     match &*enum_type {
-        DataType::Enum(_, variants) => Some(variants.clone()),
+        DataType::Enum(_, variants, _, _) => Some(variants.clone()),
         _ => None,
     }
 }
@@ -16,7 +16,7 @@ pub fn get_variants(enum_type: Rc<DataType>) -> Option<BTreeMap<String, Vec<Rc<D
 /// Get all fields for a specific variant.
 pub fn get_variant_fields(enum_type: Rc<DataType>, variant: &String) -> Option<Vec<Rc<DataType>>> {
     match &*enum_type {
-        DataType::Enum(_, variants) => variants.get(variant).cloned(),
+        DataType::Enum(_, variants, _, _) => variants.get(variant).cloned(),
         _ => None,
     }
 }

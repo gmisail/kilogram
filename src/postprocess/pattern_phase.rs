@@ -101,14 +101,17 @@ impl<'a> PostprocessPhase for PatternPhase<'a> {
                 )
             }
 
-            TypedNode::EnumInstance(enum_type, name, variants) => TypedNode::EnumInstance(
-                enum_type.clone(),
-                name.clone(),
-                variants
-                    .iter()
-                    .map(|variant| self.transform(variant))
-                    .collect(),
-            ),
+            TypedNode::EnumInstance(enum_type, name, variants, type_params) => {
+                TypedNode::EnumInstance(
+                    enum_type.clone(),
+                    name.clone(),
+                    variants
+                        .iter()
+                        .map(|variant| self.transform(variant))
+                        .collect(),
+                    type_params.clone(),
+                )
+            }
 
             TypedNode::RecordInstance(name, fields) => TypedNode::RecordInstance(
                 name.clone(),

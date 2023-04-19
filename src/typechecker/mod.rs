@@ -121,6 +121,7 @@ impl Typechecker {
         &mut self,
         name: &String,
         options: &Vec<(String, Vec<Rc<DataType>>)>,
+        type_params: &Vec<String>,
     ) -> Result<(), String> {
         if self.enums.contains_key(name) {
             Err(format!("Enum {name} already defined."))
@@ -131,7 +132,13 @@ impl Typechecker {
                 option_map.insert(option_name.clone(), option_types.clone());
             }
 
-            let enum_type = Rc::new(DataType::Enum(name.clone(), option_map));
+            // By default, an enum type does not have any substitutions.
+            let enum_type = Rc::new(DataType::Enum(
+                name.clone(),
+                option_map,
+                type_params.to_owned(),
+                BTreeMap::new(),
+            ));
 
             // Push all variants onto the stack.
             for (option_name, _) in options {
@@ -208,7 +215,39 @@ impl Typechecker {
                 self.get_record(&fresh_name)
             }
 
-            _ => Err("Unable to convert type to internal type.".to_string()),
+            AstType::Generic(name, sub_types) => {
+                match name {
+                    name if self.enums.contains_key(name) => {
+                        if let enum_type @ DataType::Enum(_, _, type_params, _) =
+                            &*self.get_enum(&name.to_string())?
+                        {
+                            // Convert all sub-types to the respective DataTypes
+                            let resolved_sub_types = sub_types
+                                .iter()
+                                .map(|sub_type| self.convert_ast_type(sub_type))
+                                .collect::<Result<Vec<_>, _>>()?;
+
+                            // Substitute types passed as a type parameter. Given a list of
+                            // type parameter names and types, creating a mapping between the two:
+                            //  ['T, 'S], [Integer, Float] ==> ['T => Integer, 'S => Float]
+                            let substituted_type = (*enum_type).clone().set_type_params(
+                                type_params
+                                    .iter()
+                                    .cloned()
+                                    .zip(resolved_sub_types)
+                                    .collect::<BTreeMap<String, Rc<DataType>>>()
+                                    .into(),
+                            );
+
+                            Ok(Rc::new(substituted_type))
+                        } else {
+                            panic!("Enum expected to exist")
+                        }
+                    }
+
+                    _ => self.get_record(name),
+                }
+            }
         }
     }
 
@@ -240,10 +279,14 @@ impl Typechecker {
         variant_name: &String,
         variant_arguments: &[(Rc<DataType>, TypedNode)],
     ) -> Result<(Rc<DataType>, TypedNode), String> {
-        if let DataType::Enum(_, enum_variants) = &*enum_type {
+        if let DataType::Enum(_, enum_variants, _, initial_type_params) = &*enum_type {
             let expected_variant = enum_variants
                 .get(variant_name)
                 .expect("Expected variant to be in enum.");
+
+            println!("Checking enum: {:#?}", variant_name);
+
+            // TODO: check to make sure that types match if using type parameters
 
             // Check that the number of arguments match.
             if variant_arguments.len() != expected_variant.len() {
@@ -257,18 +300,44 @@ impl Typechecker {
             let (arg_types, arg_nodes): (Vec<Rc<DataType>>, Vec<TypedNode>) =
                 variant_arguments.iter().cloned().unzip();
 
+            let mut type_param_bindings: BTreeMap<String, Rc<DataType>> = BTreeMap::new();
+            type_param_bindings.extend(initial_type_params.clone());
+
             // Check that the actual & expected types match.
             for (defined_type, actual_type) in expected_variant.iter().zip(arg_types) {
                 let expected_type = self.resolve_reference(defined_type.clone())?;
 
-                if expected_type != actual_type.clone() {
+                if let DataType::TypeParameter(type_param) = &**defined_type {
+                    if let Some(bound_type) = type_param_bindings.get(type_param) {
+                        println!("BOUND TO: {:#?}, ACTUAL: {:#?}", bound_type, actual_type);
+
+                        if *bound_type != actual_type.clone() {
+                            return Err(format!("Type parameter {type_param} previously bound to {bound_type} but got {actual_type} instead."));
+                        }
+
+                        continue;
+                    } else {
+                        println!("INSERTING: {type_param} -> {:#?}", actual_type);
+
+                        type_param_bindings.insert(type_param.clone(), actual_type);
+                    }
+                } else if expected_type != actual_type.clone() {
                     return Err(format!("Invalid parameter type in variant {variant_name}: expected {expected_type}, but got {actual_type}."));
                 }
             }
 
+            let new_type = (*enum_type)
+                .clone()
+                .set_type_params(type_param_bindings.clone());
+
             Ok((
-                enum_type.clone(),
-                TypedNode::EnumInstance(enum_type, variant_name.clone(), arg_nodes),
+                Rc::new(new_type),
+                TypedNode::EnumInstance(
+                    enum_type,
+                    variant_name.clone(),
+                    arg_nodes,
+                    type_param_bindings,
+                ),
             ))
         } else {
             panic!("Expected node of type enum.")
@@ -425,7 +494,9 @@ impl Typechecker {
             UntypedNode::CaseOf(expression, arms) => {
                 let (expr_type, expr_node) = self.resolve_type(expression)?;
 
-                let variants = if let DataType::Enum(_, enum_variants) = &*expr_type {
+                let variants = if let DataType::Enum(_, enum_variants, _, _) = &*expr_type {
+                    // TODO: pass down type parameters
+
                     enum_variants
                 } else {
                     return Err(
@@ -639,11 +710,9 @@ impl Typechecker {
 
                         // In case the function returns a generic type, fetch what the it is bound
                         // to.
-                        let resolved_return_type = if let DataType::TypeParameter(
-                            return_type_param,
-                        ) = &**return_type
-                        {
-                            let actual_return_type = match type_param_bindings
+                        let resolved_return_type =
+                            if let DataType::TypeParameter(return_type_param) = &**return_type {
+                                let actual_return_type = match type_param_bindings
                                 .get(return_type_param)
                             {
                                 Some(actual_return_type) => actual_return_type.clone(),
@@ -653,10 +722,10 @@ impl Typechecker {
                                 ),
                             };
 
-                            actual_return_type
-                        } else {
-                            return_type.clone()
-                        };
+                                actual_return_type
+                            } else {
+                                return_type.clone()
+                            };
 
                         Ok((
                             resolved_return_type.clone(),
@@ -746,11 +815,11 @@ impl Typechecker {
                 ))
             }
 
-            UntypedNode::EnumDeclaration(name, options, body) => {
+            UntypedNode::EnumDeclaration(name, options, type_params, body) => {
                 let mut typed_variants = Vec::new();
 
                 // Add enum temporarily so that we can reference it in its variants.
-                self.add_enum(name, &Vec::new())?;
+                self.add_enum(name, &Vec::new(), type_params)?;
 
                 // Compute the types assuming that the self-referential enum is defined.
                 for (variant_name, variant_types) in options {
@@ -759,7 +828,7 @@ impl Typechecker {
                     for variant_type in variant_types {
                         let mut resolved_type = self.convert_ast_type(variant_type)?;
 
-                        if let DataType::Enum(enum_name, _) = &*resolved_type {
+                        if let DataType::Enum(enum_name, _, _, _) = &*resolved_type {
                             if name == enum_name {
                                 // Since we can't refer to ourselves, use a self-referencing type.
                                 resolved_type =
@@ -777,7 +846,7 @@ impl Typechecker {
                 self.enums.remove(name);
 
                 // Update entry with the new definiton.
-                self.add_enum(name, &typed_variants)?;
+                self.add_enum(name, &typed_variants, type_params)?;
                 self.resolve_type(body)
             }
 

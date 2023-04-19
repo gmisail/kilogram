@@ -16,7 +16,7 @@ impl Pattern {
     pub fn new(expr: &TypedNode) -> Pattern {
         match expr {
             TypedNode::Variable(_, variable_name) => Pattern::Variable(variable_name.clone()),
-            TypedNode::EnumInstance(_, variant, variant_arguments) => Pattern::Constructor(
+            TypedNode::EnumInstance(_, variant, variant_arguments, _) => Pattern::Constructor(
                 variant.clone(),
                 variant_arguments.iter().map(Pattern::new).collect(),
             ),
@@ -28,6 +28,7 @@ impl Pattern {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
     use std::rc::Rc;
 
     use crate::postprocess::pattern::Pattern;
@@ -60,6 +61,7 @@ mod tests {
             node_type.clone(),
             String::from("my_enum"),
             vec![TypedNode::Variable(node_type, String::from("my_var"))],
+            HashMap::new(),
         );
 
         let var_pattern = Pattern::new(&tree);

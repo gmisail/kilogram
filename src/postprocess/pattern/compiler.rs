@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 
 use crate::ast::typed::data_type::DataType;
@@ -102,7 +102,8 @@ impl<'c> PatternCompiler<'c> {
                             .unwrap_or_else(|| panic!("constructor to exist with variant {name}"));
 
                         let constr_variant = match &**constr_type {
-                            DataType::Enum(_, variants) => {
+                            // TODO: pass down type parameters
+                            DataType::Enum(_, variants, ..) => {
                                 variants.get(name).expect("variant to exist")
                             }
                             _ => panic!("Expected constructor type to be Enum."),
@@ -215,6 +216,7 @@ impl<'c> PatternCompiler<'c> {
                 constr_type.clone(),
                 constr_name.clone(),
                 constr_vars.clone(),
+                BTreeMap::new(), // TODO: pass down type parameters
             );
 
             // Each arm's body has the same type, so just use the type of the first arm.

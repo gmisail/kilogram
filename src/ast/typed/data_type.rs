@@ -12,9 +12,43 @@ pub enum DataType {
     TypeParameter(String),
 
     NamedReference(String),
-    Enum(String, BTreeMap<String, Vec<Rc<DataType>>>),
+    Enum(
+        String,
+        BTreeMap<String, Vec<Rc<DataType>>>,
+        Vec<String>,
+        BTreeMap<String, Rc<DataType>>,
+    ),
     Function(Vec<Rc<DataType>>, Rc<DataType>),
     Record(String, BTreeMap<String, Rc<DataType>>),
+}
+
+impl DataType {
+    pub fn substitute_type_params(self, sub_types: Vec<Rc<DataType>>) -> Result<DataType, String> {
+        match self {
+            DataType::Enum(name, variants, type_params, type_param_bindings) => {
+                todo!()
+            }
+
+            DataType::Record(..) => todo!(),
+
+            _ => Ok(self),
+        }
+    }
+
+    pub fn set_type_params(self, type_param_bindings: BTreeMap<String, Rc<DataType>>) -> DataType {
+        match self {
+            DataType::Enum(name, variants, type_params, _) => DataType::Enum(
+                name.clone(),
+                variants.clone(),
+                type_params.clone(),
+                type_param_bindings,
+            ),
+
+            DataType::Record(..) => todo!(),
+
+            _ => self,
+        }
+    }
 }
 
 impl PartialEq for DataType {
@@ -57,7 +91,25 @@ impl PartialEq for DataType {
                 _ => false,
             },
 
-            // TODO: add enum
+            DataType::Enum(name, _, _, type_params) => {
+                if let DataType::Enum(other_name, _, _, other_type_params) = other {
+                    println!("{:?}", type_params);
+                    println!("{:?}", other_type_params);
+
+                    // Perform a couple checks:
+                    //  - Same name
+                    //  - Same number of type parameter bindings
+                    //  - Each of the type parameters are bound to the same type.
+                    name == other_name
+                        && type_params.len() == other_type_params.len()
+                        && type_params
+                            .keys()
+                            .all(|key| type_params.get(key) == other_type_params.get(key))
+                } else {
+                    false
+                }
+            }
+
             DataType::TypeParameter(first_param) => match other {
                 DataType::TypeParameter(second_param) => first_param == second_param,
 
@@ -84,7 +136,7 @@ impl Display for DataType {
 
                 DataType::TypeParameter(type_param) => type_param.into(),
 
-                DataType::Enum(name, _) => name.clone(),
+                DataType::Enum(name, _, _, _) => name.clone(),
 
                 DataType::NamedReference(name) => format!("NamedReference({name})"),
 

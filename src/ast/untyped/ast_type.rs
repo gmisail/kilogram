@@ -3,7 +3,7 @@ use std::fmt::Display;
 #[derive(Clone, Debug)]
 pub enum AstType {
     Base(String),                  // string, int, ...
-    Generic(String, Box<AstType>), // array<string>, list<int>, ...
+    Generic(String, Vec<AstType>), // array<string>, list<int>, ...
     Function(Vec<Box<AstType>>, Box<AstType>),
     Record(Vec<(String, AstType)>),
 }
@@ -15,8 +15,14 @@ impl Display for AstType {
             "{}",
             match self {
                 AstType::Base(name) => format!("(AstType, name: {name})"),
-                AstType::Generic(name, sub_type) =>
-                    format!("(GenericType, name: {name}, sub_type: {sub_type})"),
+                AstType::Generic(name, sub_types) => format!(
+                    "(GenericType, name: {name}, sub_types: [{}])",
+                    sub_types
+                        .iter()
+                        .map(|sub_type| format!("{sub_type}"))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                ),
                 AstType::Function(argument_types, return_type) => {
                     let arg_type_list: Vec<String> =
                         argument_types.iter().map(|arg| arg.to_string()).collect();

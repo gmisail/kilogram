@@ -6,11 +6,7 @@ enum List('T)
 	Nil
 end
 
-let identity = function(val: 'T, val2: 'T, val3: 'S): 'T 
-	val2
-end
+let valid: List(int) = Cons(1, Cons(2, Cons(3, Nil)))
+let invalid: List(int) = Cons(1, Cons(false, Cons("Hello!", Nil)))
 
-let int_type: int = identity(10, 20, "hello")
-let bool_type: bool = identity(true, false, 123)
-
-print(int_to_string(int_type))
+0

@@ -5,7 +5,6 @@ use crate::ast::untyped::untyped_node::UntypedNode;
 use super::scanner;
 use super::token::{Token, TokenKind};
 
-use std::collections::HashSet;
 use std::mem;
 
 struct Parser {
@@ -559,11 +558,23 @@ impl Parser {
         if self.match_token(&TokenKind::LeftParen) {
             self.advance_token();
 
-            let sub_type = self.parse_type()?;
+            let mut sub_types = Vec::new();
 
-            self.expect_token(&TokenKind::RightParen)?;
+            loop {
+                let sub_type = self.parse_type()?;
 
-            Ok(AstType::Generic(base_type, Box::new(sub_type)))
+                sub_types.push(sub_type);
+
+                if self.match_token(&TokenKind::RightParen) {
+                    self.advance_token();
+
+                    break;
+                } else {
+                    self.expect_token(&TokenKind::Comma)?;
+                }
+            }
+
+            Ok(AstType::Generic(base_type, sub_types))
         } else {
             Ok(AstType::Base(base_type))
         }
@@ -651,7 +662,7 @@ impl Parser {
                 }
             };
 
-            let mut type_params = HashSet::new();
+            let mut type_params = Vec::new();
 
             if self.match_token(&TokenKind::LeftParen) {
                 self.advance_token();
@@ -672,7 +683,7 @@ impl Parser {
                         }
                     };
 
-                    type_params.insert(type_param);
+                    type_params.push(type_param);
 
                     if self.match_token(&TokenKind::RightParen) {
                         self.advance_token();
@@ -749,6 +760,7 @@ impl Parser {
             Ok(UntypedNode::EnumDeclaration(
                 enum_name,
                 enum_types,
+                type_params,
                 Box::new(body),
             ))
         } else {

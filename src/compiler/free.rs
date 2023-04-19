@@ -99,7 +99,7 @@ pub fn find_free(node: &TypedNode) -> HashMap<String, Rc<DataType>> {
 
         TypedNode::RecordDeclaration(_, _, body) => find_free(body),
 
-        TypedNode::EnumInstance(_, _, arguments) => {
+        TypedNode::EnumInstance(_, _, arguments, _) => {
             let mut all_free = HashMap::new();
 
             for argument in arguments {

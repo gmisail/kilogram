@@ -55,7 +55,12 @@ pub enum TypedNode {
 
     Extern(String, Rc<DataType>, Box<TypedNode>),
 
-    EnumInstance(Rc<DataType>, String, Vec<TypedNode>),
+    EnumInstance(
+        Rc<DataType>,
+        String,
+        Vec<TypedNode>,
+        BTreeMap<String, Rc<DataType>>,
+    ),
 }
 
 impl TypedNode {
@@ -73,7 +78,7 @@ impl TypedNode {
             | TypedNode::If(t, _, _, _)
             | TypedNode::Extern(_, t, _)
             | TypedNode::FunctionCall(t, _, _, _)
-            | TypedNode::EnumInstance(t, _, _)
+            | TypedNode::EnumInstance(t, _, _, _)
             | TypedNode::CaseOf(t, _, _) => t.clone(),
 
             TypedNode::Let(_, _, _, body, _)
