@@ -11,3 +11,6 @@ Cargo.lock
 
 # Mac-specific files
 .DS_Store
+
+out.c
+./out

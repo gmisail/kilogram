@@ -1,12 +1,9 @@
 extern print: (string) -> int
 extern int_to_string: (int) -> string
 
-enum List('T)
-	Cons('T, List),
-	Nil
+record Pair('T, 'S)
+	first: 'T,
+	second: 'S
 end
-
-let valid: List(int) = Cons(1, Cons(2, Cons(3, Nil)))
-let invalid: List(int) = Cons(1, Cons(false, Cons("Hello!", Nil)))
 
 0
