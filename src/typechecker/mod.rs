@@ -762,7 +762,7 @@ impl Typechecker {
                     Err("Records don't match.".to_string())
                 }
             }
-            UntypedNode::RecordDeclaration(name, fields, body) => {
+            UntypedNode::RecordDeclaration(name, fields, _, body) => {
                 self.add_record(name, fields)?;
                 self.resolve_type(body)
             }

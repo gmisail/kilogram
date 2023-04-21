@@ -870,6 +870,7 @@ impl Parser {
             Ok(UntypedNode::RecordDeclaration(
                 record_name,
                 fields,
+                type_params,
                 Box::new(body),
             ))
         } else {

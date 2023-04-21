@@ -16,7 +16,12 @@ pub enum UntypedNode {
 
     Get(String, Box<UntypedNode>),
 
-    RecordDeclaration(String, Vec<(String, AstType)>, Box<UntypedNode>),
+    RecordDeclaration(
+        String,
+        Vec<(String, AstType)>,
+        Vec<String>,
+        Box<UntypedNode>,
+    ),
     RecordInstance(String, Vec<(String, UntypedNode)>),
     AnonymousRecord(Vec<(String, UntypedNode)>),
 
@@ -105,7 +110,7 @@ impl Display for UntypedNode {
                 )
             }
 
-            UntypedNode::RecordDeclaration(name, fields, body) => {
+            UntypedNode::RecordDeclaration(name, fields, _, body) => {
                 let field_list: Vec<String> = fields
                     .iter()
                     .map(|(field_name, field_type)| format!("({field_name}: {field_type})"))

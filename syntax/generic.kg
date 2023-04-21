@@ -6,4 +6,6 @@ record Pair('T, 'S)
 	second: 'S
 end
 
+let test_pair: Pair(int, int) = Pair { first: 100, second: 200 }
+
 0
