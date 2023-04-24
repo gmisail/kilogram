@@ -2,10 +2,9 @@
 ///
 use crate::ast::untyped::untyped_node::UntypedNode;
 
-use self::generic_phase::GenericPhase;
+use self::generic::phase::GenericPhase;
 
 mod generic;
-mod generic_phase;
 
 pub trait PreprocessPhase {
     fn transform(&mut self, root: &UntypedNode) -> UntypedNode;

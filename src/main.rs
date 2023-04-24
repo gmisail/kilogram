@@ -20,8 +20,6 @@ use compiler::Compiler;
 use parser::parse;
 use typechecker::Typechecker;
 
-use crate::postprocess::apply_all;
-
 fn compile(file: &str) -> Result<(), String> {
     let mut file = File::open(file).expect("Failed to load file.");
 
@@ -40,14 +38,18 @@ fn compile(file: &str) -> Result<(), String> {
     let tree = parse(s)?;
     println!("Finished parsing in {:?}", start_parse.elapsed());
 
+    let start_pre = Instant::now();
+    let preprocessed_node = preprocess::apply_all(&tree);
+    println!("Finished pre-processing in {:?}", start_pre.elapsed());
+
     let start_type = Instant::now();
     let mut checker = Typechecker::new();
-    let (_, root_node) = checker.resolve_type(&tree)?;
+    let (_, root_node) = checker.resolve_type(&preprocessed_node)?;
     println!("Finished type-checking in {:?}", start_type.elapsed());
 
     let start_post = Instant::now();
-    let postprocessed_node = apply_all(&root_node, &checker.enums);
-    println!("Finished postprocessing in {:?}", start_post.elapsed());
+    let postprocessed_node = postprocess::apply_all(&root_node, &checker.enums);
+    println!("Finished post-processing in {:?}", start_post.elapsed());
 
     let start_comp = Instant::now();
     let mut compiler = Compiler::new(checker);

@@ -927,7 +927,7 @@ impl Compiler {
                 self.compile_expression(body)
             }
 
-            TypedNode::EnumInstance(enum_type, variant, variant_arguments, type_params) => {
+            TypedNode::EnumInstance(enum_type, variant, variant_arguments, _type_params) => {
                 self.compile_enum_instance(enum_type, variant, variant_arguments)
             }
         }

@@ -51,5 +51,5 @@ pub fn get_native_type(internal_type: Rc<DataType>) -> String {
 /// In case we want to use the native type as a name (say, in a function name), we need
 /// to remove "illegal" characters like '*'
 pub fn get_native_type_as_name(native_type: &String) -> String {
-    native_type.replace("*", "_ptr")
+    native_type.replace('*', "_ptr")
 }

@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::ast::untyped::untyped_node::UntypedNode;
 
-use super::generic::template::RecordTemplate;
-use super::PreprocessPhase;
+use crate::preprocess::generic::template::RecordTemplate;
+use crate::preprocess::PreprocessPhase;
 
 pub struct GenericPhase {
     templates: HashMap<String, RecordTemplate>,
@@ -31,7 +31,7 @@ impl PreprocessPhase for GenericPhase {
 
             UntypedNode::RecordDeclaration(name, fields, type_params, body) => {
                 // If we have more than one type parameter, then this is a generic record.
-                if type_params.len() > 0 {
+                if !type_params.is_empty() {
                     self.templates.insert(
                         name.clone(),
                         RecordTemplate::new(type_params.clone(), fields.clone()),
@@ -98,11 +98,18 @@ impl PreprocessPhase for GenericPhase {
                     .collect(),
             ),
 
-            UntypedNode::RecordInstance(name, fields) => {
+            UntypedNode::RecordInstance(name, type_params, fields) => {
                 // TODO: create instance of template if generic
+
+                let new_type = if let Some(template) = self.templates.get(name) {
+                    template.substitute(type_params)
+                } else {
+                    panic!()
+                };
 
                 UntypedNode::RecordInstance(
                     name.clone(),
+                    type_params.clone(),
                     fields
                         .iter()
                         .map(|(field_name, field_value)| {
@@ -119,7 +126,7 @@ impl PreprocessPhase for GenericPhase {
                     name.clone(),
                     variants
                         .iter()
-                        .map(|(variant_name, variant_types)| {
+                        .map(|(variant_name, _variant_types)| {
                             // TODO: convert generic types to concrete types.
                             (variant_name.clone(), Vec::new())
                         })
@@ -138,7 +145,7 @@ impl PreprocessPhase for GenericPhase {
 
             UntypedNode::AnonymousRecord(..) => todo!(),
 
-            UntypedNode::CaseOf(expr, arms) => {
+            UntypedNode::CaseOf(_expr, _arms) => {
                 todo!("add generic checking to case of")
             }
         }

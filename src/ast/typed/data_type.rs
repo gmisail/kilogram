@@ -23,9 +23,9 @@ pub enum DataType {
 }
 
 impl DataType {
-    pub fn substitute_type_params(self, sub_types: Vec<Rc<DataType>>) -> Result<DataType, String> {
+    pub fn substitute_type_params(self, _sub_types: Vec<Rc<DataType>>) -> Result<DataType, String> {
         match self {
-            DataType::Enum(name, variants, type_params, type_param_bindings) => {
+            DataType::Enum(_name, _variants, _type_params, _type_param_bindings) => {
                 todo!()
             }
 
@@ -37,12 +37,9 @@ impl DataType {
 
     pub fn set_type_params(self, type_param_bindings: BTreeMap<String, Rc<DataType>>) -> DataType {
         match self {
-            DataType::Enum(name, variants, type_params, _) => DataType::Enum(
-                name.clone(),
-                variants.clone(),
-                type_params.clone(),
-                type_param_bindings,
-            ),
+            DataType::Enum(name, variants, type_params, _) => {
+                DataType::Enum(name, variants, type_params, type_param_bindings)
+            }
 
             DataType::Record(..) => todo!(),
 
@@ -93,8 +90,8 @@ impl PartialEq for DataType {
 
             DataType::Enum(name, _, _, type_params) => {
                 if let DataType::Enum(other_name, _, _, other_type_params) = other {
-                    println!("{:?}", type_params);
-                    println!("{:?}", other_type_params);
+                    println!("{type_params:?}");
+                    println!("{other_type_params:?}");
 
                     // Perform a couple checks:
                     //  - Same name

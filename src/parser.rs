@@ -195,6 +195,25 @@ impl Parser {
         // Consume the opening brace.
         self.advance_token();
 
+        let mut type_params = Vec::new();
+        if self.match_token(&TokenKind::LeftParen) {
+            self.advance_token();
+
+            loop {
+                type_params.push(self.parse_type()?);
+
+                if self.match_token(&TokenKind::Comma) {
+                    // Consume a comma after a type, implies there are multiple.
+                    self.advance_token();
+                } else {
+                    // Not a comma? Then we must be done.
+                    self.expect_token(&TokenKind::RightParen)?;
+
+                    break;
+                }
+            }
+        }
+
         // If we immediately get a '}', don't bother parsing any fields.
         if !self.match_token(&TokenKind::RightBrace) {
             loop {
@@ -229,7 +248,11 @@ impl Parser {
             self.advance_token();
         }
 
-        Ok(UntypedNode::RecordInstance(record_type, fields))
+        Ok(UntypedNode::RecordInstance(
+            record_type,
+            type_params,
+            fields,
+        ))
     }
 
     fn finish_function_call(&mut self, expr: UntypedNode) -> Result<UntypedNode, String> {
@@ -753,7 +776,7 @@ impl Parser {
                 return Err(format!("Enum {enum_name} defined with no options."));
             }
 
-            println!("{:?}", type_params);
+            println!("{type_params:?}");
 
             let body = self.parse_expression()?;
 
@@ -824,8 +847,6 @@ impl Parser {
                     }
                 }
             }
-
-            println!("{type_params:?}");
 
             // If we immediately get a 'end' don't bother parsing any fields.
             if !self.match_token(&TokenKind::End) {

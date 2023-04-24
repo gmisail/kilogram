@@ -235,8 +235,7 @@ impl Typechecker {
                                     .iter()
                                     .cloned()
                                     .zip(resolved_sub_types)
-                                    .collect::<BTreeMap<String, Rc<DataType>>>()
-                                    .into(),
+                                    .collect::<BTreeMap<String, Rc<DataType>>>(),
                             );
 
                             Ok(Rc::new(substituted_type))
@@ -284,7 +283,7 @@ impl Typechecker {
                 .get(variant_name)
                 .expect("Expected variant to be in enum.");
 
-            println!("Checking enum: {:#?}", variant_name);
+            println!("Checking enum: {variant_name:#?}");
 
             // TODO: check to make sure that types match if using type parameters
 
@@ -309,7 +308,7 @@ impl Typechecker {
 
                 if let DataType::TypeParameter(type_param) = &**defined_type {
                     if let Some(bound_type) = type_param_bindings.get(type_param) {
-                        println!("BOUND TO: {:#?}, ACTUAL: {:#?}", bound_type, actual_type);
+                        println!("BOUND TO: {bound_type:#?}, ACTUAL: {actual_type:#?}");
 
                         if *bound_type != actual_type.clone() {
                             return Err(format!("Type parameter {type_param} previously bound to {bound_type} but got {actual_type} instead."));
@@ -317,7 +316,7 @@ impl Typechecker {
 
                         continue;
                     } else {
-                        println!("INSERTING: {type_param} -> {:#?}", actual_type);
+                        println!("INSERTING: {type_param} -> {actual_type:#?}");
 
                         type_param_bindings.insert(type_param.clone(), actual_type);
                     }
@@ -695,7 +694,7 @@ impl Typechecker {
                                 if let Some(existing_binding) = bind_result {
                                     if existing_binding != resolved_type {
                                         return Err(format!(
-                                            "Cannot substitute type {resolved_type} for type parameter {type_param}, expected type {existing_binding}." 
+                                            "Cannot substitute type {resolved_type} for type parameter {type_param}, expected type {existing_binding}."
                                         ));
                                     }
                                 }
@@ -742,7 +741,7 @@ impl Typechecker {
                 }
             }
 
-            UntypedNode::RecordInstance(name, fields) => {
+            UntypedNode::RecordInstance(name, _type_params, fields) => {
                 let record_type = self.get_record(name)?;
                 let mut field_types = BTreeMap::new();
                 let mut field_values = Vec::new();
