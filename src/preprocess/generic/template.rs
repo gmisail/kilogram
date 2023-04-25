@@ -1,9 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ast::{
-    typed::data_type::DataType,
-    untyped::{ast_type::AstType, untyped_node::UntypedNode},
-};
+use crate::ast::untyped::{ast_type::AstType, untyped_node::UntypedNode};
 
 pub struct RecordTemplate {
     name: String,
@@ -57,7 +54,7 @@ impl RecordTemplate {
         Ok(UntypedNode::RecordDeclaration(
             "TEMP".into(),
             concrete_fields,
-            self.type_params,
+            self.type_params.clone(),
             Box::new(body),
         ))
     }

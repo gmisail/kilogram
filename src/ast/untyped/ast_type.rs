@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum AstType {
     Base(String),                  // string, int, ...
     Generic(String, Vec<AstType>), // array<string>, list<int>, ...
