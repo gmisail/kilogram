@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeSet;
 
 use crate::ast::untyped::{ast_type::AstType, untyped_node::UntypedNode};
 
@@ -21,46 +21,51 @@ impl RecordTemplate {
         }
     }
 
+    fn substitute_all(&self, subject_type: AstType, types: &[(String, AstType)]) -> AstType {
+        match types {
+            [(type_name, subtituted_type), tail @ ..] => {
+                let result = subject_type.substitute_type_parameter(type_name, subtituted_type);
+
+                self.substitute_all(result, tail)
+            },
+
+            [] => subject_type
+        }
+    }
+
     pub fn substitute(
         &self,
-        type_param_values: &Vec<AstType>,
+        variants: &mut BTreeSet<AstType>,
         body: UntypedNode,
-    ) -> Result<UntypedNode, String> {
-        if self.type_params.len() != type_param_values.len() {
-            return Err("Mismatched type parameters.".into());
+    ) -> UntypedNode {
+        if variants.len() == 0 {
+            body
+        } else {
+            let head = variants.pop_first().unwrap().clone();
+
+            let types = if let AstType::Generic(_, sub_types) = &head {
+                sub_types
+            } else {
+                panic!("Expected type be generic.")
+            };
+
+            let substitution_pairs = self.type_params
+                .iter()
+                .cloned()
+                .zip(types.iter().cloned())
+                .collect::<Vec<(String, AstType)>>();
+
+            UntypedNode::RecordDeclaration(
+                head.to_string(),
+                self.fields
+                    .iter()
+                    .map(|(field_name, field_type)| {
+                        (field_name.clone(), self.substitute_all(field_type.clone(), &substitution_pairs))
+                    })
+                    .collect(),
+                self.type_params.clone(),
+                Box::new(self.substitute(variants, body))
+            )
         }
-
-        let substitutions: HashMap<String, AstType> = self
-            .type_params
-            .iter()
-            .cloned()
-            .zip(type_param_values.clone())
-            .collect();
-
-        let concrete_fields = self
-            .fields
-            .iter()
-            .map(|field @ (field_name, field_type)| {
-                if let AstType::Base(type_param) = field_type {
-                    if let Some(substitution) = substitutions.get(type_param) {
-                        return (field_name.clone(), substitution.clone());
-                    }
-                }
-
-                field.clone()
-            })
-            .collect();
-
-        Ok(UntypedNode::RecordDeclaration(
-            "TEMP".into(),
-            concrete_fields,
-            self.type_params.clone(),
-            Box::new(body),
-        ))
     }
-}
-
-/// Creates a concrete type from type parameters: Map(String, Int) => Map_String_Int
-fn create_concrete_type_name(base_type: String, sub_types: &[String]) -> String {
-    format!("{base_type}{}", sub_types.join("_"))
 }

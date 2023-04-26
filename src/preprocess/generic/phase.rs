@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, BTreeSet};
 
 use crate::ast::untyped::ast_type::AstType;
 use crate::ast::untyped::untyped_node::UntypedNode;
@@ -7,7 +7,7 @@ use crate::preprocess::generic::template::RecordTemplate;
 use crate::preprocess::PreprocessPhase;
 
 pub struct GenericPhase {
-    types: HashMap<String, HashSet<AstType>>,
+    types: HashMap<String, BTreeSet<AstType>>,
     templates: HashMap<String, RecordTemplate>,
 }
 
@@ -37,7 +37,7 @@ impl GenericPhase {
 
                 self.types
                     .entry(name.clone())
-                    .or_insert(HashSet::new())
+                    .or_insert(BTreeSet::new())
                     .insert(AstType::Generic(name.clone(), sub_types.clone()));
             }
 
@@ -142,7 +142,7 @@ impl GenericPhase {
                 if type_params.len() > 0 {
                     self.types
                         .entry(name.clone())
-                        .or_insert(HashSet::new())
+                        .or_insert(BTreeSet::new())
                         .insert(AstType::Generic(name.clone(), type_params.clone()));
                 }
 
@@ -185,12 +185,11 @@ impl GenericPhase {
                 //
                 // TODO: test this
                 if !type_params.is_empty() {
-                    self.templates.insert(
-                        name.clone(),
-                        RecordTemplate::new(name.clone(), type_params.clone(), fields.clone()),
-                    );
+                    let expanded_body = self.expand_generic_declarations(body);
+                    let template = self.templates.get(name).unwrap();
+                    let mut types = self.types.get(name).unwrap().clone();
 
-                    self.expand_generic_declarations(body)
+                    template.substitute(&mut types, expanded_body)
                 } else {
                     UntypedNode::RecordDeclaration(
                         name.clone(),
@@ -257,7 +256,7 @@ impl GenericPhase {
                     .collect(),
             ),
 
-            UntypedNode::RecordInstance(name, type_params, fields) => {
+            UntypedNode::RecordInstance(_name, _type_params, _fields) => {
                 // TODO: create instance of template if generic
 
                 /*

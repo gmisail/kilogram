@@ -94,8 +94,8 @@ impl Display for UntypedNode {
                 "(Let, name: '{name}', value: {value}, body: {body}, is_recursive: {is_recursive})",
             ),
 
-            UntypedNode::Function(name, ast_type, _, value) => {
-                format!("(Function, name: '{name}', type: {ast_type}, value: {value})")
+            UntypedNode::Function(name, _, _, value) => {
+                format!("(Function, name: '{name}', value: {value})")
             }
 
             UntypedNode::Get(name, expr) => format!("(Get, name: '{name}', parent: {expr})"),
@@ -113,7 +113,7 @@ impl Display for UntypedNode {
             UntypedNode::RecordDeclaration(name, fields, _, body) => {
                 let field_list: Vec<String> = fields
                     .iter()
-                    .map(|(field_name, field_type)| format!("({field_name}: {field_type})"))
+                    .map(|(field_name, _)| field_name.clone())
                     .collect();
 
                 format!(
@@ -143,8 +143,8 @@ impl Display for UntypedNode {
                 format!("(AnonymousRecord, fields: [{}])", field_list.join(", "))
             }
 
-            UntypedNode::Extern(name, extern_type, body) => {
-                format!("(Extern, name: {name}, type: {extern_type}, body: {body})")
+            UntypedNode::Extern(name, _, body) => {
+                format!("(Extern, name: {name}, body: {body})")
             }
 
             UntypedNode::EnumDeclaration(name, _, _, body) => {
