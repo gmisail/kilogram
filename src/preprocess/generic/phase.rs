@@ -21,8 +21,40 @@ impl GenericPhase {
 }
 
 impl GenericPhase {
-    fn resolve_generic_type(&mut self, t: &AstType) {
-        todo!("resolve generic type as a concrete type")
+
+    /// Recurse through a type searching for unique generic type instances, creating them
+    /// if they do not exist.
+    ///
+    /// * `ast_type`: type to search on
+    fn resolve_generic_type(&mut self, ast_type: &AstType) {
+        match ast_type {
+            // Base types (int, float, etc...) can't be generic.
+            AstType::Base(_) => return,
+
+            AstType::Generic(name, sub_types) => {
+                for sub_type in sub_types {
+                    self.resolve_generic_type(sub_type);
+                }
+
+                self.types
+                    .entry(name.clone())
+                    .or_insert(HashSet::new())
+                    .insert(AstType::Generic(name.clone(), sub_types.clone()));
+            },
+
+            AstType::Function(arguments, return_type) => {
+                for argument in arguments {
+                    self.resolve_generic_type(argument);
+                }
+
+                self.resolve_generic_type(return_type);
+            },
+            AstType::Record(fields) => {
+                for (_, field_type) in fields {
+                    self.resolve_generic_type(field_type);
+                }
+            }
+        }
     }
 
     /// Search the AST for generic types and save all unique configurations.
