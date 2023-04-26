@@ -1,14 +1,17 @@
 extern print: (string) -> int
 extern int_to_string: (int) -> string
 
-record Pair('T, 'S)
+record Pair['T, 'S]
 	first: 'T,
 	second: 'S
 end
 
-let test_pair = Pair(int, int) { 
-	first: 100, 
-	second: 200 
-}
+record Concrete 
+	num: int
+end
+
+let test_pair = Pair[int, int] { first: 100, second: 200 }
+
+let test_num = Concrete { num: 100 }
 
 0

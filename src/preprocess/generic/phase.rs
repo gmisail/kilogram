@@ -66,7 +66,7 @@ impl GenericPhase {
                 self.find_unique_types(body);
             }
 
-            UntypedNode::Unary(value, operator) => {
+            UntypedNode::Unary(value, _) => {
                 self.find_unique_types(value);
             }
 
@@ -97,7 +97,7 @@ impl GenericPhase {
                 self.find_unique_types(parent);
 
                 for argument in arguments {
-                    self.find_unique_types(parent);
+                    self.find_unique_types(argument);
                 }
             }
 

@@ -82,7 +82,9 @@ impl Parser {
         // Consume the identifer token.
         self.advance_token();
 
-        if self.match_token(&TokenKind::LeftBrace) {
+        println!("got identifier: {name}");
+
+        if self.match_token(&TokenKind::LeftBracket) || self.match_token(&TokenKind::LeftBrace) {
             self.parse_record_instance(name)
         } else {
             Ok(UntypedNode::Variable(name))
@@ -190,13 +192,8 @@ impl Parser {
     }
 
     fn parse_record_instance(&mut self, record_type: String) -> Result<UntypedNode, String> {
-        let mut fields = Vec::new();
-
-        // Consume the opening brace.
-        self.advance_token();
-
         let mut type_params = Vec::new();
-        if self.match_token(&TokenKind::LeftParen) {
+        if self.match_token(&TokenKind::LeftBracket) {
             self.advance_token();
 
             loop {
@@ -207,12 +204,17 @@ impl Parser {
                     self.advance_token();
                 } else {
                     // Not a comma? Then we must be done.
-                    self.expect_token(&TokenKind::RightParen)?;
+                    self.expect_token(&TokenKind::RightBracket)?;
 
                     break;
                 }
             }
         }
+
+        // Consume the opening brace.
+        self.advance_token();
+
+        let mut fields = Vec::new();
 
         // If we immediately get a '}', don't bother parsing any fields.
         if !self.match_token(&TokenKind::RightBrace) {
@@ -812,7 +814,7 @@ impl Parser {
 
             let mut type_params = Vec::new();
 
-            if self.match_token(&TokenKind::LeftParen) {
+            if self.match_token(&TokenKind::LeftBracket) {
                 self.advance_token();
 
                 loop {
@@ -841,7 +843,7 @@ impl Parser {
                         self.advance_token();
                     } else {
                         // Not a comma? Then we must be done.
-                        self.expect_token(&TokenKind::RightParen)?;
+                        self.expect_token(&TokenKind::RightBracket)?;
 
                         break;
                     }
