@@ -21,7 +21,6 @@ impl GenericPhase {
 }
 
 impl GenericPhase {
-
     /// Recurse through a type searching for unique generic type instances, creating them
     /// if they do not exist.
     ///
@@ -40,7 +39,7 @@ impl GenericPhase {
                     .entry(name.clone())
                     .or_insert(HashSet::new())
                     .insert(AstType::Generic(name.clone(), sub_types.clone()));
-            },
+            }
 
             AstType::Function(arguments, return_type) => {
                 for argument in arguments {
@@ -48,7 +47,7 @@ impl GenericPhase {
                 }
 
                 self.resolve_generic_type(return_type);
-            },
+            }
             AstType::Record(fields) => {
                 for (_, field_type) in fields {
                     self.resolve_generic_type(field_type);
@@ -191,9 +190,14 @@ impl GenericPhase {
                         RecordTemplate::new(name.clone(), type_params.clone(), fields.clone()),
                     );
 
-                    self.transform(body)
+                    self.expand_generic_declarations(body)
                 } else {
-                    root.to_owned()
+                    UntypedNode::RecordDeclaration(
+                        name.clone(),
+                        fields.clone(),
+                        Vec::new(),
+                        Box::new(self.expand_generic_declarations(body)),
+                    )
                 }
             }
 

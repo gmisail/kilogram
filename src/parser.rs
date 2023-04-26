@@ -82,8 +82,6 @@ impl Parser {
         // Consume the identifer token.
         self.advance_token();
 
-        println!("got identifier: {name}");
-
         if self.match_token(&TokenKind::LeftBracket) || self.match_token(&TokenKind::LeftBrace) {
             self.parse_record_instance(name)
         } else {
@@ -777,8 +775,6 @@ impl Parser {
             if enum_types.is_empty() {
                 return Err(format!("Enum {enum_name} defined with no options."));
             }
-
-            println!("{type_params:?}");
 
             let body = self.parse_expression()?;
 
