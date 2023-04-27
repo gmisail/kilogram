@@ -11,6 +11,11 @@ enum Sequence
     Cons(int, Sequence)
 end
 
+record Pair['T, 'S]
+    first: 'T,
+    second: 'S
+end
+
 let rec length = function(seq: Sequence): int
     case seq of 
         Cons(num, next) -> 1 + length(next),
@@ -26,6 +31,7 @@ let rec factorial = function(x: int): int
 end
 
 let iter = 10
+let user = Pair[string, int] { first: "gmisail", second: 22 }
 
 print(int_to_string(factorial(iter)))
 ```
