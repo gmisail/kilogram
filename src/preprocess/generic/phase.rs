@@ -7,13 +7,16 @@ use crate::preprocess::generic::template::RecordTemplate;
 use crate::preprocess::PreprocessPhase;
 
 pub struct GenericPhase {
-    types: HashMap<String, BTreeSet<AstType>>,
+    // Ensures uniqueness without needing to check every t
+    all_types: BTreeSet<AstType>,
+    types: HashMap<String, Vec<AstType>>,
     templates: HashMap<String, RecordTemplate>,
 }
 
 impl GenericPhase {
     pub fn new() -> Self {
         GenericPhase {
+            all_types: BTreeSet::new(),
             types: HashMap::new(),
             templates: HashMap::new(),
         }
@@ -35,10 +38,9 @@ impl GenericPhase {
                     self.resolve_generic_type(sub_type);
                 }
 
-                self.types
-                    .entry(name.clone())
-                    .or_insert(BTreeSet::new())
-                    .insert(AstType::Generic(name.clone(), sub_types.clone()));
+                let new_type = AstType::Generic(name.clone(), sub_types.clone());
+
+                self.register_type(name.clone(), new_type);
             }
 
             AstType::Function(arguments, return_type) => {
@@ -53,6 +55,17 @@ impl GenericPhase {
                     self.resolve_generic_type(field_type);
                 }
             }
+        }
+    }
+
+    fn register_type(&mut self, name: String, ast_type: AstType) {
+        if !self.all_types.contains(&ast_type) {
+            self.all_types.insert(ast_type.clone());
+
+            self.types
+                .entry(name.clone())
+                .or_insert(Vec::new())
+                .push(ast_type);
         }
     }
 
@@ -140,10 +153,10 @@ impl GenericPhase {
 
                 // If the type is generic, add it to the list of generic type configurations.
                 if !type_params.is_empty() {
-                    self.types
-                        .entry(name.clone())
-                        .or_insert(BTreeSet::new())
-                        .insert(AstType::Generic(name.clone(), type_params.clone()));
+                    self.register_type(
+                        name.clone(),
+                        AstType::Generic(name.clone(), type_params.clone()),
+                    );
                 }
 
                 // Recurse through each of the field values and search for generic types.
@@ -187,9 +200,9 @@ impl GenericPhase {
                     let expanded_body = self.expand_generic_declarations(body);
 
                     let template = self.templates.get(name).unwrap();
-                    let mut types = self.types.get(name).unwrap().clone();
+                    let types = self.types.get(name).unwrap().clone();
 
-                    template.substitute(&mut types, expanded_body)
+                    template.substitute(&types, expanded_body)
                 } else {
                     UntypedNode::RecordDeclaration(
                         name.clone(),

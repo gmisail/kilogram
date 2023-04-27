@@ -1,5 +1,3 @@
-use std::collections::BTreeSet;
-
 use crate::ast::untyped::{ast_type::AstType, untyped_node::UntypedNode};
 
 pub struct RecordTemplate {
@@ -27,42 +25,42 @@ impl RecordTemplate {
         }
     }
 
-    pub fn substitute(&self, variants: &mut BTreeSet<AstType>, body: UntypedNode) -> UntypedNode {
-        if variants.len() == 0 {
-            body
-        } else {
-            let head = variants.pop_first().unwrap().clone();
+    pub fn substitute(&self, variants: &[AstType], body: UntypedNode) -> UntypedNode {
+        match variants {
+            [head, tail @ ..] => {
+                let types = if let AstType::Generic(_, sub_types) = &head {
+                    sub_types
+                } else {
+                    panic!("Expected type be generic.")
+                };
 
-            let types = if let AstType::Generic(_, sub_types) = &head {
-                sub_types
-            } else {
-                panic!("Expected type be generic.")
-            };
-
-            let substitution_pairs = self
-                .type_params
-                .iter()
-                .cloned()
-                .zip(types.iter().cloned())
-                .collect::<Vec<(String, AstType)>>();
-
-            UntypedNode::RecordDeclaration(
-                head.to_string(),
-                self.fields
+                let substitution_pairs = self
+                    .type_params
                     .iter()
-                    .map(|(field_name, field_type)| {
-                        let original_type =
-                            self.substitute_all(field_type.clone(), &substitution_pairs);
+                    .cloned()
+                    .zip(types.iter().cloned())
+                    .collect::<Vec<(String, AstType)>>();
 
-                        (
-                            field_name.clone(),
-                            original_type.convert_generic_to_concrete(),
-                        )
-                    })
-                    .collect(),
-                self.type_params.clone(),
-                Box::new(self.substitute(variants, body)),
-            )
+                UntypedNode::RecordDeclaration(
+                    head.to_string(),
+                    self.fields
+                        .iter()
+                        .map(|(field_name, field_type)| {
+                            let original_type =
+                                self.substitute_all(field_type.clone(), &substitution_pairs);
+
+                            (
+                                field_name.clone(),
+                                original_type.convert_generic_to_concrete(),
+                            )
+                        })
+                        .collect(),
+                    self.type_params.clone(),
+                    Box::new(self.substitute(tail, body)),
+                )
+            }
+
+            [] => body,
         }
     }
 }
