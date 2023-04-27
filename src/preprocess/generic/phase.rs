@@ -1,4 +1,4 @@
-use std::collections::{HashMap, BTreeSet};
+use std::collections::{BTreeSet, HashMap};
 
 use crate::ast::untyped::ast_type::AstType;
 use crate::ast::untyped::untyped_node::UntypedNode;
@@ -80,7 +80,7 @@ impl GenericPhase {
                 if !type_params.is_empty() {
                     self.templates.insert(
                         name.clone(),
-                        RecordTemplate::new(name.clone(), type_params.clone(), fields.clone()),
+                        RecordTemplate::new(type_params.clone(), fields.clone()),
                     );
                 }
 
@@ -139,7 +139,7 @@ impl GenericPhase {
                 }
 
                 // If the type is generic, add it to the list of generic type configurations.
-                if type_params.len() > 0 {
+                if !type_params.is_empty() {
                     self.types
                         .entry(name.clone())
                         .or_insert(BTreeSet::new())
@@ -181,11 +181,11 @@ impl GenericPhase {
             | UntypedNode::Get(..) => root.to_owned(),
 
             UntypedNode::RecordDeclaration(name, fields, type_params, body) => {
-                // If we have more than one type parameter, then this is a generic record.
-                //
-                // TODO: test this
+                // More than one type parameter? Must be generic record.
                 if !type_params.is_empty() {
+                    // Expand the rest of the AST first
                     let expanded_body = self.expand_generic_declarations(body);
+
                     let template = self.templates.get(name).unwrap();
                     let mut types = self.types.get(name).unwrap().clone();
 
@@ -208,13 +208,23 @@ impl GenericPhase {
                 Box::new(self.expand_generic_declarations(body)),
             ),
 
-            UntypedNode::Let(name, var_type, var_value, body, is_recursive) => UntypedNode::Let(
-                name.clone(),
-                var_type.clone(),
-                Box::new(self.expand_generic_declarations(var_value)),
-                Box::new(self.expand_generic_declarations(body)),
-                *is_recursive,
-            ),
+            UntypedNode::Let(name, var_type, var_value, body, is_recursive) => {
+                let concrete_type = if let Some(generic_type @ AstType::Generic(..)) = var_type {
+                    Some(AstType::Base(
+                        generic_type.convert_generic_to_concrete().to_string(),
+                    ))
+                } else {
+                    var_type.clone()
+                };
+
+                UntypedNode::Let(
+                    name.clone(),
+                    concrete_type,
+                    Box::new(self.expand_generic_declarations(var_value)),
+                    Box::new(self.expand_generic_declarations(body)),
+                    *is_recursive,
+                )
+            }
 
             UntypedNode::Unary(value, operator) => UntypedNode::Unary(
                 Box::new(self.expand_generic_declarations(value)),
@@ -256,28 +266,33 @@ impl GenericPhase {
                     .collect(),
             ),
 
-            UntypedNode::RecordInstance(_name, _type_params, _fields) => {
-                // TODO: create instance of template if generic
-
-                /*
-                     let new_type = if let Some(template) = self.templates.get(name) {
-                    template.substitute(type_params)
+            UntypedNode::RecordInstance(name, type_params, fields) => {
+                let new_name = if !type_params.is_empty() {
+                    AstType::Generic(
+                        name.clone(),
+                        type_params
+                            .iter()
+                            .map(|type_param| type_param.convert_generic_to_concrete())
+                            .collect(),
+                    )
+                    .to_string()
                 } else {
-                    panic!()
+                    name.clone()
                 };
 
                 UntypedNode::RecordInstance(
-                    name.clone(),
-                    type_params.clone(),
+                    new_name,
+                    Vec::new(),
                     fields
                         .iter()
                         .map(|(field_name, field_value)| {
-                            (field_name.clone(), self.transform(field_value))
+                            (
+                                field_name.clone(),
+                                self.expand_generic_declarations(field_value),
+                            )
                         })
                         .collect(),
-                )*/
-
-                todo!()
+                )
             }
 
             UntypedNode::EnumDeclaration(name, variants, type_params, body) => {

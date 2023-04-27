@@ -3,7 +3,7 @@ use std::fmt::Display;
 use super::ast_type::AstType;
 use crate::ast::operator::{BinaryOperator, LogicalOperator, UnaryOperator};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum UntypedNode {
     // Literals
     Integer(i32),
@@ -91,7 +91,7 @@ impl Display for UntypedNode {
             }
 
             UntypedNode::Let(name, _, value, body, is_recursive) => format!(
-                "(Let, name: '{name}', value: {value}, body: {body}, is_recursive: {is_recursive})",
+                "(Let, name: '{name}', value: {value}, body: {body}, is_recursive: {is_recursive})"
             ),
 
             UntypedNode::Function(name, _, _, value) => {
@@ -113,7 +113,9 @@ impl Display for UntypedNode {
             UntypedNode::RecordDeclaration(name, fields, _, body) => {
                 let field_list: Vec<String> = fields
                     .iter()
-                    .map(|(field_name, _)| field_name.clone())
+                    .map(|(field_name, field_type)| {
+                        format!("{field_name} {}", field_type.to_string())
+                    })
                     .collect();
 
                 format!(

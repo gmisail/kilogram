@@ -560,7 +560,7 @@ impl Parser {
     fn parse_type(&mut self) -> Result<AstType, String> {
         if self.match_token(&TokenKind::LeftParen) {
             return self.parse_function_type();
-        } else if self.match_token(&TokenKind::LeftBrace) {
+        } else if self.match_token(&TokenKind::LeftBracket) {
             return self.parse_record_type();
         }
 
@@ -578,7 +578,7 @@ impl Parser {
 
         self.advance_token();
 
-        if self.match_token(&TokenKind::LeftParen) {
+        if self.match_token(&TokenKind::LeftBracket) {
             self.advance_token();
 
             let mut sub_types = Vec::new();
@@ -588,7 +588,7 @@ impl Parser {
 
                 sub_types.push(sub_type);
 
-                if self.match_token(&TokenKind::RightParen) {
+                if self.match_token(&TokenKind::RightBracket) {
                     self.advance_token();
 
                     break;

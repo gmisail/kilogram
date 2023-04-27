@@ -3,19 +3,13 @@ use std::collections::BTreeSet;
 use crate::ast::untyped::{ast_type::AstType, untyped_node::UntypedNode};
 
 pub struct RecordTemplate {
-    name: String,
     type_params: Vec<String>,
     fields: Vec<(String, AstType)>,
 }
 
 impl RecordTemplate {
-    pub fn new(
-        name: String,
-        type_params: Vec<String>,
-        fields: Vec<(String, AstType)>,
-    ) -> RecordTemplate {
+    pub fn new(type_params: Vec<String>, fields: Vec<(String, AstType)>) -> RecordTemplate {
         RecordTemplate {
-            name,
             type_params,
             fields,
         }
@@ -27,17 +21,13 @@ impl RecordTemplate {
                 let result = subject_type.substitute_type_parameter(type_name, subtituted_type);
 
                 self.substitute_all(result, tail)
-            },
+            }
 
-            [] => subject_type
+            [] => subject_type,
         }
     }
 
-    pub fn substitute(
-        &self,
-        variants: &mut BTreeSet<AstType>,
-        body: UntypedNode,
-    ) -> UntypedNode {
+    pub fn substitute(&self, variants: &mut BTreeSet<AstType>, body: UntypedNode) -> UntypedNode {
         if variants.len() == 0 {
             body
         } else {
@@ -49,7 +39,8 @@ impl RecordTemplate {
                 panic!("Expected type be generic.")
             };
 
-            let substitution_pairs = self.type_params
+            let substitution_pairs = self
+                .type_params
                 .iter()
                 .cloned()
                 .zip(types.iter().cloned())
@@ -60,11 +51,17 @@ impl RecordTemplate {
                 self.fields
                     .iter()
                     .map(|(field_name, field_type)| {
-                        (field_name.clone(), self.substitute_all(field_type.clone(), &substitution_pairs))
+                        let original_type =
+                            self.substitute_all(field_type.clone(), &substitution_pairs);
+
+                        (
+                            field_name.clone(),
+                            original_type.convert_generic_to_concrete(),
+                        )
                     })
                     .collect(),
                 self.type_params.clone(),
-                Box::new(self.substitute(variants, body))
+                Box::new(self.substitute(variants, body)),
             )
         }
     }

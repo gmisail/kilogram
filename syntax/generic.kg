@@ -13,6 +13,8 @@ end
 let int_pair = Pair[int, int] { first: 100, second: 200 }
 let float_pair = Pair[float, float] { first: 1.23, second: 4.56 }
 
+let bad_pair = Pair[string, Pair[int, float]] { first: "hello!", second: Pair[int, float] { first: 0, second: 1.23 } }
+
 let test_num = Concrete { num: 100 }
 
 0
