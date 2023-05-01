@@ -206,7 +206,12 @@ impl GenericPhase {
                 } else {
                     UntypedNode::RecordDeclaration(
                         name.clone(),
-                        fields.clone(),
+                        fields
+                            .iter()
+                            .map(|(field_name, field_type)| {
+                                (field_name.clone(), field_type.convert_generic_to_concrete())
+                            })
+                            .collect(),
                         Vec::new(),
                         Box::new(self.expand_generic_declarations(body)),
                     )
@@ -347,6 +352,10 @@ impl PreprocessPhase for GenericPhase {
         self.find_unique_types(root);
 
         // Once these are found, convert them into concrete type declarations.
-        self.expand_generic_declarations(root)
+        let res = self.expand_generic_declarations(root);
+
+        println!("{res:#?}");
+
+        res
     }
 }

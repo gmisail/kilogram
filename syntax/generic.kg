@@ -7,26 +7,19 @@ record Pair['T, 'S]
 end
 
 record Concrete 
-	num: int
+	num: int,
+	values: Pair[int, int]
 end
 
 let int_pair = Pair[int, int] { first: 100, second: 200 }
 let float_pair = Pair[float, float] { first: 1.23, second: 4.56 }
 
-let complex_pair = Pair[
-	string, 
-	Pair[int, Pair[string, string]]
-] { 
-	first: "hello!", 
-	second: Pair[int, Pair[string, string]] { 
-		first: 0, 
-		second: Pair[string, string] {
-			first: "hello",
-			second: "world"
-		} 
-	} 
+let test_num = Concrete { 
+	num: 100,
+	values: Pair[int, int] {
+		first: 0,
+		second: 1
+	}
 }
-
-let test_num = Concrete { num: 100 }
 
 0
