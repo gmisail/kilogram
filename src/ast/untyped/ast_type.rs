@@ -30,6 +30,7 @@ impl AstType {
                     .collect(),
                 Box::new(return_type.substitute_type_parameter(param, new_type)),
             ),
+
             AstType::Record(fields) => AstType::Record(
                 fields
                     .iter()
@@ -46,7 +47,7 @@ impl AstType {
 
     pub fn convert_generic_to_concrete(&self) -> AstType {
         match self {
-            AstType::Base(_) => self.clone(),
+            AstType::Base(name) => AstType::Base(name.replace("'", "param_")), 
 
             AstType::Generic(name, sub_types) => {
                 let concrete = AstType::Generic(

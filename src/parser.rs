@@ -603,10 +603,54 @@ impl Parser {
         }
     }
 
+    fn parse_type_params(&mut self) -> Result<Vec<String>, String> {
+        let mut type_params = Vec::new();
+
+        if self.match_token(&TokenKind::LeftBracket) {
+            self.advance_token();
+
+            loop {
+                let identifier = self.expect_token(&TokenKind::Identifier("".to_string()))?;
+                let type_param = match identifier {
+                    Some(t) => match &t.kind {
+                        TokenKind::Identifier(literal) => literal.clone(),
+                        _ => {
+                            return Err(format!(
+                                "Expected type parameter, got {} instead.",
+                                t.kind
+                            ))
+                        }
+                    },
+                    None => {
+                        return Err(
+                            "Reached end of input while parsing UntypedNode.".to_string()
+                        )
+                    }
+                };
+
+                type_params.push(type_param);
+
+                if self.match_token(&TokenKind::Comma) {
+                    // Consume a comma after a type, implies there are multiple.
+                    self.advance_token();
+                } else {
+                    // Not a comma? Then we must be done.
+                    self.expect_token(&TokenKind::RightBracket)?;
+
+                    break;
+                }
+            }
+        }
+
+        Ok(type_params)
+    }
+
     fn parse_function_expression(&mut self) -> Result<UntypedNode, String> {
         if self.match_token(&TokenKind::Function) {
             // Consume 'function' keyword.
             self.advance_token();
+
+            let type_params = self.parse_type_params()?;
 
             self.expect_token(&TokenKind::LeftParen)?;
 
@@ -658,7 +702,7 @@ impl Parser {
             self.expect_token(&TokenKind::End)?;
 
             Ok(UntypedNode::Function(
-                "anonymous".to_string(),
+                type_params,
                 function_type,
                 arguments,
                 Box::new(function_body),
@@ -808,43 +852,7 @@ impl Parser {
                 }
             };
 
-            let mut type_params = Vec::new();
-
-            if self.match_token(&TokenKind::LeftBracket) {
-                self.advance_token();
-
-                loop {
-                    let identifier = self.expect_token(&TokenKind::Identifier("".to_string()))?;
-                    let type_param = match identifier {
-                        Some(t) => match &t.kind {
-                            TokenKind::Identifier(literal) => literal.clone(),
-                            _ => {
-                                return Err(format!(
-                                    "Expected type parameter, got {} instead.",
-                                    t.kind
-                                ))
-                            }
-                        },
-                        None => {
-                            return Err(
-                                "Reached end of input while parsing UntypedNode.".to_string()
-                            )
-                        }
-                    };
-
-                    type_params.push(type_param);
-
-                    if self.match_token(&TokenKind::Comma) {
-                        // Consume a comma after a type, implies there are multiple.
-                        self.advance_token();
-                    } else {
-                        // Not a comma? Then we must be done.
-                        self.expect_token(&TokenKind::RightBracket)?;
-
-                        break;
-                    }
-                }
-            }
+            let type_params = self.parse_type_params()?;
 
             // If we immediately get a 'end' don't bother parsing any fields.
             if !self.match_token(&TokenKind::End) {

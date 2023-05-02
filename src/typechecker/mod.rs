@@ -308,16 +308,12 @@ impl Typechecker {
 
                 if let DataType::TypeParameter(type_param) = &**defined_type {
                     if let Some(bound_type) = type_param_bindings.get(type_param) {
-                        println!("BOUND TO: {bound_type:#?}, ACTUAL: {actual_type:#?}");
-
                         if *bound_type != actual_type.clone() {
                             return Err(format!("Type parameter {type_param} previously bound to {bound_type} but got {actual_type} instead."));
                         }
 
                         continue;
                     } else {
-                        println!("INSERTING: {type_param} -> {actual_type:#?}");
-
                         type_param_bindings.insert(type_param.clone(), actual_type);
                     }
                 } else if expected_type != actual_type.clone() {

@@ -6,20 +6,13 @@ record Pair['T, 'S]
 	second: 'S
 end
 
-record Concrete 
-	num: int,
-	values: Pair[int, int]
+let make_pair = function(first: 'T, second: 'S): Pair['T, 'S] 
+	Pair['T, 'S] {
+		first: first,
+		second: second
+	}
 end
 
-let int_pair = Pair[int, int] { first: 100, second: 200 }
-let float_pair = Pair[float, float] { first: 1.23, second: 4.56 }
-
-let test_num = Concrete { 
-	num: 100,
-	values: Pair[int, int] {
-		first: 0,
-		second: 1
-	}
-}
+make_pair(10, 20)
 
 0

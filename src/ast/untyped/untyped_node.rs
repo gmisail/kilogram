@@ -51,7 +51,7 @@ pub enum UntypedNode {
         Box<UntypedNode>,
         bool,
     ),
-    Function(String, AstType, Vec<(String, AstType)>, Box<UntypedNode>),
+    Function(Vec<String>, AstType, Vec<(String, AstType)>, Box<UntypedNode>),
 
     Extern(String, AstType, Box<UntypedNode>),
 }
@@ -94,8 +94,8 @@ impl Display for UntypedNode {
                 "(Let, name: '{name}', value: {value}, body: {body}, is_recursive: {is_recursive})"
             ),
 
-            UntypedNode::Function(name, _, _, value) => {
-                format!("(Function, name: '{name}', value: {value})")
+            UntypedNode::Function(_, _, _, value) => {
+                format!("(Function, value: {value})")
             }
 
             UntypedNode::Get(name, expr) => format!("(Get, name: '{name}', parent: {expr})"),
