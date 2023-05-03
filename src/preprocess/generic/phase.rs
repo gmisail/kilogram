@@ -10,7 +10,9 @@ pub struct GenericPhase {
     // Ensures uniqueness without needing to check every t
     all_types: BTreeSet<AstType>,
     types: HashMap<String, Vec<AstType>>,
+
     templates: HashMap<String, RecordTemplate>,
+    // TODO: add function templates
 }
 
 impl GenericPhase {
@@ -296,13 +298,31 @@ impl GenericPhase {
 
             UntypedNode::FunctionDeclaration(
                 name,
-                _type_params,
-                _return_type,
-                _arguments,
-                _func_body,
-                _body,
+                type_params,
+                return_type,
+                arguments,
+                func_body,
+                body,
             ) => {
-                todo!("make monomorphized copies for {name}...")
+                if !type_params.is_empty() {
+                    todo!("make monomorphized copies for {name}...")
+                } else {
+                    // Not generic? Don't apply any substitutions, just convert types to concrete
+                    // and recurse.
+                    UntypedNode::FunctionDeclaration(
+                        name.clone(), 
+                        Vec::new(), 
+                        return_type.convert_generic_to_concrete(),
+                        arguments
+                            .iter() 
+                            .map(|(arg_name, arg_type)| {
+                                (arg_name.clone(), arg_type.convert_generic_to_concrete())
+                            })
+                            .collect(),
+                        Box::new(self.expand_generic_declarations(func_body)), 
+                        Box::new(self.expand_generic_declarations(body))
+                    )
+                }
             }
 
             UntypedNode::FunctionCall(parent, arguments) => UntypedNode::FunctionCall(
