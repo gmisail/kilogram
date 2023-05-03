@@ -58,6 +58,19 @@ impl Parser {
         }
     }
 
+    fn parse_name(&mut self) -> Result<String, String> {
+        let identifier = self.expect_token(&TokenKind::Identifier("".to_string()))?;
+        match identifier {
+            Some(t) => match &t.kind {
+                TokenKind::Identifier(literal) => Ok(literal.clone()),
+                _ => Err(format!("Expected identifier, got {} instead.", t.kind)),
+            },
+            None => {
+                Err("Reached end of input while parsing UntypedNode.".to_string())
+            }
+        }
+    }
+
     fn parse_boolean(&mut self, value: bool) -> Result<UntypedNode, String> {
         self.advance_token();
         Ok(UntypedNode::Boolean(value))
@@ -155,17 +168,7 @@ impl Parser {
         // If we immediately get a '}', don't bother parsing any fields.
         if !self.match_token(&TokenKind::RightBrace) {
             loop {
-                let identifier = self.expect_token(&TokenKind::Identifier("".to_string()))?;
-                let name = match identifier {
-                    Some(t) => match &t.kind {
-                        TokenKind::Identifier(literal) => literal.clone(),
-                        _ => return Err(format!("Expected identifier, got {} instead.", t.kind)),
-                    },
-                    None => {
-                        return Err("Reached end of input while parsing UntypedNode.".to_string())
-                    }
-                };
-
+                let name = self.parse_name()?;
                 self.expect_token(&TokenKind::Colon)?;
 
                 let value = self.parse_expression()?;
@@ -217,16 +220,7 @@ impl Parser {
         // If we immediately get a '}', don't bother parsing any fields.
         if !self.match_token(&TokenKind::RightBrace) {
             loop {
-                let identifier = self.expect_token(&TokenKind::Identifier("".to_string()))?;
-                let name = match identifier {
-                    Some(t) => match &t.kind {
-                        TokenKind::Identifier(literal) => literal.clone(),
-                        _ => return Err(format!("Expected identifier, got {} instead.", t.kind)),
-                    },
-                    None => {
-                        return Err("Reached end of input while parsing UntypedNode.".to_string())
-                    }
-                };
+                let name = self.parse_name()?;
 
                 self.expect_token(&TokenKind::Colon)?;
 
@@ -291,14 +285,7 @@ impl Parser {
                 // expect_token only compares token *kind*, thus
                 // the value here doesn't matter-- we just use an
                 // empty string.
-                let identifier = self.expect_token(&TokenKind::Identifier("".to_string()))?;
-                let name = match identifier {
-                    Some(t) => match &t.kind {
-                        TokenKind::Identifier(literal) => literal,
-                        _ => return Err("Expected identifier after '.'.".to_string()),
-                    },
-                    None => return Err("Expected identifier after '.', got nothing.".to_string()),
-                };
+                let name = self.parse_name()?;
 
                 expr = UntypedNode::Get(name.clone(), Box::new(expr));
             } else {
@@ -523,16 +510,7 @@ impl Parser {
         // If we immediately get a '}', don't bother parsing any fields.
         if !self.match_token(&TokenKind::RightBrace) {
             loop {
-                let identifier = self.expect_token(&TokenKind::Identifier("".to_string()))?;
-                let name = match identifier {
-                    Some(t) => match &t.kind {
-                        TokenKind::Identifier(literal) => literal.clone(),
-                        _ => return Err(format!("Expected identifier, got {} instead.", t.kind)),
-                    },
-                    None => {
-                        return Err("Reached end of input while parsing UntypedNode.".to_string())
-                    }
-                };
+                let name = self.parse_name()?;
 
                 self.expect_token(&TokenKind::Colon)?;
 
@@ -610,24 +588,7 @@ impl Parser {
             self.advance_token();
 
             loop {
-                let identifier = self.expect_token(&TokenKind::Identifier("".to_string()))?;
-                let type_param = match identifier {
-                    Some(t) => match &t.kind {
-                        TokenKind::Identifier(literal) => literal.clone(),
-                        _ => {
-                            return Err(format!(
-                                "Expected type parameter, got {} instead.",
-                                t.kind
-                            ))
-                        }
-                    },
-                    None => {
-                        return Err(
-                            "Reached end of input while parsing UntypedNode.".to_string()
-                        )
-                    }
-                };
-
+                let type_param = self.parse_name()?;
                 type_params.push(type_param);
 
                 if self.match_token(&TokenKind::Comma) {
@@ -650,6 +611,8 @@ impl Parser {
             // Consume 'function' keyword.
             self.advance_token();
 
+            // TODO: optionally parse function name 
+
             let type_params = self.parse_type_params()?;
 
             self.expect_token(&TokenKind::LeftParen)?;
@@ -659,20 +622,7 @@ impl Parser {
             // If we immediately get a ')', don't bother parsing any arguments.
             if !self.match_token(&TokenKind::RightParen) {
                 loop {
-                    let identifier = self.expect_token(&TokenKind::Identifier("".to_string()))?;
-                    let name = match identifier {
-                        Some(t) => match &t.kind {
-                            TokenKind::Identifier(literal) => literal.clone(),
-                            _ => {
-                                return Err(format!("Expected identifier, got {} instead.", t.kind))
-                            }
-                        },
-                        None => {
-                            return Err(
-                                "Reached end of input while parsing UntypedNode.".to_string()
-                            )
-                        }
-                    };
+                    let name = self.parse_name()?;
 
                     self.expect_token(&TokenKind::Colon)?;
 
@@ -702,6 +652,7 @@ impl Parser {
             self.expect_token(&TokenKind::End)?;
 
             Ok(UntypedNode::Function(
+                None,
                 type_params,
                 function_type,
                 arguments,

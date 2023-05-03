@@ -6,11 +6,8 @@ record Pair['T, 'S]
 	second: 'S
 end
 
-let make_pair = function(first: 'T, second: 'S): Pair['T, 'S] 
-	Pair['T, 'S] {
-		first: first,
-		second: second
-	}
+function make_pair['T, 'S](first: 'T, second: 'S): Pair['T, 'S]
+	Pair['T, 'S] { first: first, second: second }
 end
 
 make_pair(10, 20)
