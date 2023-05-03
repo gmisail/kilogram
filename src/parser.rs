@@ -65,9 +65,7 @@ impl Parser {
                 TokenKind::Identifier(literal) => Ok(literal.clone()),
                 _ => Err(format!("Expected identifier, got {} instead.", t.kind)),
             },
-            None => {
-                Err("Reached end of input while parsing UntypedNode.".to_string())
-            }
+            None => Err("Reached end of input while parsing UntypedNode.".to_string()),
         }
     }
 
@@ -611,9 +609,16 @@ impl Parser {
             // Consume 'function' keyword.
             self.advance_token();
 
-            // TODO: optionally parse function name 
+            let name = match self.parse_name() {
+                Ok(name) => Some(name),
+                Err(_) => None,
+            };
 
             let type_params = self.parse_type_params()?;
+
+            if !type_params.is_empty() && name.is_none() {
+                return Err("Closures cannot have type parameters.".to_string());
+            }
 
             self.expect_token(&TokenKind::LeftParen)?;
 
@@ -651,13 +656,25 @@ impl Parser {
 
             self.expect_token(&TokenKind::End)?;
 
-            Ok(UntypedNode::Function(
-                None,
-                type_params,
-                function_type,
-                arguments,
-                Box::new(function_body),
-            ))
+            // Named functions are stored separately from closures.
+            if let Some(func_name) = name {
+                let body = self.parse_expression()?;
+
+                Ok(UntypedNode::FunctionDeclaration(
+                    func_name,
+                    type_params,
+                    function_type,
+                    arguments,
+                    Box::new(function_body),
+                    Box::new(body),
+                ))
+            } else {
+                Ok(UntypedNode::Function(
+                    function_type,
+                    arguments,
+                    Box::new(function_body),
+                ))
+            }
         } else {
             self.parse_logical_or()
         }

@@ -11,5 +11,3 @@ function make_pair['T, 'S](first: 'T, second: 'S): Pair['T, 'S]
 end
 
 make_pair(10, 20)
-
-0

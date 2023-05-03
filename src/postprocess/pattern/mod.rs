@@ -28,7 +28,7 @@ impl Pattern {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap};
     use std::rc::Rc;
 
     use crate::postprocess::pattern::Pattern;
@@ -61,7 +61,7 @@ mod tests {
             node_type.clone(),
             String::from("my_enum"),
             vec![TypedNode::Variable(node_type, String::from("my_var"))],
-            HashMap::new(),
+            BTreeMap::new(),
         );
 
         let var_pattern = Pattern::new(&tree);

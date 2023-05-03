@@ -12,8 +12,8 @@ pub fn generate_box_constructor(var_type: Rc<DataType>) -> String {
     body.push_str(&format!(
         "{resolved_type}* tmp = ({resolved_type}*) malloc(sizeof({resolved_type}));\n"
     ));
-    body.push_str(&"*tmp = data;\n".to_string());
-    body.push_str(&"return (void*) tmp;".to_string());
+    body.push_str("*tmp = data;\n");
+    body.push_str("return (void*) tmp;");
 
     format!("{signature}{{\n{body}\n}}\n")
 }

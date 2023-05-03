@@ -32,8 +32,6 @@ pub enum UntypedNode {
         Box<UntypedNode>,
     ),
 
-    FunctionCall(Box<UntypedNode>, Vec<UntypedNode>),
-
     // Operators
     Unary(Box<UntypedNode>, UnaryOperator),
     Binary(Box<UntypedNode>, BinaryOperator, Box<UntypedNode>),
@@ -51,7 +49,17 @@ pub enum UntypedNode {
         Box<UntypedNode>,
         bool,
     ),
-    Function(Option<String>, Vec<String>, AstType, Vec<(String, AstType)>, Box<UntypedNode>),
+
+    Function(AstType, Vec<(String, AstType)>, Box<UntypedNode>),
+    FunctionDeclaration(
+        String,
+        Vec<String>,
+        AstType,
+        Vec<(String, AstType)>,
+        Box<UntypedNode>,
+        Box<UntypedNode>,
+    ),
+    FunctionCall(Box<UntypedNode>, Vec<UntypedNode>),
 
     Extern(String, AstType, Box<UntypedNode>),
 }
@@ -94,8 +102,14 @@ impl Display for UntypedNode {
                 "(Let, name: '{name}', value: {value}, body: {body}, is_recursive: {is_recursive})"
             ),
 
-            UntypedNode::Function(name, _, _, _, value) => {
-                format!("(Function, name: {name:?}, value: {value})")
+            UntypedNode::Function(_, _, value) => {
+                format!("(Function, value: {value})")
+            }
+
+            UntypedNode::FunctionDeclaration(name, _, _, _, func_body, body) => {
+                format!(
+                    "(FunctionDeclaration, name: {name}, function_body: {func_body}, body: {body})"
+                )
             }
 
             UntypedNode::Get(name, expr) => format!("(Get, name: '{name}', parent: {expr})"),

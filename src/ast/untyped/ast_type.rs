@@ -47,7 +47,7 @@ impl AstType {
 
     pub fn convert_generic_to_concrete(&self) -> AstType {
         match self {
-            AstType::Base(name) => AstType::Base(name.replace("'", "param_")), 
+            AstType::Base(name) => AstType::Base(name.replace('\'', "param_")),
 
             AstType::Generic(name, sub_types) => {
                 let concrete = AstType::Generic(

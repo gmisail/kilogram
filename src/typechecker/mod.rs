@@ -560,7 +560,7 @@ impl Typechecker {
                     None => match &**var_value {
                         // Assume that the type of the variable is the same as the function's type
                         // signature.
-                        UntypedNode::Function(_, func_type, func_params, _) => {
+                        UntypedNode::Function(func_type, func_params, _) => {
                             let mut parameter_types = Vec::new();
 
                             // Resolve types & add parameters to scope.
@@ -612,7 +612,7 @@ impl Typechecker {
                 }
             }
 
-            UntypedNode::Function(_, ast_return_type, ast_argument_types, body) => {
+            UntypedNode::Function(ast_return_type, ast_argument_types, body) => {
                 let mut argument_types = Vec::new();
                 let mut typed_arguments = Vec::new();
 
@@ -735,6 +735,17 @@ impl Typechecker {
 
                     _ => Err("Cannot call non-function.".to_string()),
                 }
+            }
+
+            UntypedNode::FunctionDeclaration(
+                _name,
+                _type_params,
+                _ast_return_type,
+                _ast_arguments,
+                _func_body,
+                _body,
+            ) => {
+                todo!("add type checking for function declarations")
             }
 
             UntypedNode::RecordInstance(name, _type_params, fields) => {

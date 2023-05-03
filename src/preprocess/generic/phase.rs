@@ -31,7 +31,7 @@ impl GenericPhase {
     fn resolve_generic_type(&mut self, ast_type: &AstType) {
         match ast_type {
             // Base types (int, float, etc...) can't be generic.
-            AstType::Base(_) => return,
+            AstType::Base(_) => (),
 
             AstType::Generic(name, sub_types) => {
                 for sub_type in sub_types {
@@ -63,7 +63,7 @@ impl GenericPhase {
             self.all_types.insert(ast_type.clone());
 
             self.types
-                .entry(name.clone())
+                .entry(name)
                 .or_insert(Vec::new())
                 .push(ast_type);
         }
@@ -81,7 +81,6 @@ impl GenericPhase {
             | UntypedNode::Str(..)
             | UntypedNode::Boolean(..)
             | UntypedNode::Get(..) => {
-                return;
             }
 
             UntypedNode::Group(body) | UntypedNode::Extern(_, _, body) => {
@@ -126,7 +125,7 @@ impl GenericPhase {
                 self.find_unique_types(else_expr);
             }
 
-            UntypedNode::Function(_, return_type, arguments, body) => {
+            UntypedNode::Function(return_type, arguments, body) => {
                 // Find generic types in both the return type and arguments.
                 self.resolve_generic_type(return_type);
 
@@ -143,6 +142,28 @@ impl GenericPhase {
                 for argument in arguments {
                     self.find_unique_types(argument);
                 }
+            }
+
+            UntypedNode::FunctionDeclaration(_, _, return_type, arguments, func_body, body) => {
+                // Find generic types in both the return type and arguments.
+                self.resolve_generic_type(return_type);
+
+                for (_, arg_type) in arguments {
+                    self.resolve_generic_type(arg_type);
+                }
+
+                // TODO: how do we handle generic instances within the function body?
+                //       for instance, if we have:
+                //
+                //       function make_pair['T, 'S](...): Pair['T, 'S]
+                //          Pair['T, 'S] { ... }
+                //       end
+                //
+                //       How do we know what types to register for Pair? Separate generic
+                //       resolution phases for records, types, and enums maybe?
+
+                self.find_unique_types(func_body);
+                self.find_unique_types(body);
             }
 
             UntypedNode::RecordInstance(name, type_params, fields) => {
@@ -267,13 +288,21 @@ impl GenericPhase {
                 Box::new(self.expand_generic_declarations(else_expr)),
             ),
 
-            UntypedNode::Function(func_type, return_type, arguments, body) => {
-                UntypedNode::Function(
-                    func_type.clone(),
-                    return_type.clone(),
-                    arguments.clone(),
-                    Box::new(self.expand_generic_declarations(body)),
-                )
+            UntypedNode::Function(return_type, arguments, body) => UntypedNode::Function(
+                return_type.clone(),
+                arguments.clone(),
+                Box::new(self.expand_generic_declarations(body)),
+            ),
+
+            UntypedNode::FunctionDeclaration(
+                name,
+                _type_params,
+                _return_type,
+                _arguments,
+                _func_body,
+                _body,
+            ) => {
+                todo!("make monomorphized copies for {name}...")
             }
 
             UntypedNode::FunctionCall(parent, arguments) => UntypedNode::FunctionCall(
