@@ -3,14 +3,15 @@ use std::collections::{BTreeSet, HashMap};
 use crate::ast::untyped::ast_type::AstType;
 use crate::ast::untyped::untyped_node::UntypedNode;
 
-use crate::preprocess::generic::template::RecordTemplate;
+use crate::preprocess::generic::template::Template;
 use crate::preprocess::PreprocessPhase;
+
+use super::record_template::RecordTemplate;
 
 pub struct GenericPhase {
     // Ensures uniqueness without needing to check every t
     all_types: BTreeSet<AstType>,
     types: HashMap<String, Vec<AstType>>,
-
     templates: HashMap<String, RecordTemplate>,
     // TODO: add function templates
 }
@@ -64,10 +65,7 @@ impl GenericPhase {
         if !self.all_types.contains(&ast_type) {
             self.all_types.insert(ast_type.clone());
 
-            self.types
-                .entry(name)
-                .or_insert(Vec::new())
-                .push(ast_type);
+            self.types.entry(name).or_insert(Vec::new()).push(ast_type);
         }
     }
 
@@ -83,6 +81,7 @@ impl GenericPhase {
             | UntypedNode::Str(..)
             | UntypedNode::Boolean(..)
             | UntypedNode::Get(..) => {
+                return;
             }
 
             UntypedNode::Group(body) | UntypedNode::Extern(_, _, body) => {
@@ -310,17 +309,17 @@ impl GenericPhase {
                     // Not generic? Don't apply any substitutions, just convert types to concrete
                     // and recurse.
                     UntypedNode::FunctionDeclaration(
-                        name.clone(), 
-                        Vec::new(), 
+                        name.clone(),
+                        Vec::new(),
                         return_type.convert_generic_to_concrete(),
                         arguments
-                            .iter() 
+                            .iter()
                             .map(|(arg_name, arg_type)| {
                                 (arg_name.clone(), arg_type.convert_generic_to_concrete())
                             })
                             .collect(),
-                        Box::new(self.expand_generic_declarations(func_body)), 
-                        Box::new(self.expand_generic_declarations(body))
+                        Box::new(self.expand_generic_declarations(func_body)),
+                        Box::new(self.expand_generic_declarations(body)),
                     )
                 }
             }
@@ -363,8 +362,6 @@ impl GenericPhase {
             }
 
             UntypedNode::EnumDeclaration(name, variants, type_params, body) => {
-                // TODO: handle generics
-
                 UntypedNode::EnumDeclaration(
                     name.clone(),
                     variants
