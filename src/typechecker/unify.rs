@@ -29,7 +29,7 @@ fn unify_variant(
 
                         // In case we have nested Constructors (i.e. FunctionCall), recursively
                         // unify them.
-                        UntypedNode::FunctionCall(parent, arguments) => {
+                        UntypedNode::FunctionCall(parent, _, arguments) => {
                             if let UntypedNode::Variable(name) = &**parent {
                                 unbound.extend(unify_variant(name, variants, arguments)?);
                             } else {
@@ -57,7 +57,7 @@ pub fn unify_enum(
 ) -> Result<HashMap<String, Rc<DataType>>, String> {
     if let UntypedNode::Variable(name) = expression {
         unify_variant(name, variants, &[])
-    } else if let UntypedNode::FunctionCall(parent, arguments) = expression {
+    } else if let UntypedNode::FunctionCall(parent, _, arguments) = expression {
         if let UntypedNode::Variable(name) = &**parent {
             unify_variant(name, variants, arguments)
         } else {

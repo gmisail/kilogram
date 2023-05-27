@@ -28,7 +28,7 @@ impl Pattern {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{BTreeMap, HashMap};
+    use std::collections::BTreeMap;
     use std::rc::Rc;
 
     use crate::postprocess::pattern::Pattern;

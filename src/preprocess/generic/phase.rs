@@ -6,14 +6,15 @@ use crate::ast::untyped::untyped_node::UntypedNode;
 use crate::preprocess::generic::template::Template;
 use crate::preprocess::PreprocessPhase;
 
+use super::function_template::FunctionTemplate;
 use super::record_template::RecordTemplate;
 
 pub struct GenericPhase {
     // Ensures uniqueness without needing to check every t
     all_types: BTreeSet<AstType>,
     types: HashMap<String, Vec<AstType>>,
-    templates: HashMap<String, RecordTemplate>,
-    // TODO: add function templates
+    record_templates: HashMap<String, RecordTemplate>,
+    function_templates: HashMap<String, FunctionTemplate>,
 }
 
 impl GenericPhase {
@@ -21,7 +22,8 @@ impl GenericPhase {
         GenericPhase {
             all_types: BTreeSet::new(),
             types: HashMap::new(),
-            templates: HashMap::new(),
+            record_templates: HashMap::new(),
+            function_templates: HashMap::new(),
         }
     }
 }
@@ -91,7 +93,7 @@ impl GenericPhase {
             UntypedNode::RecordDeclaration(name, fields, type_params, body) => {
                 // If we have more than one type parameter, then this is a generic record.
                 if !type_params.is_empty() {
-                    self.templates.insert(
+                    self.record_templates.insert(
                         name.clone(),
                         RecordTemplate::new(type_params.clone(), fields.clone()),
                     );
@@ -137,31 +139,48 @@ impl GenericPhase {
                 self.find_unique_types(body);
             }
 
-            UntypedNode::FunctionCall(parent, arguments) => {
+            UntypedNode::FunctionCall(parent, sub_types, arguments) => {
                 self.find_unique_types(parent);
+
+                for sub_type in sub_types {
+                    self.resolve_generic_type(sub_type)
+                }
 
                 for argument in arguments {
                     self.find_unique_types(argument);
                 }
             }
 
-            UntypedNode::FunctionDeclaration(_, _, return_type, arguments, func_body, body) => {
+            UntypedNode::FunctionDeclaration(
+                name,
+                type_params,
+                return_type,
+                func_params,
+                func_body,
+                body,
+            ) => {
                 // Find generic types in both the return type and arguments.
                 self.resolve_generic_type(return_type);
 
-                for (_, arg_type) in arguments {
-                    self.resolve_generic_type(arg_type);
+                for (_, param_type) in func_params {
+                    self.resolve_generic_type(param_type);
                 }
 
-                // TODO: how do we handle generic instances within the function body?
-                //       for instance, if we have:
-                //
-                //       function make_pair['T, 'S](...): Pair['T, 'S]
-                //          Pair['T, 'S] { ... }
-                //       end
-                //
-                //       How do we know what types to register for Pair? Separate generic
-                //       resolution phases for records, types, and enums maybe?
+                if !type_params.is_empty() {
+                    if let Some(_) = self.function_templates.insert(
+                        name.clone(),
+                        FunctionTemplate::new(
+                            type_params.clone(),
+                            func_params.clone(),
+                            return_type.clone(),
+                            (**func_body).clone(),
+                        ),
+                    ) {
+                        panic!(
+                            "TODO: handle this gracefully. This function template already exists."
+                        );
+                    }
+                }
 
                 self.find_unique_types(func_body);
                 self.find_unique_types(body);
@@ -221,7 +240,7 @@ impl GenericPhase {
                     // Expand the rest of the AST first
                     let expanded_body = self.expand_generic_declarations(body);
 
-                    let template = self.templates.get(name).unwrap();
+                    let template = self.record_templates.get(name).unwrap();
                     let types = self.types.get(name).unwrap().clone();
 
                     template.substitute(&types, expanded_body)
@@ -324,13 +343,46 @@ impl GenericPhase {
                 }
             }
 
-            UntypedNode::FunctionCall(parent, arguments) => UntypedNode::FunctionCall(
-                Box::new(self.expand_generic_declarations(parent)),
-                arguments
-                    .iter()
-                    .map(|argument| self.expand_generic_declarations(argument))
-                    .collect(),
-            ),
+            UntypedNode::FunctionCall(parent, sub_types, arguments) => {
+                // If generic, we can assume that the function's name must be a named function. Otherwise, keep expanding
+                // as normal
+                let new_name = if sub_types.is_empty() {
+                    self.expand_generic_declarations(parent)
+                } else {
+                    if let UntypedNode::Variable(function_name) = &**parent {
+                        // Consider the following example:
+                        //
+                        //      make_pair[int, int](10, 20)
+                        //
+                        // After monomorphization, this call is converted into a concrete form
+                        // with *no* subtypes. Therefore, the call looks like this:
+                        //
+                        //      make_pair_int_int(10, 20)
+                        //
+                        let concrete_name = AstType::Generic(
+                            function_name.clone(),
+                            sub_types
+                                .iter()
+                                .map(|sub_type| sub_type.convert_generic_to_concrete())
+                                .collect(),
+                        )
+                        .to_string();
+
+                        UntypedNode::Variable(concrete_name)
+                    } else {
+                        panic!("Generic functions must be named functions.")
+                    }
+                };
+
+                UntypedNode::FunctionCall(
+                    Box::new(new_name),
+                    Vec::new(),
+                    arguments
+                        .iter()
+                        .map(|argument| self.expand_generic_declarations(argument))
+                        .collect(),
+                )
+            }
 
             UntypedNode::RecordInstance(name, type_params, fields) => {
                 let new_name = if !type_params.is_empty() {

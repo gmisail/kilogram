@@ -59,7 +59,7 @@ pub enum UntypedNode {
         Box<UntypedNode>,
         Box<UntypedNode>,
     ),
-    FunctionCall(Box<UntypedNode>, Vec<UntypedNode>),
+    FunctionCall(Box<UntypedNode>, Vec<AstType>, Vec<UntypedNode>),
 
     Extern(String, AstType, Box<UntypedNode>),
 }
@@ -114,7 +114,7 @@ impl Display for UntypedNode {
 
             UntypedNode::Get(name, expr) => format!("(Get, name: '{name}', parent: {expr})"),
 
-            UntypedNode::FunctionCall(name, arguments) => {
+            UntypedNode::FunctionCall(name, _, arguments) => {
                 let argument_list: Vec<String> =
                     arguments.iter().map(|arg| arg.to_string()).collect();
 

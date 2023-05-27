@@ -248,6 +248,28 @@ impl Parser {
     }
 
     fn finish_function_call(&mut self, expr: UntypedNode) -> Result<UntypedNode, String> {
+        let mut sub_types = Vec::new();
+
+        if self.match_token(&TokenKind::LeftBracket) {
+            self.advance_token();
+
+            loop {
+                let sub_type = self.parse_type()?;
+
+                sub_types.push(sub_type);
+
+                if self.match_token(&TokenKind::RightBracket) {
+                    self.advance_token();
+
+                    break;
+                } else {
+                    self.expect_token(&TokenKind::Comma)?;
+                }
+            }
+        }
+
+        self.expect_token(&TokenKind::LeftParen)?;
+
         let mut arguments = vec![];
 
         // If the next token is ')', then there are *no* arguments in
@@ -267,22 +289,41 @@ impl Parser {
 
         self.expect_token(&TokenKind::RightParen)?;
 
-        Ok(UntypedNode::FunctionCall(Box::new(expr), arguments))
+        Ok(UntypedNode::FunctionCall(
+            Box::new(expr),
+            sub_types,
+            arguments,
+        ))
+    }
+
+    // Lookahead to check for the '[...](' pattern, indicating a generic function call. This is
+    // to help distinguish it from the '[...]{' pattern (used by generic records) and '[...]:' (used
+    // by generic enums.)
+    fn is_generic_function_call(&self) -> bool {
+        let mut is_type_param_closed = false;
+
+        for token in self.tokens.iter().skip(self.current) {
+            if is_type_param_closed {
+                return token.kind == TokenKind::LeftParen;
+            }
+
+            if token.kind == TokenKind::RightBracket {
+                is_type_param_closed = true;
+            }
+        }
+
+        false
     }
 
     fn parse_function_call(&mut self) -> Result<UntypedNode, String> {
         let mut expr = self.parse_primary()?;
 
         loop {
-            if self.match_token(&TokenKind::LeftParen) {
-                self.advance_token();
-
+            if self.match_token(&TokenKind::LeftParen) || self.is_generic_function_call() {
                 expr = self.finish_function_call(expr)?;
             } else if self.match_token(&TokenKind::Period) {
                 self.advance_token();
-                // expect_token only compares token *kind*, thus
-                // the value here doesn't matter-- we just use an
-                // empty string.
+
                 let name = self.parse_name()?;
 
                 expr = UntypedNode::Get(name.clone(), Box::new(expr));
