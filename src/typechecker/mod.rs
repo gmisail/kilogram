@@ -857,6 +857,9 @@ impl Typechecker {
             }
 
             UntypedNode::List(_) => panic!("expected list to be converted to Cons operators."),
+            UntypedNode::FunctionInstance(..) => {
+                panic!("expected to have been converted to concrete types")
+            }
         }
     }
 }

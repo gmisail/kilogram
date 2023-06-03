@@ -5,6 +5,7 @@ use crate::ast::untyped::untyped_node::UntypedNode;
 use super::scanner;
 use super::token::{Token, TokenKind};
 
+use crate::ast::untyped::untyped_node::UntypedNode::FunctionInstance;
 use std::mem;
 
 struct Parser {
@@ -90,11 +91,11 @@ impl Parser {
     }
 
     fn parse_identifier(&mut self, name: String) -> Result<UntypedNode, String> {
-        // Consume the identifer token.
+        // Consume the identifier token.
         self.advance_token();
 
         if self.match_token(&TokenKind::LeftBracket) || self.match_token(&TokenKind::LeftBrace) {
-            self.parse_record_instance(name)
+            self.parse_sub_type_instance(name)
         } else {
             Ok(UntypedNode::Variable(name))
         }
@@ -190,7 +191,8 @@ impl Parser {
         Ok(UntypedNode::AnonymousRecord(fields))
     }
 
-    fn parse_record_instance(&mut self, record_type: String) -> Result<UntypedNode, String> {
+    // Parses either a sub-typed function instance or sub-typed record instance.
+    fn parse_sub_type_instance(&mut self, instance_name: String) -> Result<UntypedNode, String> {
         let mut type_params = Vec::new();
         if self.match_token(&TokenKind::LeftBracket) {
             self.advance_token();
@@ -210,41 +212,47 @@ impl Parser {
             }
         }
 
-        // Consume the opening brace.
-        self.advance_token();
-
-        let mut fields = Vec::new();
-
-        // If we immediately get a '}', don't bother parsing any fields.
-        if !self.match_token(&TokenKind::RightBrace) {
-            loop {
-                let name = self.parse_name()?;
-
-                self.expect_token(&TokenKind::Colon)?;
-
-                let value = self.parse_expression()?;
-                fields.push((name, value));
-
-                if self.match_token(&TokenKind::Comma) {
-                    // Consume a comma after a key:value pair, implies there are multiple.
-                    self.advance_token();
-                } else {
-                    // Not a comma? Then we must be done.
-                    self.expect_token(&TokenKind::RightBrace)?;
-
-                    break;
-                }
-            }
+        if !self.match_token(&TokenKind::LeftBrace) {
+            Ok(FunctionInstance(
+                Box::new(UntypedNode::Variable(instance_name)),
+                type_params,
+            ))
         } else {
-            // Consume the closing '}'.
             self.advance_token();
-        }
 
-        Ok(UntypedNode::RecordInstance(
-            record_type,
-            type_params,
-            fields,
-        ))
+            let mut fields = Vec::new();
+
+            // If we immediately get a '}', don't bother parsing any fields.
+            if !self.match_token(&TokenKind::RightBrace) {
+                loop {
+                    let name = self.parse_name()?;
+
+                    self.expect_token(&TokenKind::Colon)?;
+
+                    let value = self.parse_expression()?;
+                    fields.push((name, value));
+
+                    if self.match_token(&TokenKind::Comma) {
+                        // Consume a comma after a key:value pair, implies there are multiple.
+                        self.advance_token();
+                    } else {
+                        // Not a comma? Then we must be done.
+                        self.expect_token(&TokenKind::RightBrace)?;
+
+                        break;
+                    }
+                }
+            } else {
+                // Consume the closing '}'.
+                self.advance_token();
+            }
+
+            Ok(UntypedNode::RecordInstance(
+                instance_name,
+                type_params,
+                fields,
+            ))
+        }
     }
 
     fn finish_function_call(&mut self, expr: UntypedNode) -> Result<UntypedNode, String> {
@@ -291,35 +299,16 @@ impl Parser {
 
         Ok(UntypedNode::FunctionCall(
             Box::new(expr),
-            sub_types,
+            Vec::new(),
             arguments,
         ))
     }
 
-    // Lookahead to check for the '[...](' pattern, indicating a generic function call. This is
-    // to help distinguish it from the '[...]{' pattern (used by generic records) and '[...]:' (used
-    // by generic enums.)
-    fn is_generic_function_call(&self) -> bool {
-        let mut is_type_param_closed = false;
-
-        for token in self.tokens.iter().skip(self.current) {
-            if is_type_param_closed {
-                return token.kind == TokenKind::LeftParen;
-            }
-
-            if token.kind == TokenKind::RightBracket {
-                is_type_param_closed = true;
-            }
-        }
-
-        false
-    }
-
     fn parse_function_call(&mut self) -> Result<UntypedNode, String> {
         let mut expr = self.parse_primary()?;
-
+        
         loop {
-            if self.match_token(&TokenKind::LeftParen) || self.is_generic_function_call() {
+            if self.match_token(&TokenKind::LeftParen) {
                 expr = self.finish_function_call(expr)?;
             } else if self.match_token(&TokenKind::Period) {
                 self.advance_token();

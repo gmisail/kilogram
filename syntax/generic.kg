@@ -1,6 +1,3 @@
-extern print: (string) -> int
-extern int_to_string: (int) -> string
-
 record Pair['T, 'S]
 	first: 'T,
 	second: 'S
@@ -16,4 +13,11 @@ function make_pair['T, 'S](
 	}
 end
 
-make_pair(10, 20)
+let temp_a = make_pair[int, int](10, 20)
+let temp_b = make_pair[int, float](10, 3.14)
+let temp_c = make_pair[float, string](3.14, "PI")
+let temp_d = make_pair[string, int]("PI", 20)
+let temp_e = make_pair[bool, string](true, "TRUE")
+let temp_f = make_pair[int, bool](10, false)
+
+0

@@ -142,8 +142,25 @@ impl GenericPhase {
             UntypedNode::FunctionCall(parent, sub_types, arguments) => {
                 self.find_unique_types(parent);
 
-                for sub_type in sub_types {
-                    self.resolve_generic_type(sub_type)
+                if !sub_types.is_empty() {
+                    for sub_type in sub_types {
+                        self.resolve_generic_type(sub_type);
+                    }
+
+                    if let UntypedNode::Variable(function_name) = &**parent {
+                        // TODO: maybe we should separate this into separate sets, i.e. not mix functions and other types?
+                        self.register_type(
+                            function_name.clone(),
+                            AstType::Generic(function_name.clone(), sub_types.clone()),
+                        );
+
+                        println!(
+                            "inserting new generic type: {} {:#?}",
+                            function_name, sub_types
+                        )
+                    } else {
+                        panic!("Generic functions must be named.")
+                    }
                 }
 
                 for argument in arguments {
@@ -217,6 +234,7 @@ impl GenericPhase {
             }
 
             UntypedNode::AnonymousRecord(..) => todo!("add generic checking to anonymous records"),
+            UntypedNode::FunctionInstance(..) => todo!("add generic checking to generic functions"),
             UntypedNode::CaseOf(_expr, _arms) => todo!("add generic checking to case of"),
         }
     }
@@ -435,7 +453,8 @@ impl GenericPhase {
                     .collect(),
             ),
 
-            UntypedNode::AnonymousRecord(..) => todo!(),
+            UntypedNode::AnonymousRecord(..) => todo!("handle anonymous records"),
+            UntypedNode::FunctionInstance(..) => todo!("handle generic functions"),
 
             UntypedNode::CaseOf(_expr, _arms) => {
                 todo!("add generic checking to case of")

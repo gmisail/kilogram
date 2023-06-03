@@ -60,6 +60,7 @@ pub enum UntypedNode {
         Box<UntypedNode>,
     ),
     FunctionCall(Box<UntypedNode>, Vec<AstType>, Vec<UntypedNode>),
+    FunctionInstance(Box<UntypedNode>, Vec<AstType>),
 
     Extern(String, AstType, Box<UntypedNode>),
 }
@@ -165,6 +166,13 @@ impl Display for UntypedNode {
 
             UntypedNode::EnumDeclaration(name, _, _, body) => {
                 format!("(EnumDeclaration, name: {name}, body: {body})")
+            }
+
+            UntypedNode::FunctionInstance(base, subtypes) => {
+                let generics: Vec<String> =
+                    subtypes.iter().map(|subtype| subtype.to_string()).collect();
+
+                format!("{base}[{}]", generics.join(", "))
             }
 
             UntypedNode::CaseOf(_, _) => todo!(),
