@@ -297,16 +297,12 @@ impl Parser {
 
         self.expect_token(&TokenKind::RightParen)?;
 
-        Ok(UntypedNode::FunctionCall(
-            Box::new(expr),
-            Vec::new(),
-            arguments,
-        ))
+        Ok(UntypedNode::FunctionCall(Box::new(expr), arguments))
     }
 
     fn parse_function_call(&mut self) -> Result<UntypedNode, String> {
         let mut expr = self.parse_primary()?;
-        
+
         loop {
             if self.match_token(&TokenKind::LeftParen) {
                 expr = self.finish_function_call(expr)?;

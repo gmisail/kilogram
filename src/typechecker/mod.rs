@@ -652,7 +652,7 @@ impl Typechecker {
                 }
             }
 
-            UntypedNode::FunctionCall(parent, _, parameters) => {
+            UntypedNode::FunctionCall(parent, parameters) => {
                 let mut typed_arguments = Vec::new();
 
                 for parameter in parameters {

@@ -83,7 +83,6 @@ impl GenericPhase {
             | UntypedNode::Str(..)
             | UntypedNode::Boolean(..)
             | UntypedNode::Get(..) => {
-                return;
             }
 
             UntypedNode::Group(body) | UntypedNode::Extern(_, _, body) => {
@@ -139,25 +138,20 @@ impl GenericPhase {
                 self.find_unique_types(body);
             }
 
-            UntypedNode::FunctionCall(parent, sub_types, arguments) => {
+            UntypedNode::FunctionCall(parent, arguments) => {
                 self.find_unique_types(parent);
 
-                if !sub_types.is_empty() {
+                if let UntypedNode::FunctionInstance(base, sub_types) = &**parent {
                     for sub_type in sub_types {
                         self.resolve_generic_type(sub_type);
                     }
 
-                    if let UntypedNode::Variable(function_name) = &**parent {
+                    if let UntypedNode::Variable(function_name) = &**base {
                         // TODO: maybe we should separate this into separate sets, i.e. not mix functions and other types?
                         self.register_type(
                             function_name.clone(),
                             AstType::Generic(function_name.clone(), sub_types.clone()),
                         );
-
-                        println!(
-                            "inserting new generic type: {} {:#?}",
-                            function_name, sub_types
-                        )
                     } else {
                         panic!("Generic functions must be named.")
                     }
@@ -233,8 +227,20 @@ impl GenericPhase {
                 }
             }
 
+            UntypedNode::FunctionInstance(parent, sub_types) => {
+                let name = match &**parent {
+                    UntypedNode::Variable(function_name) => function_name, 
+                    _ => panic!("expected generic function call to be named."),
+                };
+
+                for sub_type in sub_types {
+                    self.resolve_generic_type(sub_type);
+                }
+
+                self.register_type(name.clone(), AstType::Generic(name.clone(), sub_types.clone()));
+            }
+
             UntypedNode::AnonymousRecord(..) => todo!("add generic checking to anonymous records"),
-            UntypedNode::FunctionInstance(..) => todo!("add generic checking to generic functions"),
             UntypedNode::CaseOf(_expr, _arms) => todo!("add generic checking to case of"),
         }
     }
@@ -361,40 +367,32 @@ impl GenericPhase {
                 }
             }
 
-            UntypedNode::FunctionCall(parent, sub_types, arguments) => {
+            UntypedNode::FunctionCall(parent, arguments) => {
                 // If generic, we can assume that the function's name must be a named function. Otherwise, keep expanding
                 // as normal
-                let new_name = if sub_types.is_empty() {
-                    self.expand_generic_declarations(parent)
-                } else {
-                    if let UntypedNode::Variable(function_name) = &**parent {
-                        // Consider the following example:
-                        //
-                        //      make_pair[int, int](10, 20)
-                        //
-                        // After monomorphization, this call is converted into a concrete form
-                        // with *no* subtypes. Therefore, the call looks like this:
-                        //
-                        //      make_pair_int_int(10, 20)
-                        //
-                        let concrete_name = AstType::Generic(
-                            function_name.clone(),
-                            sub_types
-                                .iter()
-                                .map(|sub_type| sub_type.convert_generic_to_concrete())
-                                .collect(),
-                        )
-                        .to_string();
+                let new_name = if let UntypedNode::FunctionInstance(function, sub_types) = &**parent
+                {
+                    let original_name = match &**function {
+                        UntypedNode::Variable(original_name) => original_name,
+                        _ => panic!("expected generic function call to be named."),
+                    };
 
-                        UntypedNode::Variable(concrete_name)
-                    } else {
-                        panic!("Generic functions must be named functions.")
-                    }
+                    let concrete_name = AstType::Generic(
+                        original_name.clone(),
+                        sub_types
+                            .iter()
+                            .map(|sub_type| sub_type.convert_generic_to_concrete())
+                            .collect(),
+                    )
+                    .to_string();
+
+                    UntypedNode::Variable(concrete_name)
+                } else {
+                    self.expand_generic_declarations(parent)
                 };
 
                 UntypedNode::FunctionCall(
                     Box::new(new_name),
-                    Vec::new(),
                     arguments
                         .iter()
                         .map(|argument| self.expand_generic_declarations(argument))
