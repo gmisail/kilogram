@@ -3,6 +3,7 @@ use crate::ast::untyped::untyped_node::UntypedNode;
 
 use crate::preprocess::generic::template::{substitute_all, Template};
 
+#[derive(Debug)]
 pub struct FunctionTemplate {
     type_params: Vec<String>,
     func_params: Vec<(String, AstType)>,

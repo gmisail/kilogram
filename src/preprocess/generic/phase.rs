@@ -82,8 +82,7 @@ impl GenericPhase {
             | UntypedNode::Float(..)
             | UntypedNode::Str(..)
             | UntypedNode::Boolean(..)
-            | UntypedNode::Get(..) => {
-            }
+            | UntypedNode::Get(..) => {}
 
             UntypedNode::Group(body) | UntypedNode::Extern(_, _, body) => {
                 self.find_unique_types(body);
@@ -229,7 +228,7 @@ impl GenericPhase {
 
             UntypedNode::FunctionInstance(parent, sub_types) => {
                 let name = match &**parent {
-                    UntypedNode::Variable(function_name) => function_name, 
+                    UntypedNode::Variable(function_name) => function_name,
                     _ => panic!("expected generic function call to be named."),
                 };
 
@@ -237,7 +236,10 @@ impl GenericPhase {
                     self.resolve_generic_type(sub_type);
                 }
 
-                self.register_type(name.clone(), AstType::Generic(name.clone(), sub_types.clone()));
+                self.register_type(
+                    name.clone(),
+                    AstType::Generic(name.clone(), sub_types.clone()),
+                );
             }
 
             UntypedNode::AnonymousRecord(..) => todo!("add generic checking to anonymous records"),
@@ -347,7 +349,17 @@ impl GenericPhase {
                 body,
             ) => {
                 if !type_params.is_empty() {
-                    todo!("make monomorphized copies for {name}...")
+                    println!("make monomorphized copies for {name}...");
+
+                    let expanded_body = self.expand_generic_declarations(body);
+
+                    let template = self.function_templates.get(name).unwrap();
+
+                    println!("{:#?}", template);
+
+                    let types = self.types.get(name).unwrap().clone();
+
+                    template.substitute(&types, expanded_body)
                 } else {
                     // Not generic? Don't apply any substitutions, just convert types to concrete
                     // and recurse.
