@@ -168,9 +168,11 @@ impl Display for UntypedNode {
                 format!("(EnumDeclaration, name: {name}, body: {body})")
             }
 
-            UntypedNode::FunctionInstance(base, subtypes) => {
-                let generics: Vec<String> =
-                    subtypes.iter().map(|subtype| subtype.to_string()).collect();
+            UntypedNode::FunctionInstance(base, sub_types) => {
+                let generics: Vec<String> = sub_types
+                    .iter()
+                    .map(|sub_type| sub_type.to_string())
+                    .collect();
 
                 format!("{base}[{}]", generics.join(", "))
             }

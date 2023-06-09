@@ -28,12 +28,27 @@ impl FunctionTemplate {
 }
 
 impl FunctionTemplate {
-    fn resolve_return_type(&self) -> AstType {
-        todo!("resolve the return type")
+    // From a list of generic parameters and substitutions, get a list of concrete types.
+    fn resolve_parameters(&self, substitutions: &Vec<(String, AstType)>) -> Vec<(String, AstType)> {
+        self.func_params
+            .iter()
+            .map(|(param_name, param_type)| {
+                let original_type = substitute_all(param_type.clone(), &substitutions);
+
+                (
+                    param_name.clone(),
+                    original_type.convert_generic_to_concrete(),
+                )
+            })
+            .collect()
+    }
+
+    fn resolve_return_type(&self, substitutions: &Vec<(String, AstType)>) -> AstType {
+        substitute_all(self.func_return.clone(), &substitutions)
     }
 
     fn substitute_body(&self) -> UntypedNode {
-        todo!("add body substitution")
+        UntypedNode::Integer(0)
     }
 }
 
@@ -41,7 +56,6 @@ impl Template for FunctionTemplate {
     fn substitute(&self, variants: &[AstType], body: UntypedNode) -> UntypedNode {
         match variants {
             [head, tail @ ..] => {
-                // TODO: how do we need to change this to support function types?
                 let types = if let AstType::Generic(_, sub_types) = &head {
                     sub_types
                 } else {
@@ -58,19 +72,8 @@ impl Template for FunctionTemplate {
                 UntypedNode::FunctionDeclaration(
                     head.to_string(),
                     Vec::new(),
-                    self.resolve_return_type(),
-                    self.func_params
-                        .iter()
-                        .map(|(param_name, param_type)| {
-                            let original_type =
-                                substitute_all(param_type.clone(), &substitution_pairs);
-
-                            (
-                                param_name.clone(),
-                                original_type.convert_generic_to_concrete(),
-                            )
-                        })
-                        .collect(),
+                    self.resolve_return_type(&substitution_pairs),
+                    self.resolve_parameters(&substitution_pairs),
                     Box::new(self.substitute_body()),
                     Box::new(self.substitute(tail, body)),
                 )
