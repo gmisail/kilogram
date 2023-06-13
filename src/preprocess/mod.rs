@@ -11,5 +11,5 @@ pub trait PreprocessPhase {
 }
 
 pub fn apply_all(root: &UntypedNode) -> UntypedNode {
-    GenericPhase::new().transform(root)
+    GenericPhase {}.transform(root)
 }
