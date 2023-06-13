@@ -48,6 +48,10 @@ impl FunctionTemplate {
     }
 
     fn substitute_body(&self) -> UntypedNode {
+        /*
+           TODO: replace all type parameters in the function body with the concrete type
+           TODO: re-evaluate the body to check for any unique types
+        */
         UntypedNode::Integer(0)
     }
 }
@@ -69,13 +73,16 @@ impl Template for FunctionTemplate {
                     .zip(types.iter().cloned())
                     .collect::<Vec<(String, AstType)>>();
 
-                UntypedNode::FunctionDeclaration(
+                UntypedNode::Let(
                     head.to_string(),
-                    Vec::new(),
-                    self.resolve_return_type(&substitution_pairs),
-                    self.resolve_parameters(&substitution_pairs),
-                    Box::new(self.substitute_body()),
+                    None,
+                    Box::new(UntypedNode::Function(
+                        self.resolve_return_type(&substitution_pairs),
+                        self.resolve_parameters(&substitution_pairs),
+                        Box::new(self.substitute_body()),
+                    )),
                     Box::new(self.substitute(tail, body)),
+                    false,
                 )
             }
 

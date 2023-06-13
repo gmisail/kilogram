@@ -354,10 +354,9 @@ impl GenericPhase {
                     let expanded_body = self.expand_generic_declarations(body);
 
                     let template = self.function_templates.get(name).unwrap();
+                    let types = self.types.get(name).unwrap().clone();
 
                     println!("{:#?}", template);
-
-                    let types = self.types.get(name).unwrap().clone();
 
                     template.substitute(&types, expanded_body)
                 } else {
