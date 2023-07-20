@@ -5,7 +5,6 @@ use crate::ast::untyped::untyped_node::UntypedNode;
 
 use crate::preprocess::generic::template::Template;
 
-use crate::preprocess::generic::function_template::FunctionTemplate;
 use crate::preprocess::generic::record_template::RecordTemplate;
 
 pub struct DataTypePass {
@@ -13,7 +12,6 @@ pub struct DataTypePass {
     all_types: BTreeSet<AstType>,
     types: HashMap<String, Vec<AstType>>,
     record_templates: HashMap<String, RecordTemplate>,
-    function_templates: HashMap<String, FunctionTemplate>,
 }
 
 impl DataTypePass {
@@ -22,7 +20,6 @@ impl DataTypePass {
             all_types: BTreeSet::new(),
             types: HashMap::new(),
             record_templates: HashMap::new(),
-            function_templates: HashMap::new(),
         }
     }
 
@@ -31,11 +28,7 @@ impl DataTypePass {
         self.find_unique_types(node);
 
         // Once these are found, convert them into concrete type declarations.
-        let res = self.expand_generic_declarations(node);
-
-        println!("{res:#?}");
-
-        res
+        self.expand_generic_declarations(node)
     }
 
     /// Recurse through a type searching for unique generic type instances, creating them
@@ -183,22 +176,6 @@ impl DataTypePass {
 
                 for (_, param_type) in func_params {
                     self.resolve_generic_type(param_type);
-                }
-
-                if !type_params.is_empty() {
-                    if let Some(_) = self.function_templates.insert(
-                        name.clone(),
-                        FunctionTemplate::new(
-                            type_params.clone(),
-                            func_params.clone(),
-                            return_type.clone(),
-                            (**func_body).clone(),
-                        ),
-                    ) {
-                        panic!(
-                            "TODO: handle this gracefully. This function template already exists."
-                        );
-                    }
                 }
 
                 self.find_unique_types(func_body);
@@ -349,42 +326,20 @@ impl DataTypePass {
                 Box::new(self.expand_generic_declarations(body)),
             ),
 
-            UntypedNode::FunctionDeclaration(
-                name,
-                type_params,
-                return_type,
-                arguments,
-                func_body,
-                body,
-            ) => {
-                if !type_params.is_empty() {
-                    println!("make monomorphized copies for {name}...");
-
-                    let expanded_body = self.expand_generic_declarations(body);
-
-                    let template = self.function_templates.get(name).unwrap();
-                    let types = self.types.get(name).unwrap().clone();
-
-                    println!("{:#?}", template);
-
-                    template.substitute(&types, expanded_body)
-                } else {
-                    // Not generic? Don't apply any substitutions, just convert types to concrete
-                    // and recurse.
-                    UntypedNode::FunctionDeclaration(
-                        name.clone(),
-                        Vec::new(),
-                        return_type.convert_generic_to_concrete(),
-                        arguments
-                            .iter()
-                            .map(|(arg_name, arg_type)| {
-                                (arg_name.clone(), arg_type.convert_generic_to_concrete())
-                            })
-                            .collect(),
-                        Box::new(self.expand_generic_declarations(func_body)),
-                        Box::new(self.expand_generic_declarations(body)),
-                    )
-                }
+            UntypedNode::FunctionDeclaration(name, _, return_type, arguments, func_body, body) => {
+                UntypedNode::FunctionDeclaration(
+                    name.clone(),
+                    Vec::new(),
+                    return_type.convert_generic_to_concrete(),
+                    arguments
+                        .iter()
+                        .map(|(arg_name, arg_type)| {
+                            (arg_name.clone(), arg_type.convert_generic_to_concrete())
+                        })
+                        .collect(),
+                    Box::new(self.expand_generic_declarations(func_body)),
+                    Box::new(self.expand_generic_declarations(body)),
+                )
             }
 
             UntypedNode::FunctionCall(parent, arguments) => {

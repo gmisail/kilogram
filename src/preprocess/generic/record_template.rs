@@ -2,6 +2,7 @@ use crate::ast::untyped::{ast_type::AstType, untyped_node::UntypedNode};
 
 use super::template::{substitute_all, Template};
 
+#[derive(Debug)]
 pub struct RecordTemplate {
     type_params: Vec<String>,
     fields: Vec<(String, AstType)>,
