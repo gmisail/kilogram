@@ -5,6 +5,7 @@ use crate::ast::untyped::untyped_node::UntypedNode;
 use crate::ast::untyped::untyped_node::UntypedNode::*;
 
 use crate::preprocess::generic::function_template::FunctionTemplate;
+use crate::preprocess::generic::template::Template;
 
 ///
 ///     GENERIC - FUNCTION PASS
@@ -16,6 +17,9 @@ use crate::preprocess::generic::function_template::FunctionTemplate;
 ///     Given these unique invocations, walk through again and replace the generic calls
 ///     with calls to concrete types.
 ///
+
+// TODO: add type parameter collision detection, i.e. if there is 'T defined within a generic
+// type that defines 'T, throw an error.
 
 pub struct FunctionPass {
     // Ensures uniqueness without needing to check every type
@@ -37,16 +41,8 @@ impl FunctionPass {
         // First, search the AST for usages of generic types.
         self.find_unique_types(node);
 
-        println!("Unique function types => {:?}", self.templates);
-
-        // // Once these are found, convert them into concrete type declarations.
-        // let res = self.expand_generic_declarations(node);
-
-        // println!("{res:#?}");
-
-        // res
-
-        node.clone()
+        // Once these are found, convert them into concrete type declarations.
+        self.expand_generic_declarations(node)
     }
 
     /// Recurse through a type searching for unique generic type instances, creating them
@@ -235,213 +231,204 @@ impl FunctionPass {
     ///
     /// * `root`: node to start expansion
     fn expand_generic_declarations(&mut self, root: &UntypedNode) -> UntypedNode {
-        todo!("add generic declaration expansion for functions...")
+        match root {
+            Integer(..) | Variable(..) | Float(..) | Str(..) | Boolean(..) | Get(..) => {
+                root.to_owned()
+            }
 
-        // match root {
-        //     Integer(..) | Variable(..) | Float(..) | Str(..) | Boolean(..) | Get(..) => {
-        //         root.to_owned()
-        //     }
+            RecordDeclaration(name, fields, _type_params, body) => {
+                // TODO: do something here??
 
-        //     RecordDeclaration(name, fields, type_params, body) => {
-        //         // More than one type parameter? Must be generic record.
-        //         if !type_params.is_empty() {
-        //             // Expand the rest of the AST first
-        //             let expanded_body = self.expand_generic_declarations(body);
+                RecordDeclaration(
+                    name.clone(),
+                    fields
+                        .iter()
+                        .map(|(field_name, field_type)| {
+                            (field_name.clone(), field_type.convert_generic_to_concrete())
+                        })
+                        .collect(),
+                    Vec::new(),
+                    Box::new(self.expand_generic_declarations(body)),
+                )
+            }
 
-        //             let template = self.record_templates.get(name).unwrap();
-        //             let types = self.types.get(name).unwrap().clone();
+            Group(body) => self.expand_generic_declarations(body),
 
-        //             template.substitute(&types, expanded_body)
-        //         } else {
-        //             RecordDeclaration(
-        //                 name.clone(),
-        //                 fields
-        //                     .iter()
-        //                     .map(|(field_name, field_type)| {
-        //                         (field_name.clone(), field_type.convert_generic_to_concrete())
-        //                     })
-        //                     .collect(),
-        //                 Vec::new(),
-        //                 Box::new(self.expand_generic_declarations(body)),
-        //             )
-        //         }
-        //     }
+            Extern(extern_name, extern_type, body) => Extern(
+                extern_name.clone(),
+                extern_type.clone(),
+                Box::new(self.expand_generic_declarations(body)),
+            ),
 
-        //     Group(body) => self.expand_generic_declarations(body),
+            Let(name, var_type, var_value, body, is_recursive) => {
+                let concrete_type = if let Some(generic_type @ AstType::Generic(..)) = var_type {
+                    Some(AstType::Base(
+                        generic_type.convert_generic_to_concrete().to_string(),
+                    ))
+                } else {
+                    var_type.clone()
+                };
 
-        //     Extern(extern_name, extern_type, body) => Extern(
-        //         extern_name.clone(),
-        //         extern_type.clone(),
-        //         Box::new(self.expand_generic_declarations(body)),
-        //     ),
+                Let(
+                    name.clone(),
+                    concrete_type,
+                    Box::new(self.expand_generic_declarations(var_value)),
+                    Box::new(self.expand_generic_declarations(body)),
+                    *is_recursive,
+                )
+            }
 
-        //     Let(name, var_type, var_value, body, is_recursive) => {
-        //         let concrete_type = if let Some(generic_type @ AstType::Generic(..)) = var_type {
-        //             Some(AstType::Base(
-        //                 generic_type.convert_generic_to_concrete().to_string(),
-        //             ))
-        //         } else {
-        //             var_type.clone()
-        //         };
+            Unary(value, operator) => Unary(
+                Box::new(self.expand_generic_declarations(value)),
+                operator.clone(),
+            ),
 
-        //         Let(
-        //             name.clone(),
-        //             concrete_type,
-        //             Box::new(self.expand_generic_declarations(var_value)),
-        //             Box::new(self.expand_generic_declarations(body)),
-        //             *is_recursive,
-        //         )
-        //     }
+            Binary(left_value, operator, right_value) => Binary(
+                Box::new(self.expand_generic_declarations(left_value)),
+                operator.clone(),
+                Box::new(self.expand_generic_declarations(right_value)),
+            ),
 
-        //     Unary(value, operator) => Unary(
-        //         Box::new(self.expand_generic_declarations(value)),
-        //         operator.clone(),
-        //     ),
+            Logical(left_value, operator, right_value) => Logical(
+                Box::new(self.expand_generic_declarations(left_value)),
+                operator.clone(),
+                Box::new(self.expand_generic_declarations(right_value)),
+            ),
 
-        //     Binary(left_value, operator, right_value) => Binary(
-        //         Box::new(self.expand_generic_declarations(left_value)),
-        //         operator.clone(),
-        //         Box::new(self.expand_generic_declarations(right_value)),
-        //     ),
+            If(if_cond, then_expr, else_expr) => If(
+                Box::new(self.expand_generic_declarations(if_cond)),
+                Box::new(self.expand_generic_declarations(then_expr)),
+                Box::new(self.expand_generic_declarations(else_expr)),
+            ),
 
-        //     Logical(left_value, operator, right_value) => Logical(
-        //         Box::new(self.expand_generic_declarations(left_value)),
-        //         operator.clone(),
-        //         Box::new(self.expand_generic_declarations(right_value)),
-        //     ),
+            Function(return_type, arguments, body) => Function(
+                return_type.clone(),
+                arguments.clone(),
+                Box::new(self.expand_generic_declarations(body)),
+            ),
 
-        //     If(if_cond, then_expr, else_expr) => If(
-        //         Box::new(self.expand_generic_declarations(if_cond)),
-        //         Box::new(self.expand_generic_declarations(then_expr)),
-        //         Box::new(self.expand_generic_declarations(else_expr)),
-        //     ),
+            FunctionDeclaration(name, type_params, return_type, arguments, func_body, body) => {
+                if !type_params.is_empty() {
+                    println!("make monomorphized copies for {name}...");
 
-        //     Function(return_type, arguments, body) => Function(
-        //         return_type.clone(),
-        //         arguments.clone(),
-        //         Box::new(self.expand_generic_declarations(body)),
-        //     ),
+                    let expanded_body = self.expand_generic_declarations(body);
 
-        //     FunctionDeclaration(name, type_params, return_type, arguments, func_body, body) => {
-        //         if !type_params.is_empty() {
-        //             println!("make monomorphized copies for {name}...");
+                    let template = self.templates.get(name).unwrap();
+                    let types = self.types.get(name).unwrap().clone();
 
-        //             let expanded_body = self.expand_generic_declarations(body);
+                    println!("{:#?}", template);
 
-        //             let template = self.function_templates.get(name).unwrap();
-        //             let types = self.types.get(name).unwrap().clone();
+                    template.substitute(&types, expanded_body)
+                } else {
+                    /*
+                        Not generic? Don't apply any substitutions, just convert types to concrete
+                        and recurse.
+                    */
+                    FunctionDeclaration(
+                        name.clone(),
+                        Vec::new(),
+                        return_type.convert_generic_to_concrete(),
+                        arguments
+                            .iter()
+                            .map(|(arg_name, arg_type)| {
+                                (arg_name.clone(), arg_type.convert_generic_to_concrete())
+                            })
+                            .collect(),
+                        Box::new(self.expand_generic_declarations(func_body)),
+                        Box::new(self.expand_generic_declarations(body)),
+                    )
+                }
+            }
 
-        //             println!("{:#?}", template);
+            FunctionCall(parent, arguments) => {
+                // If generic, we can assume that the function's name must be a named function. Otherwise, keep expanding
+                // as normal
+                let new_name = if let FunctionInstance(function, sub_types) = &**parent {
+                    let original_name = match &**function {
+                        Variable(original_name) => original_name,
+                        _ => panic!("expected generic function call to be named."),
+                    };
 
-        //             template.substitute(&types, expanded_body)
-        //         } else {
-        //             // Not generic? Don't apply any substitutions, just convert types to concrete
-        //             // and recurse.
-        //             FunctionDeclaration(
-        //                 name.clone(),
-        //                 Vec::new(),
-        //                 return_type.convert_generic_to_concrete(),
-        //                 arguments
-        //                     .iter()
-        //                     .map(|(arg_name, arg_type)| {
-        //                         (arg_name.clone(), arg_type.convert_generic_to_concrete())
-        //                     })
-        //                     .collect(),
-        //                 Box::new(self.expand_generic_declarations(func_body)),
-        //                 Box::new(self.expand_generic_declarations(body)),
-        //             )
-        //         }
-        //     }
+                    let concrete_name = AstType::Generic(
+                        original_name.clone(),
+                        sub_types
+                            .iter()
+                            .map(|sub_type| sub_type.convert_generic_to_concrete())
+                            .collect(),
+                    )
+                    .to_string();
 
-        //     FunctionCall(parent, arguments) => {
-        //         // If generic, we can assume that the function's name must be a named function. Otherwise, keep expanding
-        //         // as normal
-        //         let new_name = if let FunctionInstance(function, sub_types) = &**parent {
-        //             let original_name = match &**function {
-        //                 Variable(original_name) => original_name,
-        //                 _ => panic!("expected generic function call to be named."),
-        //             };
+                    Variable(concrete_name)
+                } else {
+                    self.expand_generic_declarations(parent)
+                };
 
-        //             let concrete_name = AstType::Generic(
-        //                 original_name.clone(),
-        //                 sub_types
-        //                     .iter()
-        //                     .map(|sub_type| sub_type.convert_generic_to_concrete())
-        //                     .collect(),
-        //             )
-        //             .to_string();
+                FunctionCall(
+                    Box::new(new_name),
+                    arguments
+                        .iter()
+                        .map(|argument| self.expand_generic_declarations(argument))
+                        .collect(),
+                )
+            }
 
-        //             Variable(concrete_name)
-        //         } else {
-        //             self.expand_generic_declarations(parent)
-        //         };
+            RecordInstance(name, type_params, fields) => {
+                let new_name = if !type_params.is_empty() {
+                    AstType::Generic(
+                        name.clone(),
+                        type_params
+                            .iter()
+                            .map(|type_param| type_param.convert_generic_to_concrete())
+                            .collect(),
+                    )
+                    .to_string()
+                } else {
+                    name.clone()
+                };
 
-        //         FunctionCall(
-        //             Box::new(new_name),
-        //             arguments
-        //                 .iter()
-        //                 .map(|argument| self.expand_generic_declarations(argument))
-        //                 .collect(),
-        //         )
-        //     }
+                RecordInstance(
+                    new_name,
+                    Vec::new(),
+                    fields
+                        .iter()
+                        .map(|(field_name, field_value)| {
+                            (
+                                field_name.clone(),
+                                self.expand_generic_declarations(field_value),
+                            )
+                        })
+                        .collect(),
+                )
+            }
 
-        //     RecordInstance(name, type_params, fields) => {
-        //         let new_name = if !type_params.is_empty() {
-        //             AstType::Generic(
-        //                 name.clone(),
-        //                 type_params
-        //                     .iter()
-        //                     .map(|type_param| type_param.convert_generic_to_concrete())
-        //                     .collect(),
-        //             )
-        //             .to_string()
-        //         } else {
-        //             name.clone()
-        //         };
+            EnumDeclaration(name, variants, type_params, body) => {
+                EnumDeclaration(
+                    name.clone(),
+                    variants
+                        .iter()
+                        .map(|(variant_name, _variant_types)| {
+                            // TODO: convert generic types to concrete types.
+                            (variant_name.clone(), Vec::new())
+                        })
+                        .collect(),
+                    type_params.clone(),
+                    Box::new(self.expand_generic_declarations(body)),
+                )
+            }
 
-        //         RecordInstance(
-        //             new_name,
-        //             Vec::new(),
-        //             fields
-        //                 .iter()
-        //                 .map(|(field_name, field_value)| {
-        //                     (
-        //                         field_name.clone(),
-        //                         self.expand_generic_declarations(field_value),
-        //                     )
-        //                 })
-        //                 .collect(),
-        //         )
-        //     }
+            List(elements) => List(
+                elements
+                    .iter()
+                    .map(|element| self.expand_generic_declarations(element))
+                    .collect(),
+            ),
 
-        //     EnumDeclaration(name, variants, type_params, body) => {
-        //         EnumDeclaration(
-        //             name.clone(),
-        //             variants
-        //                 .iter()
-        //                 .map(|(variant_name, _variant_types)| {
-        //                     // TODO: convert generic types to concrete types.
-        //                     (variant_name.clone(), Vec::new())
-        //                 })
-        //                 .collect(),
-        //             type_params.clone(),
-        //             Box::new(self.expand_generic_declarations(body)),
-        //         )
-        //     }
+            AnonymousRecord(..) => todo!("handle anonymous records"),
+            FunctionInstance(..) => todo!("handle generic functions"),
 
-        //     List(elements) => List(
-        //         elements
-        //             .iter()
-        //             .map(|element| self.expand_generic_declarations(element))
-        //             .collect(),
-        //     ),
-
-        //     AnonymousRecord(..) => todo!("handle anonymous records"),
-        //     FunctionInstance(..) => todo!("handle generic functions"),
-
-        //     CaseOf(_expr, _arms) => {
-        //         todo!("add generic checking to case of")
-        //     }
-        // }
+            CaseOf(_expr, _arms) => {
+                todo!("add generic checking to case of")
+            }
+        }
     }
 }

@@ -164,8 +164,8 @@ impl DataTypePass {
             }
 
             UntypedNode::FunctionDeclaration(
-                name,
-                type_params,
+                _name,
+                _type_params,
                 return_type,
                 func_params,
                 func_body,

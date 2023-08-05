@@ -25,15 +25,13 @@ impl FunctionTemplate {
             func_body,
         }
     }
-}
 
-impl FunctionTemplate {
     // From a list of generic parameters and substitutions, get a list of concrete types.
     fn resolve_parameters(&self, substitutions: &Vec<(String, AstType)>) -> Vec<(String, AstType)> {
         self.func_params
             .iter()
             .map(|(param_name, param_type)| {
-                let original_type = substitute_all(param_type.clone(), &substitutions);
+                let original_type = substitute_all(param_type.clone(), substitutions);
 
                 (
                     param_name.clone(),
@@ -44,7 +42,7 @@ impl FunctionTemplate {
     }
 
     fn resolve_return_type(&self, substitutions: &Vec<(String, AstType)>) -> AstType {
-        substitute_all(self.func_return.clone(), &substitutions)
+        substitute_all(self.func_return.clone(), substitutions)
     }
 
     fn substitute_body(&self) -> UntypedNode {
