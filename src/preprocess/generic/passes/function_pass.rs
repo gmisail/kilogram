@@ -311,14 +311,21 @@ impl FunctionPass {
                 if !type_params.is_empty() {
                     println!("make monomorphized copies for {name}...");
 
+                    // Expand the rest of the code first.
                     let expanded_body = self.expand_generic_declarations(body);
 
                     let template = self.templates.get(name).unwrap();
                     let types = self.types.get(name).unwrap().clone();
 
-                    println!("{:#?}", template);
+                    println!("unique types: {types:?}");
 
-                    template.substitute(&types, expanded_body)
+                    println!("BEFORE: {:#?}", template);
+
+                    let res = template.substitute(&types, expanded_body);
+
+                    println!("AFTER: {:#?}", res);
+
+                    res
                 } else {
                     /*
                         Not generic? Don't apply any substitutions, just convert types to concrete

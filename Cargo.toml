@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 owo-colors = "3"
+tracing = "0.1.37"
+tracing-subscriber = "0.3.17"

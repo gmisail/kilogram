@@ -1062,6 +1062,7 @@ impl Parser {
     }
 }
 
+#[tracing::instrument]
 pub fn parse(input: String) -> Result<UntypedNode, &'static str> {
     let tokens = scanner::scan(input)?;
     let mut context = Parser { current: 0, tokens };

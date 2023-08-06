@@ -1,3 +1,5 @@
+use tracing::trace;
+
 use super::passes;
 use crate::ast::untyped::untyped_node::UntypedNode;
 
