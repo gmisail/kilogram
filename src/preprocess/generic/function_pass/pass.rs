@@ -243,12 +243,7 @@ impl FunctionPass {
 
                 RecordDeclaration(
                     name.clone(),
-                    fields
-                        .iter()
-                        .map(|(field_name, field_type)| {
-                            (field_name.clone(), field_type.convert_generic_to_concrete())
-                        })
-                        .collect(),
+                    fields.clone(),
                     type_params.clone(),
                     Box::new(self.expand_generic_declarations(body)),
                 )

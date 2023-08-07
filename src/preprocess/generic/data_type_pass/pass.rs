@@ -1,4 +1,5 @@
 use std::collections::{BTreeSet, HashMap};
+use tracing::trace;
 
 use crate::ast::untyped::ast_type::AstType;
 use crate::ast::untyped::untyped_node::UntypedNode;
@@ -248,8 +249,6 @@ impl DataTypePass {
             UntypedNode::RecordDeclaration(name, fields, type_params, body) => {
                 // More than one type parameter? Must be generic record.
                 if !type_params.is_empty() {
-                    println!("Type params for {name}");
-
                     // Expand the rest of the AST first
                     let expanded_body = self.expand_generic_declarations(body);
 
@@ -258,8 +257,6 @@ impl DataTypePass {
 
                     template.substitute(&types, expanded_body)
                 } else {
-                    println!("No type params for {name}");
-
                     UntypedNode::RecordDeclaration(
                         name.clone(),
                         fields

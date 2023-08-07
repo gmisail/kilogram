@@ -10,6 +10,7 @@ impl PreprocessPhase for GenericPhase {
     fn transform(&mut self, root: &UntypedNode) -> UntypedNode {
         // TODO: add function pass, pass to data type pass
         // TODO: add UntypedPass trait for UntypedNode, this will allow us to chain .apply(...) instead.
+
         let func_pass_res = FunctionPass::new().apply(root);
         let data_pass_res = DataTypePass::new().apply(&func_pass_res);
 
