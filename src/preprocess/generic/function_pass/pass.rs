@@ -2,24 +2,38 @@ use std::collections::{BTreeSet, HashMap};
 
 use crate::ast::untyped::ast_type::AstType;
 use crate::ast::untyped::untyped_node::UntypedNode;
+use crate::ast::untyped::untyped_node::UntypedNode::*;
+use crate::preprocess::generic::function_pass::template::FunctionTemplate;
 
 use crate::preprocess::generic::template::Template;
 
-use crate::preprocess::generic::record_template::RecordTemplate;
+///
+///     GENERIC - FUNCTION PASS
+///
+///     Walks through the AST looking for
+///         a) generic type declarations
+///         b) unique invocations of generic types
+///
+///     Given these unique invocations, walk through again and replace the generic calls
+///     with calls to concrete types.
+///
 
-pub struct DataTypePass {
-    // Ensures uniqueness without needing to check every t
+// TODO: add type parameter collision detection, i.e. if there is 'T defined within a generic
+// type that defines 'T, throw an error.
+
+pub struct FunctionPass {
+    // Ensures uniqueness without needing to check every type
     all_types: BTreeSet<AstType>,
     types: HashMap<String, Vec<AstType>>,
-    record_templates: HashMap<String, RecordTemplate>,
+    templates: HashMap<String, FunctionTemplate>,
 }
 
-impl DataTypePass {
+impl FunctionPass {
     pub fn new() -> Self {
-        DataTypePass {
+        FunctionPass {
             all_types: BTreeSet::new(),
             types: HashMap::new(),
-            record_templates: HashMap::new(),
+            templates: HashMap::new(),
         }
     }
 
@@ -79,56 +93,7 @@ impl DataTypePass {
     /// * `root`: node to search
     fn find_unique_types(&mut self, root: &UntypedNode) {
         match root {
-            UntypedNode::Integer(..)
-            | UntypedNode::Variable(..)
-            | UntypedNode::Float(..)
-            | UntypedNode::Str(..)
-            | UntypedNode::Boolean(..)
-            | UntypedNode::Get(..) => {}
-
-            UntypedNode::Group(body) | UntypedNode::Extern(_, _, body) => {
-                self.find_unique_types(body);
-            }
-
-            UntypedNode::RecordDeclaration(name, fields, type_params, body) => {
-                // If we have more than one type parameter, then this is a generic record.
-                if !type_params.is_empty() {
-                    self.record_templates.insert(
-                        name.clone(),
-                        RecordTemplate::new(type_params.clone(), fields.clone()),
-                    );
-                }
-
-                self.find_unique_types(body);
-            }
-
-            UntypedNode::Let(_, var_type, var_value, body, _) => {
-                // If type is explicit, check if it contains a generic type.
-                if let Some(t) = var_type {
-                    self.resolve_generic_type(t);
-                }
-
-                self.find_unique_types(var_value);
-                self.find_unique_types(body);
-            }
-
-            UntypedNode::Unary(value, _) => {
-                self.find_unique_types(value);
-            }
-
-            UntypedNode::Binary(left_value, _, right_value)
-            | UntypedNode::Logical(left_value, _, right_value) => {
-                self.find_unique_types(left_value);
-                self.find_unique_types(right_value);
-            }
-
-            UntypedNode::If(if_cond, then_expr, else_expr) => {
-                self.find_unique_types(if_cond);
-                self.find_unique_types(then_expr);
-                self.find_unique_types(else_expr);
-            }
-
-            UntypedNode::Function(return_type, arguments, body) => {
+            Function(return_type, arguments, body) => {
                 // Find generic types in both the return type and arguments.
                 self.resolve_generic_type(return_type);
 
@@ -139,15 +104,15 @@ impl DataTypePass {
                 self.find_unique_types(body);
             }
 
-            UntypedNode::FunctionCall(parent, arguments) => {
+            FunctionCall(parent, arguments) => {
                 self.find_unique_types(parent);
 
-                if let UntypedNode::FunctionInstance(base, sub_types) = &**parent {
+                if let FunctionInstance(base, sub_types) = &**parent {
                     for sub_type in sub_types {
                         self.resolve_generic_type(sub_type);
                     }
 
-                    if let UntypedNode::Variable(function_name) = &**base {
+                    if let Variable(function_name) = &**base {
                         // TODO: maybe we should separate this into separate sets, i.e. not mix functions and other types?
                         self.register_type(
                             function_name.clone(),
@@ -163,14 +128,7 @@ impl DataTypePass {
                 }
             }
 
-            UntypedNode::FunctionDeclaration(
-                _name,
-                _type_params,
-                return_type,
-                func_params,
-                func_body,
-                body,
-            ) => {
+            FunctionDeclaration(name, type_params, return_type, func_params, func_body, body) => {
                 // Find generic types in both the return type and arguments.
                 self.resolve_generic_type(return_type);
 
@@ -178,43 +136,31 @@ impl DataTypePass {
                     self.resolve_generic_type(param_type);
                 }
 
+                if !type_params.is_empty() {
+                    let inserted_template = self.templates.insert(
+                        name.clone(),
+                        FunctionTemplate::new(
+                            type_params.clone(),
+                            func_params.clone(),
+                            return_type.clone(),
+                            (**func_body).clone(),
+                        ),
+                    );
+
+                    if inserted_template.is_some() {
+                        panic!(
+                            "TODO: handle this gracefully. This function template already exists."
+                        );
+                    }
+                }
+
                 self.find_unique_types(func_body);
                 self.find_unique_types(body);
             }
 
-            UntypedNode::RecordInstance(name, type_params, fields) => {
-                // Resolve every type parameter, in case they contain a generic type.
-                for type_param in type_params {
-                    self.resolve_generic_type(type_param);
-                }
-
-                // If the type is generic, add it to the list of generic type configurations.
-                if !type_params.is_empty() {
-                    self.register_type(
-                        name.clone(),
-                        AstType::Generic(name.clone(), type_params.clone()),
-                    );
-                }
-
-                // Recurse through each of the field values and search for generic types.
-                for (_, field_value) in fields {
-                    self.find_unique_types(field_value);
-                }
-            }
-
-            UntypedNode::EnumDeclaration(_name, _variants, _type_params, _body) => {
-                todo!("add generic enum checking")
-            }
-
-            UntypedNode::List(elements) => {
-                for element in elements {
-                    self.find_unique_types(element);
-                }
-            }
-
-            UntypedNode::FunctionInstance(parent, sub_types) => {
+            FunctionInstance(parent, sub_types) => {
                 let name = match &**parent {
-                    UntypedNode::Variable(function_name) => function_name,
+                    Variable(function_name) => function_name,
                     _ => panic!("expected generic function call to be named."),
                 };
 
@@ -228,8 +174,57 @@ impl DataTypePass {
                 );
             }
 
-            UntypedNode::AnonymousRecord(..) => todo!("add generic checking to anonymous records"),
-            UntypedNode::CaseOf(_expr, _arms) => todo!("add generic checking to case of"),
+            Integer(..) | Variable(..) | Float(..) | Str(..) | Boolean(..) | Get(..) => {}
+
+            Group(body) | Extern(_, _, body) => {
+                self.find_unique_types(body);
+            }
+
+            Let(_, var_type, var_value, body, _) => {
+                // If type is explicit, check if it contains a generic type.
+                if let Some(t) = var_type {
+                    self.resolve_generic_type(t);
+                }
+
+                self.find_unique_types(var_value);
+                self.find_unique_types(body);
+            }
+
+            Unary(value, _) => {
+                self.find_unique_types(value);
+            }
+
+            Binary(left_value, _, right_value) | Logical(left_value, _, right_value) => {
+                self.find_unique_types(left_value);
+                self.find_unique_types(right_value);
+            }
+
+            If(if_cond, then_expr, else_expr) => {
+                self.find_unique_types(if_cond);
+                self.find_unique_types(then_expr);
+                self.find_unique_types(else_expr);
+            }
+
+            RecordInstance(_, _, fields) => {
+                for (_, field_value) in fields {
+                    self.find_unique_types(field_value);
+                }
+            }
+
+            RecordDeclaration(_, _, _, body) => self.find_unique_types(body),
+
+            EnumDeclaration(_name, _variants, _type_params, _body) => {
+                todo!("add generic enum checking")
+            }
+
+            List(elements) => {
+                for element in elements {
+                    self.find_unique_types(element);
+                }
+            }
+
+            AnonymousRecord(..) => todo!("add generic checking to anonymous records"),
+            CaseOf(_expr, _arms) => todo!("add generic checking to case of"),
         }
     }
 
@@ -239,47 +234,35 @@ impl DataTypePass {
     /// * `root`: node to start expansion
     fn expand_generic_declarations(&mut self, root: &UntypedNode) -> UntypedNode {
         match root {
-            UntypedNode::Integer(..)
-            | UntypedNode::Variable(..)
-            | UntypedNode::Float(..)
-            | UntypedNode::Str(..)
-            | UntypedNode::Boolean(..)
-            | UntypedNode::Get(..) => root.to_owned(),
-
-            UntypedNode::RecordDeclaration(name, fields, type_params, body) => {
-                // More than one type parameter? Must be generic record.
-                if !type_params.is_empty() {
-                    // Expand the rest of the AST first
-                    let expanded_body = self.expand_generic_declarations(body);
-
-                    let template = self.record_templates.get(name).unwrap();
-                    let types = self.types.get(name).unwrap().clone();
-
-                    template.substitute(&types, expanded_body)
-                } else {
-                    UntypedNode::RecordDeclaration(
-                        name.clone(),
-                        fields
-                            .iter()
-                            .map(|(field_name, field_type)| {
-                                (field_name.clone(), field_type.convert_generic_to_concrete())
-                            })
-                            .collect(),
-                        Vec::new(),
-                        Box::new(self.expand_generic_declarations(body)),
-                    )
-                }
+            Integer(..) | Variable(..) | Float(..) | Str(..) | Boolean(..) | Get(..) => {
+                root.to_owned()
             }
 
-            UntypedNode::Group(body) => self.expand_generic_declarations(body),
+            RecordDeclaration(name, fields, type_params, body) => {
+                // TODO: do something here??
 
-            UntypedNode::Extern(extern_name, extern_type, body) => UntypedNode::Extern(
+                RecordDeclaration(
+                    name.clone(),
+                    fields
+                        .iter()
+                        .map(|(field_name, field_type)| {
+                            (field_name.clone(), field_type.convert_generic_to_concrete())
+                        })
+                        .collect(),
+                    type_params.clone(),
+                    Box::new(self.expand_generic_declarations(body)),
+                )
+            }
+
+            Group(body) => self.expand_generic_declarations(body),
+
+            Extern(extern_name, extern_type, body) => Extern(
                 extern_name.clone(),
                 extern_type.clone(),
                 Box::new(self.expand_generic_declarations(body)),
             ),
 
-            UntypedNode::Let(name, var_type, var_value, body, is_recursive) => {
+            Let(name, var_type, var_value, body, is_recursive) => {
                 let concrete_type = if let Some(generic_type @ AstType::Generic(..)) = var_type {
                     Some(AstType::Base(
                         generic_type.convert_generic_to_concrete().to_string(),
@@ -288,7 +271,7 @@ impl DataTypePass {
                     var_type.clone()
                 };
 
-                UntypedNode::Let(
+                Let(
                     name.clone(),
                     concrete_type,
                     Box::new(self.expand_generic_declarations(var_value)),
@@ -297,58 +280,73 @@ impl DataTypePass {
                 )
             }
 
-            UntypedNode::Unary(value, operator) => UntypedNode::Unary(
+            Unary(value, operator) => Unary(
                 Box::new(self.expand_generic_declarations(value)),
                 operator.clone(),
             ),
 
-            UntypedNode::Binary(left_value, operator, right_value) => UntypedNode::Binary(
+            Binary(left_value, operator, right_value) => Binary(
                 Box::new(self.expand_generic_declarations(left_value)),
                 operator.clone(),
                 Box::new(self.expand_generic_declarations(right_value)),
             ),
 
-            UntypedNode::Logical(left_value, operator, right_value) => UntypedNode::Logical(
+            Logical(left_value, operator, right_value) => Logical(
                 Box::new(self.expand_generic_declarations(left_value)),
                 operator.clone(),
                 Box::new(self.expand_generic_declarations(right_value)),
             ),
 
-            UntypedNode::If(if_cond, then_expr, else_expr) => UntypedNode::If(
+            If(if_cond, then_expr, else_expr) => If(
                 Box::new(self.expand_generic_declarations(if_cond)),
                 Box::new(self.expand_generic_declarations(then_expr)),
                 Box::new(self.expand_generic_declarations(else_expr)),
             ),
 
-            UntypedNode::Function(return_type, arguments, body) => UntypedNode::Function(
+            Function(return_type, arguments, body) => Function(
                 return_type.clone(),
                 arguments.clone(),
                 Box::new(self.expand_generic_declarations(body)),
             ),
 
-            UntypedNode::FunctionDeclaration(name, _, return_type, arguments, func_body, body) => {
-                UntypedNode::FunctionDeclaration(
-                    name.clone(),
-                    Vec::new(),
-                    return_type.convert_generic_to_concrete(),
-                    arguments
-                        .iter()
-                        .map(|(arg_name, arg_type)| {
-                            (arg_name.clone(), arg_type.convert_generic_to_concrete())
-                        })
-                        .collect(),
-                    Box::new(self.expand_generic_declarations(func_body)),
-                    Box::new(self.expand_generic_declarations(body)),
-                )
+            FunctionDeclaration(name, type_params, return_type, arguments, func_body, body) => {
+                if !type_params.is_empty() {
+                    // Expand the rest of the code first.
+                    let expanded_body = self.expand_generic_declarations(body);
+
+                    // Find the respective template, unique type parameters.
+                    let template = self.templates.get(name).unwrap();
+                    let types = self.types.get(name).unwrap().clone();
+
+                    // Given these types, generate copies of the function template.
+                    template.substitute(&types, expanded_body)
+                } else {
+                    /*
+                        Not generic? Don't apply any substitutions, just convert types to concrete
+                        and recurse.
+                    */
+                    FunctionDeclaration(
+                        name.clone(),
+                        Vec::new(),
+                        return_type.convert_generic_to_concrete(),
+                        arguments
+                            .iter()
+                            .map(|(arg_name, arg_type)| {
+                                (arg_name.clone(), arg_type.convert_generic_to_concrete())
+                            })
+                            .collect(),
+                        Box::new(self.expand_generic_declarations(func_body)),
+                        Box::new(self.expand_generic_declarations(body)),
+                    )
+                }
             }
 
-            UntypedNode::FunctionCall(parent, arguments) => {
+            FunctionCall(parent, arguments) => {
                 // If generic, we can assume that the function's name must be a named function. Otherwise, keep expanding
                 // as normal
-                let new_name = if let UntypedNode::FunctionInstance(function, sub_types) = &**parent
-                {
+                let new_name = if let FunctionInstance(function, sub_types) = &**parent {
                     let original_name = match &**function {
-                        UntypedNode::Variable(original_name) => original_name,
+                        Variable(original_name) => original_name,
                         _ => panic!("expected generic function call to be named."),
                     };
 
@@ -361,12 +359,12 @@ impl DataTypePass {
                     )
                     .to_string();
 
-                    UntypedNode::Variable(concrete_name)
+                    Variable(concrete_name)
                 } else {
                     self.expand_generic_declarations(parent)
                 };
 
-                UntypedNode::FunctionCall(
+                FunctionCall(
                     Box::new(new_name),
                     arguments
                         .iter()
@@ -375,7 +373,7 @@ impl DataTypePass {
                 )
             }
 
-            UntypedNode::RecordInstance(name, type_params, fields) => {
+            RecordInstance(name, type_params, fields) => {
                 let new_name = if !type_params.is_empty() {
                     AstType::Generic(
                         name.clone(),
@@ -389,7 +387,7 @@ impl DataTypePass {
                     name.clone()
                 };
 
-                UntypedNode::RecordInstance(
+                RecordInstance(
                     new_name,
                     Vec::new(),
                     fields
@@ -404,8 +402,8 @@ impl DataTypePass {
                 )
             }
 
-            UntypedNode::EnumDeclaration(name, variants, type_params, body) => {
-                UntypedNode::EnumDeclaration(
+            EnumDeclaration(name, variants, type_params, body) => {
+                EnumDeclaration(
                     name.clone(),
                     variants
                         .iter()
@@ -419,17 +417,17 @@ impl DataTypePass {
                 )
             }
 
-            UntypedNode::List(elements) => UntypedNode::List(
+            List(elements) => List(
                 elements
                     .iter()
                     .map(|element| self.expand_generic_declarations(element))
                     .collect(),
             ),
 
-            UntypedNode::AnonymousRecord(..) => todo!("handle anonymous records"),
-            UntypedNode::FunctionInstance(..) => todo!("handle generic functions"),
+            AnonymousRecord(..) => todo!("handle anonymous records"),
+            FunctionInstance(..) => todo!("handle generic functions"),
 
-            UntypedNode::CaseOf(_expr, _arms) => {
+            CaseOf(_expr, _arms) => {
                 todo!("add generic checking to case of")
             }
         }

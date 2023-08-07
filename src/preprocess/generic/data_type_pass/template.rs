@@ -1,6 +1,5 @@
 use crate::ast::untyped::{ast_type::AstType, untyped_node::UntypedNode};
-
-use super::template::{substitute_all, Template};
+use crate::preprocess::generic::template::{substitute_all, Template};
 
 #[derive(Debug)]
 pub struct RecordTemplate {

@@ -1,6 +1,5 @@
-pub mod function_template;
 pub mod phase;
-pub mod record_template;
 pub mod template;
 
-mod passes;
+pub mod data_type_pass;
+pub mod function_pass;
