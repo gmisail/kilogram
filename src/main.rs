@@ -1,11 +1,8 @@
-use owo_colors::OwoColorize;
 use std::{
     fs::{self, File},
     io::Read,
-    time::Instant,
 };
-use tracing::{error, info, trace};
-use tracing_subscriber::Registry;
+use tracing::error;
 
 pub mod ast;
 pub mod compiler;

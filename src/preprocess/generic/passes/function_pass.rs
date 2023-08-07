@@ -137,7 +137,7 @@ impl FunctionPass {
                 }
 
                 if !type_params.is_empty() {
-                    if let Some(_) = self.templates.insert(
+                    let inserted_template = self.templates.insert(
                         name.clone(),
                         FunctionTemplate::new(
                             type_params.clone(),
@@ -145,7 +145,9 @@ impl FunctionPass {
                             return_type.clone(),
                             (**func_body).clone(),
                         ),
-                    ) {
+                    );
+
+                    if inserted_template.is_some() {
                         panic!(
                             "TODO: handle this gracefully. This function template already exists."
                         );
@@ -309,23 +311,15 @@ impl FunctionPass {
 
             FunctionDeclaration(name, type_params, return_type, arguments, func_body, body) => {
                 if !type_params.is_empty() {
-                    println!("make monomorphized copies for {name}...");
-
                     // Expand the rest of the code first.
                     let expanded_body = self.expand_generic_declarations(body);
 
+                    // Find the respective template, unique type parameters.
                     let template = self.templates.get(name).unwrap();
                     let types = self.types.get(name).unwrap().clone();
 
-                    println!("unique types: {types:?}");
-
-                    println!("BEFORE: {:#?}", template);
-
-                    let res = template.substitute(&types, expanded_body);
-
-                    println!("AFTER: {:#?}", res);
-
-                    res
+                    // Given these types, generate copies of the function template.
+                    template.substitute(&types, expanded_body)
                 } else {
                     /*
                         Not generic? Don't apply any substitutions, just convert types to concrete

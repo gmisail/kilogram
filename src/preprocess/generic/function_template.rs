@@ -28,7 +28,7 @@ impl FunctionTemplate {
     }
 
     // From a list of generic parameters and substitutions, get a list of concrete types.
-    fn resolve_parameters(&self, substitutions: &Vec<(String, AstType)>) -> Vec<(String, AstType)> {
+    fn resolve_parameters(&self, substitutions: &[(String, AstType)]) -> Vec<(String, AstType)> {
         self.func_params
             .iter()
             .map(|(param_name, param_type)| {
@@ -42,195 +42,10 @@ impl FunctionTemplate {
             .collect()
     }
 
-    fn resolve_return_type(&self, substitutions: &Vec<(String, AstType)>) -> AstType {
+    fn resolve_return_type(&self, substitutions: &[(String, AstType)]) -> AstType {
         substitute_all(self.func_return.clone(), substitutions)
     }
 
-    fn substitute_body(
-        &self,
-        root: UntypedNode,
-        substitutions: &Vec<(String, AstType)>,
-    ) -> UntypedNode {
-        match root {
-            Integer(..) | Variable(..) | Float(..) | Str(..) | Boolean(..) | Get(..) => root,
-
-            RecordDeclaration(name, fields, type_params, body) => {
-                // TODO: check for collisions in types, i.e. if 'T is being substituted, 'T can't be a type param of the record declaration
-
-                RecordDeclaration(
-                    name.clone(),
-                    fields
-                        .iter()
-                        .map(|(field_name, field_type)| {
-                            (
-                                field_name.clone(),
-                                substitute_all(field_type.clone(), substitutions),
-                            )
-                        })
-                        .collect(),
-                    type_params,
-                    Box::new(self.substitute_body(*body, substitutions)),
-                )
-            }
-
-            Group(body) => self.substitute_body(*body, substitutions),
-
-            Extern(extern_name, extern_type, body) => Extern(
-                extern_name.clone(),
-                extern_type.clone(),
-                Box::new(self.substitute_body(*body, substitutions)),
-            ),
-
-            Let(name, var_type, var_value, body, is_recursive) => {
-                let substituted_type = if let Some(assigned_type) = var_type {
-                    Some(substitute_all(assigned_type, substitutions))
-                } else {
-                    None
-                };
-
-                Let(
-                    name.clone(),
-                    substituted_type,
-                    Box::new(self.substitute_body(*var_value, substitutions)),
-                    Box::new(self.substitute_body(*body, substitutions)),
-                    is_recursive,
-                )
-            }
-
-            Unary(value, operator) => Unary(
-                Box::new(self.substitute_body(*value, substitutions)),
-                operator.clone(),
-            ),
-
-            Binary(left_value, operator, right_value) => Binary(
-                Box::new(self.substitute_body(*left_value, substitutions)),
-                operator.clone(),
-                Box::new(self.substitute_body(*right_value, substitutions)),
-            ),
-
-            Logical(left_value, operator, right_value) => Logical(
-                Box::new(self.substitute_body(*left_value, substitutions)),
-                operator.clone(),
-                Box::new(self.substitute_body(*right_value, substitutions)),
-            ),
-
-            If(if_cond, then_expr, else_expr) => If(
-                Box::new(self.substitute_body(*if_cond, substitutions)),
-                Box::new(self.substitute_body(*then_expr, substitutions)),
-                Box::new(self.substitute_body(*else_expr, substitutions)),
-            ),
-
-            Function(return_type, arguments, body) => Function(
-                substitute_all(return_type, &substitutions),
-                arguments
-                    .iter()
-                    .map(|(arg_name, arg_type)| {
-                        (
-                            arg_name.clone(),
-                            substitute_all(arg_type.clone(), &substitutions),
-                        )
-                    })
-                    .collect::<Vec<(String, AstType)>>(),
-                Box::new(self.substitute_body(*body, substitutions)),
-            ),
-
-            FunctionDeclaration(name, type_params, return_type, arguments, func_body, body) => {
-                // TODO: check for collisions with type params
-
-                let substituted_return = substitute_all(return_type, substitutions);
-                let substituted_args = arguments
-                    .iter()
-                    .map(|(arg_name, arg_type)| {
-                        (
-                            arg_name.clone(),
-                            substitute_all(arg_type.clone(), substitutions),
-                        )
-                    })
-                    .collect();
-
-                FunctionDeclaration(
-                    name,
-                    type_params,
-                    substituted_return,
-                    substituted_args,
-                    Box::new(self.substitute_body(*func_body, substitutions)),
-                    Box::new(self.substitute_body(*body, substitutions)),
-                )
-            }
-
-            FunctionCall(parent, arguments) => {
-                if let FunctionInstance(function, sub_types) = *parent {
-                    FunctionInstance(
-                        Box::new(self.substitute_body(*function, substitutions)),
-                        sub_types
-                            .iter()
-                            .map(|sub_type| substitute_all(sub_type.clone(), substitutions))
-                            .collect(),
-                    )
-                } else {
-                    FunctionCall(
-                        Box::new(self.substitute_body(*parent, substitutions)),
-                        arguments
-                            .iter()
-                            .map(|argument| self.substitute_body(argument.clone(), substitutions))
-                            .collect(),
-                    )
-                }
-            }
-
-            RecordInstance(name, type_params, fields) => RecordInstance(
-                name,
-                type_params
-                    .iter()
-                    .map(|type_param| substitute_all(type_param.clone(), substitutions))
-                    .collect(),
-                fields
-                    .iter()
-                    .map(|(field_name, field_value)| {
-                        (
-                            field_name.clone(),
-                            self.substitute_body(field_value.clone(), substitutions),
-                        )
-                    })
-                    .collect(),
-            ),
-
-            // TODO: check for collisions with type params
-            EnumDeclaration(name, variants, type_params, body) => EnumDeclaration(
-                name.clone(),
-                variants
-                    .iter()
-                    .map(|(variant_name, variant_types)| {
-                        (
-                            variant_name.clone(),
-                            variant_types
-                                .iter()
-                                .map(|variant_type| {
-                                    substitute_all(variant_type.clone(), substitutions)
-                                })
-                                .collect::<Vec<AstType>>(),
-                        )
-                    })
-                    .collect(),
-                type_params.clone(),
-                Box::new(self.substitute_body(*body, substitutions)),
-            ),
-
-            List(elements) => List(
-                elements
-                    .iter()
-                    .map(|element| self.substitute_body(element.clone(), substitutions))
-                    .collect(),
-            ),
-
-            AnonymousRecord(..) => todo!("handle anonymous records"),
-            FunctionInstance(..) => todo!("handle generic functions"),
-
-            CaseOf(_expr, _arms) => {
-                todo!("add generic checking to case of")
-            }
-        }
-    }
     /*
        TODO: replace all type parameters in the function body with the concrete type
        TODO: re-evaluate the body to check for any unique types
@@ -260,7 +75,7 @@ impl Template for FunctionTemplate {
                     Box::new(Function(
                         self.resolve_return_type(&substitution_pairs),
                         self.resolve_parameters(&substitution_pairs),
-                        Box::new(self.substitute_body(self.func_body.clone(), &substitution_pairs)),
+                        Box::new(substitute_body(self.func_body.clone(), &substitution_pairs)),
                     )),
                     Box::new(self.substitute(tail, body)),
                     false,
@@ -268,6 +83,182 @@ impl Template for FunctionTemplate {
             }
 
             [] => body,
+        }
+    }
+}
+
+pub fn substitute_body(root: UntypedNode, substitutions: &Vec<(String, AstType)>) -> UntypedNode {
+    match root {
+        Integer(..) | Variable(..) | Float(..) | Str(..) | Boolean(..) | Get(..) => root,
+
+        RecordDeclaration(name, fields, type_params, body) => {
+            // TODO: check for collisions in types, i.e. if 'T is being substituted, 'T can't be a type param of the record declaration
+            RecordDeclaration(
+                name.clone(),
+                fields
+                    .iter()
+                    .map(|(field_name, field_type)| {
+                        (
+                            field_name.clone(),
+                            substitute_all(field_type.clone(), substitutions),
+                        )
+                    })
+                    .collect(),
+                type_params,
+                Box::new(substitute_body(*body, substitutions)),
+            )
+        }
+
+        Group(body) => substitute_body(*body, substitutions),
+
+        Extern(extern_name, extern_type, body) => Extern(
+            extern_name.clone(),
+            extern_type.clone(),
+            Box::new(substitute_body(*body, substitutions)),
+        ),
+
+        Let(name, var_type, var_value, body, is_recursive) => {
+            let substituted_type =
+                var_type.map(|assigned_type| substitute_all(assigned_type, substitutions));
+
+            Let(
+                name.clone(),
+                substituted_type,
+                Box::new(substitute_body(*var_value, substitutions)),
+                Box::new(substitute_body(*body, substitutions)),
+                is_recursive,
+            )
+        }
+
+        Unary(value, operator) => Unary(
+            Box::new(substitute_body(*value, substitutions)),
+            operator.clone(),
+        ),
+
+        Binary(left_value, operator, right_value) => Binary(
+            Box::new(substitute_body(*left_value, substitutions)),
+            operator.clone(),
+            Box::new(substitute_body(*right_value, substitutions)),
+        ),
+
+        Logical(left_value, operator, right_value) => Logical(
+            Box::new(substitute_body(*left_value, substitutions)),
+            operator.clone(),
+            Box::new(substitute_body(*right_value, substitutions)),
+        ),
+
+        If(if_cond, then_expr, else_expr) => If(
+            Box::new(substitute_body(*if_cond, substitutions)),
+            Box::new(substitute_body(*then_expr, substitutions)),
+            Box::new(substitute_body(*else_expr, substitutions)),
+        ),
+
+        Function(return_type, arguments, body) => Function(
+            substitute_all(return_type, substitutions),
+            arguments
+                .iter()
+                .map(|(arg_name, arg_type)| {
+                    (
+                        arg_name.clone(),
+                        substitute_all(arg_type.clone(), substitutions),
+                    )
+                })
+                .collect::<Vec<(String, AstType)>>(),
+            Box::new(substitute_body(*body, substitutions)),
+        ),
+
+        FunctionDeclaration(name, type_params, return_type, arguments, func_body, body) => {
+            // TODO: check for collisions with type params
+
+            let substituted_return = substitute_all(return_type, substitutions);
+            let substituted_args = arguments
+                .iter()
+                .map(|(arg_name, arg_type)| {
+                    (
+                        arg_name.clone(),
+                        substitute_all(arg_type.clone(), substitutions),
+                    )
+                })
+                .collect();
+
+            FunctionDeclaration(
+                name,
+                type_params,
+                substituted_return,
+                substituted_args,
+                Box::new(substitute_body(*func_body, substitutions)),
+                Box::new(substitute_body(*body, substitutions)),
+            )
+        }
+
+        FunctionCall(parent, arguments) => {
+            if let FunctionInstance(function, sub_types) = *parent {
+                FunctionInstance(
+                    Box::new(substitute_body(*function, substitutions)),
+                    sub_types
+                        .iter()
+                        .map(|sub_type| substitute_all(sub_type.clone(), substitutions))
+                        .collect(),
+                )
+            } else {
+                FunctionCall(
+                    Box::new(substitute_body(*parent, substitutions)),
+                    arguments
+                        .iter()
+                        .map(|argument| substitute_body(argument.clone(), substitutions))
+                        .collect(),
+                )
+            }
+        }
+
+        RecordInstance(name, type_params, fields) => RecordInstance(
+            name,
+            type_params
+                .iter()
+                .map(|type_param| substitute_all(type_param.clone(), substitutions))
+                .collect(),
+            fields
+                .iter()
+                .map(|(field_name, field_value)| {
+                    (
+                        field_name.clone(),
+                        substitute_body(field_value.clone(), substitutions),
+                    )
+                })
+                .collect(),
+        ),
+
+        // TODO: check for collisions with type params
+        EnumDeclaration(name, variants, type_params, body) => EnumDeclaration(
+            name.clone(),
+            variants
+                .iter()
+                .map(|(variant_name, variant_types)| {
+                    (
+                        variant_name.clone(),
+                        variant_types
+                            .iter()
+                            .map(|variant_type| substitute_all(variant_type.clone(), substitutions))
+                            .collect::<Vec<AstType>>(),
+                    )
+                })
+                .collect(),
+            type_params.clone(),
+            Box::new(substitute_body(*body, substitutions)),
+        ),
+
+        List(elements) => List(
+            elements
+                .iter()
+                .map(|element| substitute_body(element.clone(), substitutions))
+                .collect(),
+        ),
+
+        AnonymousRecord(..) => todo!("handle anonymous records"),
+        FunctionInstance(..) => todo!("handle generic functions"),
+
+        CaseOf(_expr, _arms) => {
+            todo!("add generic checking to case of")
         }
     }
 }
