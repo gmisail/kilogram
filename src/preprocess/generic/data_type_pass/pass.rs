@@ -321,7 +321,7 @@ impl DataTypePass {
             ),
 
             UntypedNode::Function(return_type, arguments, body) => UntypedNode::Function(
-                return_type.clone(),
+                return_type.convert_generic_to_concrete(),
                 arguments.clone(),
                 Box::new(self.expand_generic_declarations(body)),
             ),
