@@ -30,6 +30,14 @@ function transform['T](value: 'T, transformer: ('T) -> 'T): 'T
     transformer(value)
 end
 
+function pipeline['T](value: 'T): 'T
+    let square = function(inner_value: 'T): 'T
+        inner_value * inner_value
+    end
+
+    square(value)
+end
+
 let temp_a = make_pair[int, int](10, 20)
 let temp_b = make_pair[int, float](10, 3.14)
 let temp_c = make_pair[float, string](3.14, "<--- this number")
@@ -40,17 +48,5 @@ let temp_f = make_pair[int, bool](10, false)
 let before_combination = make_pair[int, float](59, 2.14)
 let combined = combine_pairs[int, float](temp_b, before_combination)
 
-let square = function(value: int): int
-    value * value
-end
 
-print(
-    int_to_string(
-        transform[int](
-            10,
-            function(value: int): int
-                value * 10
-            end
-        )
-    )
-)
+print(int_to_string(pipeline[int](11)))

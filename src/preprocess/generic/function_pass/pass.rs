@@ -1,4 +1,5 @@
 use std::collections::{BTreeSet, HashMap};
+use tracing::info;
 
 use crate::ast::untyped::ast_type::AstType;
 use crate::ast::untyped::untyped_node::UntypedNode;
@@ -311,10 +312,14 @@ impl FunctionPass {
 
                     // Find the respective template, unique type parameters.
                     let template = self.templates.get(name).unwrap();
-                    let types = self.types.get(name).unwrap().clone();
 
-                    // Given these types, generate copies of the function template.
-                    template.substitute(&types, expanded_body)
+                    // In case there are no instances of this generic functions, ignore it.
+                    if let Some(types) = self.types.get(name) {
+                        // Given these types, generate copies of the function template.
+                        template.substitute(&types, expanded_body)
+                    } else {
+                        expanded_body
+                    }
                 } else {
                     /*
                         Not generic? Don't apply any substitutions, just convert types to concrete
