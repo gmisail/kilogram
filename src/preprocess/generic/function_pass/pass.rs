@@ -243,16 +243,12 @@ impl FunctionPass {
 
             Get(_, parent) => self.expand_generic_declarations(parent),
 
-            RecordDeclaration(name, fields, type_params, body) => {
-                // TODO: do something here??
-
-                RecordDeclaration(
-                    name.clone(),
-                    fields.clone(),
-                    type_params.clone(),
-                    Box::new(self.expand_generic_declarations(body)),
-                )
-            }
+            RecordDeclaration(name, fields, type_params, body) => RecordDeclaration(
+                name.clone(),
+                fields.clone(),
+                type_params.clone(),
+                Box::new(self.expand_generic_declarations(body)),
+            ),
 
             Group(body) => self.expand_generic_declarations(body),
 
@@ -263,6 +259,7 @@ impl FunctionPass {
             ),
 
             Let(name, var_type, var_value, body, is_recursive) => {
+                // TODO: do we need this, we're not going to be converting generic records to concrete types in this phase.
                 let concrete_type = if let Some(generic_type @ AstType::Generic(..)) = var_type {
                     Some(AstType::Base(
                         generic_type.convert_generic_to_concrete().to_string(),
@@ -377,34 +374,19 @@ impl FunctionPass {
                 )
             }
 
-            RecordInstance(name, type_params, fields) => {
-                let new_name = if !type_params.is_empty() {
-                    AstType::Generic(
-                        name.clone(),
-                        type_params
-                            .iter()
-                            .map(|type_param| type_param.convert_generic_to_concrete())
-                            .collect(),
-                    )
-                    .to_string()
-                } else {
-                    name.clone()
-                };
-
-                RecordInstance(
-                    new_name,
-                    Vec::new(),
-                    fields
-                        .iter()
-                        .map(|(field_name, field_value)| {
-                            (
-                                field_name.clone(),
-                                self.expand_generic_declarations(field_value),
-                            )
-                        })
-                        .collect(),
-                )
-            }
+            RecordInstance(name, type_params, fields) => RecordInstance(
+                name.clone(),
+                type_params.clone(),
+                fields
+                    .iter()
+                    .map(|(field_name, field_value)| {
+                        (
+                            field_name.clone(),
+                            self.expand_generic_declarations(field_value),
+                        )
+                    })
+                    .collect(),
+            ),
 
             EnumDeclaration(name, variants, type_params, body) => {
                 EnumDeclaration(

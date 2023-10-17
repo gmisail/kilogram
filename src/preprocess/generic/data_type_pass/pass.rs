@@ -254,11 +254,13 @@ impl DataTypePass {
                 if !type_params.is_empty() {
                     // Expand the rest of the AST first
                     let expanded_body = self.expand_generic_declarations(body);
-
                     let template = self.record_templates.get(name).unwrap();
-                    let types = self.types.get(name).unwrap().clone();
 
-                    template.substitute(&types, expanded_body)
+                    if let Some(types) = self.types.get(name) {
+                        template.substitute(&types, expanded_body)
+                    } else {
+                        expanded_body
+                    }
                 } else {
                     UntypedNode::RecordDeclaration(
                         name.clone(),

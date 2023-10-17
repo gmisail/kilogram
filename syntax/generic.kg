@@ -6,6 +6,11 @@ record Pair['T, 'S]
 	second: 'S
 end
 
+record Node['T]
+    name: string,
+    value: 'T
+end
+
 function make_pair['T, 'S](
 	first: 'T, 
 	second: 'S
@@ -33,6 +38,9 @@ end
 function pipeline['T, 'S](value: 'T): 'S
     value.first * value.first
 end
+
+let my_node = Node[int] { name: "my node", value: 32 }
+let more_complex_node = Node[Node[int]] { name: "my node", value: Node[int] { name: "inner_node", value: 50 }}
 
 let temp_a = make_pair[int, int](10, 20)
 let temp_b = make_pair[int, float](10, 3.14)
