@@ -175,7 +175,11 @@ impl FunctionPass {
                 );
             }
 
-            Integer(..) | Variable(..) | Float(..) | Str(..) | Boolean(..) | Get(..) => {}
+            Integer(..) | Variable(..) | Float(..) | Str(..) | Boolean(..) => {}
+
+            Get(_, parent) => {
+                self.find_unique_types(parent);
+            }
 
             Group(body) | Extern(_, _, body) => {
                 self.find_unique_types(body);
@@ -235,9 +239,9 @@ impl FunctionPass {
     /// * `root`: node to start expansion
     fn expand_generic_declarations(&mut self, root: &UntypedNode) -> UntypedNode {
         match root {
-            Integer(..) | Variable(..) | Float(..) | Str(..) | Boolean(..) | Get(..) => {
-                root.to_owned()
-            }
+            Integer(..) | Variable(..) | Float(..) | Str(..) | Boolean(..) => root.to_owned(),
+
+            Get(_, parent) => self.expand_generic_declarations(parent),
 
             RecordDeclaration(name, fields, type_params, body) => {
                 // TODO: do something here??
@@ -342,8 +346,8 @@ impl FunctionPass {
             }
 
             FunctionCall(parent, arguments) => {
-                // If generic, we can assume that the function's name must be a named function. Otherwise, keep expanding
-                // as normal
+                // If generic, we can assume that the function's name must be a named function.
+                // Otherwise, keep expanding as normal
                 let new_name = if let FunctionInstance(function, sub_types) = &**parent {
                     let original_name = match &**function {
                         Variable(original_name) => original_name,

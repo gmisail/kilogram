@@ -1,5 +1,5 @@
 use std::collections::{BTreeSet, HashMap};
-use tracing::trace;
+use tracing::{info, trace};
 
 use crate::ast::untyped::ast_type::AstType;
 use crate::ast::untyped::untyped_node::UntypedNode;
@@ -83,8 +83,11 @@ impl DataTypePass {
             | UntypedNode::Variable(..)
             | UntypedNode::Float(..)
             | UntypedNode::Str(..)
-            | UntypedNode::Boolean(..)
-            | UntypedNode::Get(..) => {}
+            | UntypedNode::Boolean(..) => {}
+
+            UntypedNode::Get(_, parent) => {
+                self.find_unique_types(parent);
+            }
 
             UntypedNode::Group(body) | UntypedNode::Extern(_, _, body) => {
                 self.find_unique_types(body);

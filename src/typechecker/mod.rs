@@ -283,8 +283,6 @@ impl Typechecker {
                 .get(variant_name)
                 .expect("Expected variant to be in enum.");
 
-            println!("Checking enum: {variant_name:#?}");
-
             // TODO: check to make sure that types match if using type parameters
 
             // Check that the number of arguments match.

@@ -90,9 +90,6 @@ impl PartialEq for DataType {
 
             DataType::Enum(name, _, _, type_params) => {
                 if let DataType::Enum(other_name, _, _, other_type_params) = other {
-                    println!("{type_params:?}");
-                    println!("{other_type_params:?}");
-
                     // Perform a couple checks:
                     //  - Same name
                     //  - Same number of type parameter bindings
