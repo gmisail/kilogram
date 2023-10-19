@@ -1,29 +1,28 @@
-use std::collections::{BTreeSet, HashMap};
-use tracing::{info, trace};
+
+
 
 use crate::ast::untyped::ast_type::AstType;
 use crate::ast::untyped::untyped_node::UntypedNode;
 use crate::preprocess::generic::data_type_pass::template::RecordTemplate;
+use crate::preprocess::generic::pass_state::PassState;
+use crate::preprocess::generic::phase::ConcretePass;
 
 use crate::preprocess::generic::template::Template;
 
 pub struct DataTypePass {
-    // Ensures uniqueness without needing to check every t
-    all_types: BTreeSet<AstType>,
-    types: HashMap<String, Vec<AstType>>,
-    record_templates: HashMap<String, RecordTemplate>,
+    state: PassState<RecordTemplate>,
 }
 
 impl DataTypePass {
     pub fn new() -> Self {
         DataTypePass {
-            all_types: BTreeSet::new(),
-            types: HashMap::new(),
-            record_templates: HashMap::new(),
+            state: PassState::new(),
         }
     }
+}
 
-    pub fn apply(&mut self, node: &UntypedNode) -> UntypedNode {
+impl ConcretePass for DataTypePass {
+    fn apply(&mut self, node: &UntypedNode) -> UntypedNode {
         // First, search the AST for usages of generic types.
         self.find_unique_types(node);
 
@@ -31,46 +30,8 @@ impl DataTypePass {
         self.expand_generic_declarations(node)
     }
 
-    /// Recurse through a type searching for unique generic type instances, creating them
-    /// if they do not exist.
-    ///
-    /// * `ast_type`: type to search on
-    fn resolve_generic_type(&mut self, ast_type: &AstType) {
-        match ast_type {
-            // Base types (int, float, etc...) can't be generic.
-            AstType::Base(_) => (),
-
-            AstType::Generic(name, sub_types) => {
-                for sub_type in sub_types {
-                    self.resolve_generic_type(sub_type);
-                }
-
-                let new_type = AstType::Generic(name.clone(), sub_types.clone());
-
-                self.register_type(name.clone(), new_type);
-            }
-
-            AstType::Function(arguments, return_type) => {
-                for argument in arguments {
-                    self.resolve_generic_type(argument);
-                }
-
-                self.resolve_generic_type(return_type);
-            }
-            AstType::Record(fields) => {
-                for (_, field_type) in fields {
-                    self.resolve_generic_type(field_type);
-                }
-            }
-        }
-    }
-
     fn register_type(&mut self, name: String, ast_type: AstType) {
-        if !self.all_types.contains(&ast_type) {
-            self.all_types.insert(ast_type.clone());
-
-            self.types.entry(name).or_insert(Vec::new()).push(ast_type);
-        }
+        self.state.register_type(name, ast_type);
     }
 
     /// Search the AST for generic types and save all unique configurations.
@@ -96,7 +57,7 @@ impl DataTypePass {
             UntypedNode::RecordDeclaration(name, fields, type_params, body) => {
                 // If we have more than one type parameter, then this is a generic record.
                 if !type_params.is_empty() {
-                    self.record_templates.insert(
+                    self.state.register_template(
                         name.clone(),
                         RecordTemplate::new(type_params.clone(), fields.clone()),
                     );
@@ -152,7 +113,7 @@ impl DataTypePass {
 
                     if let UntypedNode::Variable(function_name) = &**base {
                         // TODO: maybe we should separate this into separate sets, i.e. not mix functions and other types?
-                        self.register_type(
+                        self.state.register_type(
                             function_name.clone(),
                             AstType::Generic(function_name.clone(), sub_types.clone()),
                         );
@@ -193,7 +154,7 @@ impl DataTypePass {
 
                 // If the type is generic, add it to the list of generic type configurations.
                 if !type_params.is_empty() {
-                    self.register_type(
+                    self.state.register_type(
                         name.clone(),
                         AstType::Generic(name.clone(), type_params.clone()),
                     );
@@ -225,7 +186,7 @@ impl DataTypePass {
                     self.resolve_generic_type(sub_type);
                 }
 
-                self.register_type(
+                self.state.register_type(
                     name.clone(),
                     AstType::Generic(name.clone(), sub_types.clone()),
                 );
@@ -254,10 +215,10 @@ impl DataTypePass {
                 if !type_params.is_empty() {
                     // Expand the rest of the AST first
                     let expanded_body = self.expand_generic_declarations(body);
-                    let template = self.record_templates.get(name).unwrap();
+                    let template = self.state.get_template(name).unwrap();
 
-                    if let Some(types) = self.types.get(name) {
-                        template.substitute(&types, expanded_body)
+                    if let Some(types) = self.state.get_types(name) {
+                        template.substitute(types, expanded_body)
                     } else {
                         expanded_body
                     }

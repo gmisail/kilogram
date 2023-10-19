@@ -1074,7 +1074,7 @@ pub fn parse(input: String) -> Result<UntypedNode, &'static str> {
             Ok(node) => {
                 expressions.push(node);
             }
-            Err(e) => {
+            Err(_e) => {
                 context.advance_token();
             }
         }

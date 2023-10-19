@@ -6,8 +6,8 @@ pub trait Template {
 
 pub fn substitute_all(subject_type: AstType, types: &[(String, AstType)]) -> AstType {
     match types {
-        [(type_name, subtituted_type), tail @ ..] => {
-            let result = subject_type.substitute_type_parameter(type_name, subtituted_type);
+        [(type_name, substituted_type), tail @ ..] => {
+            let result = subject_type.substitute_type_parameter(type_name, substituted_type);
 
             substitute_all(result, tail)
         }

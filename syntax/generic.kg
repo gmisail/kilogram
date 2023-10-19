@@ -39,6 +39,14 @@ function pipeline['T, 'S](value: 'T): 'S
     value.first * value.first
 end
 
+function partially_applied_record['T](value: 'T): Pair[string, 'T]
+    Pair[string, 'T] { first: "hello", second: value }
+end
+
+let partial_test_a = partially_applied_record[int](10)
+let partial_test_b = partially_applied_record[string]("world")
+let partial_test_c = partially_applied_record[bool](false)
+
 let my_node = Node[int] { name: "my node", value: 32 }
 let more_complex_node = Node[Node[int]] { name: "my node", value: Node[int] { name: "inner_node", value: 50 }}
 
@@ -48,6 +56,8 @@ let temp_c = make_pair[float, string](3.14, "<--- this number")
 let temp_d = make_pair[string, int]("PI", 20)
 let temp_e = make_pair[bool, string](true, "TRUE")
 let temp_f = make_pair[int, bool](10, false)
+let temp_g = make_pair[string, Pair[string, int]]("A", Pair[string, int] { first: "B", second: 5 })
+let temp_h = make_pair[string, Pair[string, int]]("A", make_pair[string, int]("B", 5))
 
 let before_combination = make_pair[int, float](59, 2.14)
 let combined = combine_pairs[int, float](temp_b, before_combination)
