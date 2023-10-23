@@ -1,0 +1,6 @@
+enum Sequence
+	Cons(int, Sequence),
+	Nil
+end
+
+Cons(10, Nil)

@@ -58,7 +58,7 @@ fn compile(file: &str) -> Result<(), String> {
 }
 
 fn main() {
-    match compile("./syntax/generic.kg") {
+    match compile("./syntax/enum.kg") {
         Ok(()) => println!("Done."),
         Err(e) => panic!("{e}"),
     }

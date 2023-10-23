@@ -1,6 +1,3 @@
-
-
-
 use crate::ast::untyped::ast_type::AstType;
 use crate::ast::untyped::untyped_node::UntypedNode;
 use crate::ast::untyped::untyped_node::UntypedNode::*;
@@ -179,8 +176,14 @@ impl ConcretePass for FunctionPass {
 
             RecordDeclaration(_, _, _, body) => self.find_unique_types(body),
 
-            EnumDeclaration(_name, _variants, _type_params, _body) => {
-                todo!("add generic enum checking")
+            EnumDeclaration(_, variants, _, body) => {
+                for (_, variant_types) in variants {
+                    for variant_type in variant_types {
+                        self.resolve_generic_type(variant_type);
+                    }
+                }
+
+                self.find_unique_types(body);
             }
 
             List(elements) => {
@@ -349,20 +352,23 @@ impl ConcretePass for FunctionPass {
                     .collect(),
             ),
 
-            EnumDeclaration(name, variants, type_params, body) => {
-                EnumDeclaration(
-                    name.clone(),
-                    variants
-                        .iter()
-                        .map(|(variant_name, _variant_types)| {
-                            // TODO: convert generic types to concrete types.
-                            (variant_name.clone(), Vec::new())
-                        })
-                        .collect(),
-                    type_params.clone(),
-                    Box::new(self.expand_generic_declarations(body)),
-                )
-            }
+            EnumDeclaration(name, variants, type_params, body) => EnumDeclaration(
+                name.clone(),
+                variants
+                    .iter()
+                    .map(|(variant_name, variant_types)| {
+                        (
+                            variant_name.clone(),
+                            variant_types
+                                .iter()
+                                .map(|variant_type| variant_type.convert_generic_to_concrete())
+                                .collect(),
+                        )
+                    })
+                    .collect(),
+                type_params.clone(),
+                Box::new(self.expand_generic_declarations(body)),
+            ),
 
             List(elements) => List(
                 elements
