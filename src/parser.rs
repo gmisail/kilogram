@@ -725,7 +725,16 @@ impl Parser {
 
             let mut type_params = Vec::new();
 
-            if self.match_token(&TokenKind::LeftParen) {
+            /*
+               check to see if there is a bracket; if so,
+               then we're dealing with a generic enum.
+                         ||
+                         \/
+                enum Node['T]
+                    ... variants ...
+                end
+            */
+            if self.match_token(&TokenKind::LeftBracket) {
                 self.advance_token();
 
                 loop {
@@ -746,7 +755,7 @@ impl Parser {
 
                     type_params.push(type_param);
 
-                    if self.match_token(&TokenKind::RightParen) {
+                    if self.match_token(&TokenKind::RightBracket) {
                         self.advance_token();
 
                         break;

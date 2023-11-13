@@ -34,10 +34,7 @@ impl FunctionTemplate {
             .map(|(param_name, param_type)| {
                 let original_type = substitute_all(param_type.clone(), substitutions);
 
-                (
-                    param_name.clone(),
-                    original_type.convert_generic_to_concrete(),
-                )
+                (param_name.clone(), original_type.as_concrete())
             })
             .collect()
     }

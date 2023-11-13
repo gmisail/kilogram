@@ -3,30 +3,25 @@ use crate::ast::untyped::untyped_node::UntypedNode;
 use crate::preprocess::generic::data_type_pass::template::RecordTemplate;
 use crate::preprocess::generic::pass_state::PassState;
 use crate::preprocess::generic::phase::ConcretePass;
+use std::collections::HashSet;
 
 use crate::preprocess::generic::template::Template;
 
 pub struct DataTypePass {
     state: PassState<RecordTemplate>,
+    records: HashSet<String>,
 }
 
 impl DataTypePass {
     pub fn new() -> Self {
         DataTypePass {
             state: PassState::new(),
+            records: HashSet::new(),
         }
     }
 }
 
 impl ConcretePass for DataTypePass {
-    fn apply(&mut self, node: &UntypedNode) -> UntypedNode {
-        // First, search the AST for usages of generic types.
-        self.find_unique_types(node);
-
-        // Once these are found, convert them into concrete type declarations.
-        self.expand_generic_declarations(node)
-    }
-
     fn register_type(&mut self, name: String, ast_type: AstType) {
         self.state.register_type(name, ast_type);
     }
@@ -52,6 +47,8 @@ impl ConcretePass for DataTypePass {
             }
 
             UntypedNode::RecordDeclaration(name, fields, type_params, body) => {
+                self.records.insert(name.clone());
+
                 // If we have more than one type parameter, then this is a generic record.
                 if !type_params.is_empty() {
                     self.state.register_template(
@@ -214,30 +211,20 @@ impl ConcretePass for DataTypePass {
             | UntypedNode::Get(..) => root.to_owned(),
 
             UntypedNode::RecordDeclaration(name, fields, type_params, body) => {
-                // More than one type parameter? Must be generic record.
-                if !type_params.is_empty() {
-                    // Expand the rest of the AST first
-                    let expanded_body = self.expand_generic_declarations(body);
-                    let template = self.state.get_template(name).unwrap();
-
-                    if let Some(types) = self.state.get_types(name) {
-                        template.substitute(types, expanded_body)
-                    } else {
-                        expanded_body
-                    }
-                } else {
-                    UntypedNode::RecordDeclaration(
-                        name.clone(),
-                        fields
-                            .iter()
-                            .map(|(field_name, field_type)| {
-                                (field_name.clone(), field_type.convert_generic_to_concrete())
-                            })
-                            .collect(),
-                        Vec::new(),
-                        Box::new(self.expand_generic_declarations(body)),
-                    )
-                }
+                UntypedNode::RecordDeclaration(
+                    name.clone(),
+                    fields
+                        .iter()
+                        .map(|(field_name, field_type)| {
+                            (
+                                field_name.clone(),
+                                field_type.as_named_concrete(&self.records),
+                            )
+                        })
+                        .collect(),
+                    Vec::new(),
+                    Box::new(self.expand_generic_declarations(body)),
+                )
             }
 
             UntypedNode::Group(body) => self.expand_generic_declarations(body),
@@ -251,7 +238,7 @@ impl ConcretePass for DataTypePass {
             UntypedNode::Let(name, var_type, var_value, body, is_recursive) => {
                 let concrete_type = if let Some(generic_type @ AstType::Generic(..)) = var_type {
                     Some(AstType::Base(
-                        generic_type.convert_generic_to_concrete().to_string(),
+                        generic_type.as_named_concrete(&self.records).to_string(),
                     ))
                 } else {
                     var_type.clone()
@@ -290,7 +277,7 @@ impl ConcretePass for DataTypePass {
             ),
 
             UntypedNode::Function(return_type, arguments, body) => UntypedNode::Function(
-                return_type.convert_generic_to_concrete(),
+                return_type.as_named_concrete(&self.records),
                 arguments.clone(),
                 Box::new(self.expand_generic_declarations(body)),
             ),
@@ -299,11 +286,11 @@ impl ConcretePass for DataTypePass {
                 UntypedNode::FunctionDeclaration(
                     name.clone(),
                     Vec::new(),
-                    return_type.convert_generic_to_concrete(),
+                    return_type.as_named_concrete(&self.records),
                     arguments
                         .iter()
                         .map(|(arg_name, arg_type)| {
-                            (arg_name.clone(), arg_type.convert_generic_to_concrete())
+                            (arg_name.clone(), arg_type.as_named_concrete(&self.records))
                         })
                         .collect(),
                     Box::new(self.expand_generic_declarations(func_body)),
@@ -325,7 +312,7 @@ impl ConcretePass for DataTypePass {
                         original_name.clone(),
                         sub_types
                             .iter()
-                            .map(|sub_type| sub_type.convert_generic_to_concrete())
+                            .map(|sub_type| sub_type.as_named_concrete(&self.records))
                             .collect(),
                     )
                     .to_string();
@@ -350,7 +337,7 @@ impl ConcretePass for DataTypePass {
                         name.clone(),
                         type_params
                             .iter()
-                            .map(|type_param| type_param.convert_generic_to_concrete())
+                            .map(|type_param| type_param.as_named_concrete(&self.records))
                             .collect(),
                     )
                     .to_string()
@@ -383,7 +370,9 @@ impl ConcretePass for DataTypePass {
                                 variant_name.clone(),
                                 variant_types
                                     .iter()
-                                    .map(|variant_type| variant_type.convert_generic_to_concrete())
+                                    .map(|variant_type| {
+                                        variant_type.as_named_concrete(&self.records)
+                                    })
                                     .collect(),
                             )
                         })
@@ -400,8 +389,16 @@ impl ConcretePass for DataTypePass {
                     .collect(),
             ),
 
+            UntypedNode::FunctionInstance(base, sub_types) => {
+                let resolved_sub_types = sub_types
+                    .iter()
+                    .map(|sub_type| sub_type.as_named_concrete(&self.records))
+                    .collect();
+
+                UntypedNode::FunctionInstance(base.clone(), resolved_sub_types)
+            }
+
             UntypedNode::AnonymousRecord(..) => todo!("handle anonymous records"),
-            UntypedNode::FunctionInstance(..) => todo!("handle generic functions"),
 
             UntypedNode::CaseOf(_expr, _arms) => {
                 todo!("add generic checking to case of")

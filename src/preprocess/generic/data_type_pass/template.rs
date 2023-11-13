@@ -41,10 +41,7 @@ impl Template for RecordTemplate {
                             let original_type =
                                 substitute_all(field_type.clone(), &substitution_pairs);
 
-                            (
-                                field_name.clone(),
-                                original_type.convert_generic_to_concrete(),
-                            )
+                            (field_name.clone(), original_type.as_concrete())
                         })
                         .collect(),
                     self.type_params.clone(),

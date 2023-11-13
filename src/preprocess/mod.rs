@@ -10,7 +10,6 @@ pub trait PreprocessPhase {
     fn transform(&mut self, root: &UntypedNode) -> UntypedNode;
 }
 
-#[tracing::instrument]
 pub fn apply_all(root: &UntypedNode) -> UntypedNode {
     GenericPhase {}.transform(root)
 }

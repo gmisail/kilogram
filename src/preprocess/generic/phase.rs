@@ -1,12 +1,20 @@
 use crate::ast::untyped::ast_type::AstType;
 use crate::ast::untyped::untyped_node::UntypedNode;
 use crate::preprocess::generic::data_type_pass::pass::DataTypePass;
+use crate::preprocess::generic::enum_pass::pass::EnumPass;
 use crate::preprocess::generic::function_pass::pass::FunctionPass;
 
 use crate::preprocess::PreprocessPhase;
 
 pub trait ConcretePass {
-    fn apply(&mut self, node: &UntypedNode) -> UntypedNode;
+    fn apply(&mut self, node: &UntypedNode) -> UntypedNode {
+        // First, search the AST for usages of generic types.
+        self.find_unique_types(node);
+
+        // Once these are found, convert them into concrete type declarations.
+        self.expand_generic_declarations(node)
+    }
+
     fn register_type(&mut self, name: String, ast_type: AstType);
     fn find_unique_types(&mut self, root: &UntypedNode);
     fn expand_generic_declarations(&mut self, root: &UntypedNode) -> UntypedNode;
@@ -55,9 +63,10 @@ impl PreprocessPhase for GenericPhase {
 
         let func_pass_res = FunctionPass::new().apply(root);
         let data_pass_res = DataTypePass::new().apply(&func_pass_res);
+        let enum_pass_res = EnumPass::new().apply(&data_pass_res);
 
-        println!("{data_pass_res:#?}");
+        println!("{enum_pass_res:#?}");
 
-        data_pass_res
+        enum_pass_res
     }
 }

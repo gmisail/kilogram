@@ -4,6 +4,7 @@ use crate::ast::untyped::untyped_node::UntypedNode::*;
 use crate::preprocess::generic::function_pass::template::FunctionTemplate;
 use crate::preprocess::generic::pass_state::PassState;
 use crate::preprocess::generic::phase::ConcretePass;
+use std::collections::HashSet;
 
 use crate::preprocess::generic::template::Template;
 
@@ -23,25 +24,19 @@ use crate::preprocess::generic::template::Template;
 
 pub struct FunctionPass {
     state: PassState<FunctionTemplate>,
+    enums: HashSet<String>,
 }
 
 impl FunctionPass {
     pub fn new() -> Self {
         FunctionPass {
             state: PassState::new(),
+            enums: HashSet::new(),
         }
     }
 }
 
 impl ConcretePass for FunctionPass {
-    fn apply(&mut self, node: &UntypedNode) -> UntypedNode {
-        // First, search the AST for usages of generic types.
-        self.find_unique_types(node);
-
-        // Once these are found, convert them into concrete type declarations.
-        self.expand_generic_declarations(node)
-    }
-
     fn register_type(&mut self, name: String, ast_type: AstType) {
         self.state.register_type(name, ast_type);
     }
@@ -222,24 +217,13 @@ impl ConcretePass for FunctionPass {
                 Box::new(self.expand_generic_declarations(body)),
             ),
 
-            Let(name, var_type, var_value, body, is_recursive) => {
-                // TODO: do we need this, we're not going to be converting generic records to concrete types in this phase.
-                let concrete_type = if let Some(generic_type @ AstType::Generic(..)) = var_type {
-                    Some(AstType::Base(
-                        generic_type.convert_generic_to_concrete().to_string(),
-                    ))
-                } else {
-                    var_type.clone()
-                };
-
-                Let(
-                    name.clone(),
-                    concrete_type,
-                    Box::new(self.expand_generic_declarations(var_value)),
-                    Box::new(self.expand_generic_declarations(body)),
-                    *is_recursive,
-                )
-            }
+            Let(name, var_type, var_value, body, is_recursive) => Let(
+                name.clone(),
+                var_type.clone(),
+                Box::new(self.expand_generic_declarations(var_value)),
+                Box::new(self.expand_generic_declarations(body)),
+                *is_recursive,
+            ),
 
             Unary(value, operator) => Unary(
                 Box::new(self.expand_generic_declarations(value)),
@@ -290,16 +274,25 @@ impl ConcretePass for FunctionPass {
                         Not generic? Don't apply any substitutions, just convert types to concrete
                         and recurse.
                     */
+                    // FunctionDeclaration(
+                    //     name.clone(),
+                    //     Vec::new(),
+                    //     return_type.as_concrete(),
+                    //     arguments
+                    //         .iter()
+                    //         .map(|(arg_name, arg_type)| {
+                    //             (arg_name.clone(), arg_type.as_concrete())
+                    //         })
+                    //         .collect(),
+                    //     Box::new(self.expand_generic_declarations(func_body)),
+                    //     Box::new(self.expand_generic_declarations(body)),
+                    // )
+
                     FunctionDeclaration(
                         name.clone(),
                         Vec::new(),
-                        return_type.convert_generic_to_concrete(),
-                        arguments
-                            .iter()
-                            .map(|(arg_name, arg_type)| {
-                                (arg_name.clone(), arg_type.convert_generic_to_concrete())
-                            })
-                            .collect(),
+                        return_type.clone(),
+                        arguments.clone(),
                         Box::new(self.expand_generic_declarations(func_body)),
                         Box::new(self.expand_generic_declarations(body)),
                     )
@@ -319,7 +312,7 @@ impl ConcretePass for FunctionPass {
                         original_name.clone(),
                         sub_types
                             .iter()
-                            .map(|sub_type| sub_type.convert_generic_to_concrete())
+                            .map(|sub_type| sub_type.as_concrete())
                             .collect(),
                     )
                     .to_string();
@@ -352,23 +345,27 @@ impl ConcretePass for FunctionPass {
                     .collect(),
             ),
 
-            EnumDeclaration(name, variants, type_params, body) => EnumDeclaration(
-                name.clone(),
-                variants
-                    .iter()
-                    .map(|(variant_name, variant_types)| {
-                        (
-                            variant_name.clone(),
-                            variant_types
-                                .iter()
-                                .map(|variant_type| variant_type.convert_generic_to_concrete())
-                                .collect(),
-                        )
-                    })
-                    .collect(),
-                type_params.clone(),
-                Box::new(self.expand_generic_declarations(body)),
-            ),
+            EnumDeclaration(name, variants, type_params, body) => {
+                self.enums.insert(name.clone());
+
+                EnumDeclaration(
+                    name.clone(),
+                    variants.clone(),
+                    // .iter()
+                    // .map(|(variant_name, variant_types)| {
+                    //     (
+                    //         variant_name.clone(),
+                    //         variant_types
+                    //             .iter()
+                    //             .map(|variant_type| variant_type.as_concrete())
+                    //             .collect(),
+                    //     )
+                    // })
+                    // .collect(),
+                    type_params.clone(),
+                    Box::new(self.expand_generic_declarations(body)),
+                )
+            }
 
             List(elements) => List(
                 elements
@@ -377,8 +374,32 @@ impl ConcretePass for FunctionPass {
                     .collect(),
             ),
 
+            FunctionInstance(base, sub_types) => {
+                let original_name = match &**base {
+                    Variable(original_name) => original_name,
+                    _ => panic!("expected generic function call to be named."),
+                };
+
+                // let resolved_sub_types = sub_types
+                //     .iter()
+                //     .map(|sub_type| sub_type.as_concrete())
+                //     .collect();
+
+                // Function instances are tricky -- at this phase, they
+                // also represent generic enums since they're identical at a syntax level. So, we
+                // need to check what we're dealing with to make sure we're not converting an enum
+                // into a concrete type (we do that later.)
+                if self.enums.contains(original_name) {
+                    FunctionInstance(base.clone(), sub_types.clone())
+                } else {
+                    let concrete_name =
+                        AstType::Generic(original_name.clone(), sub_types.clone()).to_string();
+
+                    Variable(concrete_name)
+                }
+            }
+
             AnonymousRecord(..) => todo!("handle anonymous records"),
-            FunctionInstance(..) => todo!("handle generic functions"),
 
             CaseOf(_expr, _arms) => {
                 todo!("add generic checking to case of")

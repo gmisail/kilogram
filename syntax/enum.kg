@@ -1,6 +1,13 @@
-enum Sequence
-	Cons(int, Sequence),
-	Nil
+enum Sequence['T]
+    Cons('T, Sequence['T]),
+    Nil
 end
 
-Cons(10, Nil)
+function double['T](value: 'T): 'T
+    value * 2
+end
+
+let test = double[int]
+let seq = Sequence[int].Nil
+
+test(10)

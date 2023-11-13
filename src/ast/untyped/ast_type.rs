@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 #[derive(Clone, Debug, Eq, Ord, Hash, PartialOrd, PartialEq)]
 pub enum AstType {
     Base(String),                  // string, int, ...
@@ -45,16 +47,16 @@ impl AstType {
         }
     }
 
-    pub fn convert_generic_to_concrete(&self) -> AstType {
+    pub fn as_concrete(&self) -> AstType {
         match self {
-            AstType::Base(name) => AstType::Base(name.replace('\'', "param_")),
+            AstType::Base(name) => self.clone(),
 
             AstType::Generic(name, sub_types) => {
                 let concrete = AstType::Generic(
                     name.clone(),
                     sub_types
                         .iter()
-                        .map(|sub_type| sub_type.convert_generic_to_concrete())
+                        .map(|sub_type| sub_type.as_concrete())
                         .collect(),
                 );
 
@@ -64,16 +66,59 @@ impl AstType {
             AstType::Function(arguments, return_type) => AstType::Function(
                 arguments
                     .iter()
-                    .map(|argument| Box::new(argument.convert_generic_to_concrete()))
+                    .map(|argument| Box::new(argument.as_concrete()))
                     .collect(),
-                Box::new(return_type.convert_generic_to_concrete()),
+                Box::new(return_type.as_concrete()),
+            ),
+
+            AstType::Record(fields) => AstType::Record(
+                fields
+                    .iter()
+                    .map(|(field_name, field_type)| (field_name.clone(), field_type.as_concrete()))
+                    .collect(),
+            ),
+        }
+    }
+
+    /*
+        Convert named types to concrete types.
+    */
+    pub fn as_named_concrete(&self, names: &HashSet<String>) -> AstType {
+        match self {
+            AstType::Base(name) => self.clone(),
+
+            AstType::Generic(name, sub_types) => {
+                let concrete = AstType::Generic(
+                    name.clone(),
+                    sub_types
+                        .iter()
+                        .map(|sub_type| sub_type.as_named_concrete(names))
+                        .collect(),
+                );
+
+                if names.contains(name) {
+                    AstType::Base(concrete.to_string())
+                } else {
+                    // Don't convert this generic type to concrete, however we may need to
+                    // convert one of the sub-types to concrete. So, walk through the types
+                    // and look for matches to convert.
+                    concrete
+                }
+            }
+
+            AstType::Function(arguments, return_type) => AstType::Function(
+                arguments
+                    .iter()
+                    .map(|argument| Box::new(argument.as_named_concrete(names)))
+                    .collect(),
+                Box::new(return_type.as_named_concrete(names)),
             ),
 
             AstType::Record(fields) => AstType::Record(
                 fields
                     .iter()
                     .map(|(field_name, field_type)| {
-                        (field_name.clone(), field_type.convert_generic_to_concrete())
+                        (field_name.clone(), field_type.as_named_concrete(names))
                     })
                     .collect(),
             ),
