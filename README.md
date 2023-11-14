@@ -6,9 +6,9 @@ into C11 and does not use any external dependencies.
 ### Example
 
 ```lua
-enum Sequence 
+enum Sequence['T]
     None,
-    Cons(int, Sequence)
+    Cons('T, Sequence['T])
 end
 
 record Pair['T, 'S]
@@ -32,6 +32,14 @@ end
 
 let iter = 10
 let user = Pair[string, int] { first: "gmisail", second: 22 }
+
+let list = Sequence[int].Cons(
+    0, 
+    Sequence[int].Cons(
+        1, 
+        Sequence[int].Nil
+    )
+)
 
 print(int_to_string(factorial(iter)))
 ```
