@@ -1,6 +1,7 @@
 use crate::ast::untyped::ast_type::AstType;
 use crate::ast::untyped::untyped_node::UntypedNode;
 use crate::preprocess::generic::template::{substitute_all, Template};
+use std::collections::HashSet;
 
 #[derive(Debug)]
 pub struct EnumTemplate {
@@ -14,6 +15,13 @@ impl EnumTemplate {
             type_params,
             variants,
         }
+    }
+
+    /// When registering a generic, check if it contains generic fields. This indicates a nested
+    /// type that contains a generic, i.e. `List['T]` containing `Cons('T, List['T])`
+    pub fn is_instance_generic(&self, ast_type: &AstType) -> bool {
+        let param_set: HashSet<String> = HashSet::from_iter(self.type_params.iter().cloned());
+        ast_type.is_generic(&param_set)
     }
 }
 
@@ -34,22 +42,15 @@ impl Template for EnumTemplate {
                     .zip(types.iter().cloned())
                     .collect::<Vec<(String, AstType)>>();
 
-                println!("substitution pairs: {substitution_pairs:#?}");
-
                 UntypedNode::EnumDeclaration(
                     head.to_string(),
                     self.variants
                         .iter()
                         .map(|(variant_name, variant_types)| {
-                            println!("variant: {variant_name}, types: {variant_types:?}");
-
                             let original_types: Vec<AstType> = variant_types
                                 .iter()
                                 .map(|variant_type| {
-                                    let res =
-                                        substitute_all(variant_type.clone(), &substitution_pairs);
-
-                                    res
+                                    substitute_all(variant_type.clone(), &substitution_pairs).as_concrete()
                                 })
                                 .collect();
 

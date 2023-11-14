@@ -124,6 +124,33 @@ impl AstType {
             ),
         }
     }
+
+    ///
+    /// Specifies if this type contains a generic type parameter.
+    ///
+    /// Example: List[Pair[string, 'T]]  -> true, 'T exists.
+    ///          List[Pair[string, int]] -> false, no type parameters.
+    ///
+    pub fn is_generic(&self, type_params: &HashSet<String>) -> bool {
+        match self {
+            AstType::Base(name) => type_params.contains(name),
+
+            AstType::Generic(name, sub_types) => sub_types
+                .iter()
+                .any(|sub_type| sub_type.is_generic(type_params)),
+
+            AstType::Function(arguments, return_type) => {
+                arguments
+                    .iter()
+                    .any(|sub_type| sub_type.is_generic(type_params))
+                    && return_type.is_generic(type_params)
+            }
+
+            AstType::Record(fields) => fields
+                .iter()
+                .any(|(_, field_type)| field_type.is_generic(type_params)),
+        }
+    }
 }
 
 impl ToString for AstType {

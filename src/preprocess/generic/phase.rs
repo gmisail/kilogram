@@ -65,8 +65,6 @@ impl PreprocessPhase for GenericPhase {
         let data_pass_res = DataTypePass::new().apply(&func_pass_res);
         let enum_pass_res = EnumPass::new().apply(&data_pass_res);
 
-        println!("{enum_pass_res:#?}");
-
         enum_pass_res
     }
 }

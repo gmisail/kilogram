@@ -5,7 +5,7 @@ use crate::preprocess::generic::pass_state::PassState;
 use crate::preprocess::generic::phase::ConcretePass;
 use crate::preprocess::generic::template::Template;
 use std::collections::HashSet;
-use tracing::info;
+use tracing::{info, warn};
 
 pub struct EnumPass {
     state: PassState<EnumTemplate>,
@@ -23,9 +23,11 @@ impl EnumPass {
 
 impl ConcretePass for EnumPass {
     fn register_type(&mut self, name: String, ast_type: AstType) {
-        info!("Registering enum {name}.");
+        let is_generic = self.state.get_template(&name).unwrap().is_instance_generic(&ast_type);
 
-        self.state.register_type(name, ast_type);
+        if !is_generic {
+            self.state.register_type(name, ast_type);
+        }
     }
 
     fn find_unique_types(&mut self, root: &UntypedNode) {
@@ -121,10 +123,6 @@ impl ConcretePass for EnumPass {
 
             UntypedNode::EnumDeclaration(name, variants, type_params, body) => {
                 if !type_params.is_empty() {
-                    info!(
-                        "Registering enum {name} template, with type parameters {type_params:?}."
-                    );
-
                     self.enums.insert(name.clone());
 
                     self.state.register_template(
@@ -152,11 +150,11 @@ impl ConcretePass for EnumPass {
                 if let UntypedNode::Variable(enum_name) = &**parent {
                     // This isn't a function instance; it's an enum instance in disguise.
                     if self.enums.contains(enum_name) {
-                        self.register_type(
-                            enum_name.clone(),
-                            AstType::Generic(enum_name.clone(), sub_types.clone()),
-                        );
-                    };
+                        let enum_instance_type =
+                            AstType::Generic(enum_name.clone(), sub_types.clone());
+
+                        self.register_type(enum_name.clone(), enum_instance_type);
+                    }
                 };
 
                 for sub_type in sub_types {
@@ -354,13 +352,9 @@ impl ConcretePass for EnumPass {
 
                     // In case there are no instances of this generic functions, ignore it.
                     if let Some(types) = self.state.get_types(name) {
-                        info!("Expanding enum {name} with types {types:?}...");
-
                         // Given these types, generate copies of the function template.
                         template.substitute(types, expanded_body)
                     } else {
-                        info!("Trying to expand enum {name}, but there are no invocations so it's ignored.");
-
                         expanded_body
                     }
                 } else {
@@ -394,12 +388,22 @@ impl ConcretePass for EnumPass {
             ),
 
             UntypedNode::FunctionInstance(base, sub_types) => {
-                let resolved_sub_types = sub_types
+                // TODO: if this function instance is actually an enum, convert it to a concrete
+                // type.
+                let resolved_sub_types: Vec<AstType> = sub_types
                     .iter()
                     .map(|sub_type| sub_type.as_named_concrete(&self.enums))
                     .collect();
 
-                UntypedNode::FunctionInstance(base.clone(), resolved_sub_types)
+                let original_name = match &**base {
+                    UntypedNode::Variable(original_name) => original_name,
+                    _ => panic!("expected generic function call to be named."),
+                };
+
+                let concrete_name =
+                    AstType::Generic(original_name.clone(), resolved_sub_types.clone()).to_string();
+
+                UntypedNode::Variable(concrete_name)
             }
 
             UntypedNode::AnonymousRecord(..) => todo!("handle anonymous records"),
