@@ -3,6 +3,11 @@ enum Sequence['T]
     Nil
 end
 
+record List['T]
+    value: 'T,
+    next: List['T]
+end
+
 function double['T](value: 'T): 'T
     value * 2
 end

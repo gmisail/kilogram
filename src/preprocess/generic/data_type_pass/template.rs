@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+use tracing::info;
 use crate::ast::untyped::{ast_type::AstType, untyped_node::UntypedNode};
 use crate::preprocess::generic::template::{substitute_all, Template};
 
@@ -13,6 +15,11 @@ impl RecordTemplate {
             type_params,
             fields,
         }
+    }
+
+    pub fn is_instance_generic(&self, ast_type: &AstType) -> bool {
+        let param_set: HashSet<String> = HashSet::from_iter(self.type_params.iter().cloned());
+        ast_type.is_generic(&param_set)
     }
 }
 

@@ -185,33 +185,22 @@ impl ConcretePass for EnumPass {
             ),
 
             UntypedNode::RecordDeclaration(name, fields, type_params, body) => {
-                // More than one type parameter? Must be generic record.
-                if !type_params.is_empty() {
-                    // Expand the rest of the AST first
-                    let expanded_body = self.expand_generic_declarations(body);
-                    let template = self.state.get_template(name).unwrap();
-
-                    if let Some(types) = self.state.get_types(name) {
-                        template.substitute(types, expanded_body)
-                    } else {
-                        expanded_body
-                    }
-                } else {
-                    UntypedNode::RecordDeclaration(
-                        name.clone(),
-                        fields
-                            .iter()
-                            .map(|(field_name, field_type)| {
-                                (
-                                    field_name.clone(),
-                                    field_type.as_named_concrete(&self.enums),
-                                )
-                            })
-                            .collect(),
-                        Vec::new(),
-                        Box::new(self.expand_generic_declarations(body)),
-                    )
-                }
+                // Don't need to check for Record Declarations, since at this point it is assumed
+                // that all generic declarations have been expanded.
+                UntypedNode::RecordDeclaration(
+                    name.clone(),
+                    fields
+                        .iter()
+                        .map(|(field_name, field_type)| {
+                            (
+                                field_name.clone(),
+                                field_type.as_named_concrete(&self.enums),
+                            )
+                        })
+                        .collect(),
+                    Vec::new(),
+                    Box::new(self.expand_generic_declarations(body)),
+                )
             }
 
             UntypedNode::Group(body) => self.expand_generic_declarations(body),

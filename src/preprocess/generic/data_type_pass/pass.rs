@@ -23,7 +23,13 @@ impl DataTypePass {
 
 impl ConcretePass for DataTypePass {
     fn register_type(&mut self, name: String, ast_type: AstType) {
-        self.state.register_type(name, ast_type);
+        if let Some(template) = self.state.get_template(&name) {
+            let is_generic = template.is_instance_generic(&ast_type);
+
+            if !is_generic {
+                self.state.register_type(name, ast_type);
+            }
+        }
     }
 
     /// Search the AST for generic types and save all unique configurations.
@@ -177,19 +183,19 @@ impl ConcretePass for DataTypePass {
             }
 
             UntypedNode::FunctionInstance(parent, sub_types) => {
-                let name = match &**parent {
-                    UntypedNode::Variable(function_name) => function_name,
-                    _ => panic!("expected generic function call to be named."),
+                if let UntypedNode::Variable(record_name) = &**parent {
+                    // This isn't a function instance; it's an enum instance in disguise.
+                    if self.records.contains(record_name) {
+                        let record_instance_type =
+                            AstType::Generic(record_name.clone(), sub_types.clone());
+
+                        self.register_type(record_name.clone(), record_instance_type);
+                    }
                 };
 
                 for sub_type in sub_types {
                     self.resolve_generic_type(sub_type);
                 }
-
-                self.state.register_type(
-                    name.clone(),
-                    AstType::Generic(name.clone(), sub_types.clone()),
-                );
             }
 
             UntypedNode::AnonymousRecord(..) => todo!("add generic checking to anonymous records"),
@@ -215,20 +221,32 @@ impl ConcretePass for DataTypePass {
             ),
 
             UntypedNode::RecordDeclaration(name, fields, type_params, body) => {
-                UntypedNode::RecordDeclaration(
-                    name.clone(),
-                    fields
-                        .iter()
-                        .map(|(field_name, field_type)| {
-                            (
-                                field_name.clone(),
-                                field_type.as_named_concrete(&self.records),
-                            )
-                        })
-                        .collect(),
-                    Vec::new(),
-                    Box::new(self.expand_generic_declarations(body)),
-                )
+                if !type_params.is_empty() {
+                    // Expand the rest of the AST first
+                    let expanded_body = self.expand_generic_declarations(body);
+                    let template = self.state.get_template(name).unwrap();
+
+                    if let Some(types) = self.state.get_types(name) {
+                        template.substitute(types, expanded_body)
+                    } else {
+                        expanded_body
+                    }
+                } else {
+                    UntypedNode::RecordDeclaration(
+                        name.clone(),
+                        fields
+                            .iter()
+                            .map(|(field_name, field_type)| {
+                                (
+                                    field_name.clone(),
+                                    field_type.as_named_concrete(&self.records),
+                                )
+                            })
+                            .collect(),
+                        Vec::new(),
+                        Box::new(self.expand_generic_declarations(body)),
+                    )
+                }
             }
 
             UntypedNode::Group(body) => self.expand_generic_declarations(body),
