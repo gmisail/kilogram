@@ -657,10 +657,12 @@ impl Typechecker {
                     typed_arguments.push(self.resolve_type(parameter)?);
                 }
 
-                if let UntypedNode::Variable(name) = &**parent {
-                    // Is this a variant? If not, treat this like any other function call.
-                    if let Ok(enum_type) = self.get_enum_by_variant(name) {
-                        return self.check_enum(enum_type, name, &typed_arguments);
+                // Check if this function call is actually an Enum instance.
+                if let UntypedNode::Get(get_name, get_parent) = &**parent {
+                    if let UntypedNode::Variable(var_name) = &**get_parent {
+                        if let Some(enum_type) = self.enums.get(var_name) {
+                            return self.check_enum(enum_type.clone(), get_name, &typed_arguments);
+                        }
                     }
                 }
 
@@ -791,6 +793,13 @@ impl Typechecker {
             }
 
             UntypedNode::Get(field, parent) => {
+                // Check, for the expression <parent>.<field>, if parent is an enum.
+                if let UntypedNode::Variable(var_name) = &**parent {
+                    if let Some(enum_type) = self.enums.get(var_name) {
+                        return self.check_enum(enum_type.clone(), field, &[]);
+                    }
+                }
+
                 let (get_type, get_node) = self.resolve_type(parent)?;
 
                 match &*get_type {

@@ -50,7 +50,8 @@ impl Template for EnumTemplate {
                             let original_types: Vec<AstType> = variant_types
                                 .iter()
                                 .map(|variant_type| {
-                                    substitute_all(variant_type.clone(), &substitution_pairs).as_concrete()
+                                    substitute_all(variant_type.clone(), &substitution_pairs)
+                                        .as_concrete()
                                 })
                                 .collect();
 

@@ -8,6 +8,9 @@ function double['T](value: 'T): 'T
 end
 
 let test = double[int]
-let seq = Sequence[int].Nil
+let nil_seq = Sequence[int].Nil
+let cons_seq = Sequence[int].Cons(10, nil_seq)
+
+let bool_list = Sequence[bool].Cons(true, Sequence[bool].Cons(false, Sequence[bool].Nil))
 
 test(10)

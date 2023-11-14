@@ -23,7 +23,11 @@ impl EnumPass {
 
 impl ConcretePass for EnumPass {
     fn register_type(&mut self, name: String, ast_type: AstType) {
-        let is_generic = self.state.get_template(&name).unwrap().is_instance_generic(&ast_type);
+        let is_generic = self
+            .state
+            .get_template(&name)
+            .unwrap()
+            .is_instance_generic(&ast_type);
 
         if !is_generic {
             self.state.register_type(name, ast_type);
@@ -175,9 +179,10 @@ impl ConcretePass for EnumPass {
             | UntypedNode::Str(..)
             | UntypedNode::Boolean(..) => root.to_owned(),
 
-            UntypedNode::Get(a, b) => {
-                todo!("{a} {b:?}")
-            }
+            UntypedNode::Get(field, parent) => UntypedNode::Get(
+                field.clone(),
+                Box::new(self.expand_generic_declarations(parent)),
+            ),
 
             UntypedNode::RecordDeclaration(name, fields, type_params, body) => {
                 // More than one type parameter? Must be generic record.

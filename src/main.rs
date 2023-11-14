@@ -44,6 +44,8 @@ fn compile(file: &str) -> Result<(), String> {
 
     let mut checker = Typechecker::new();
 
+    println!("=== PREPROCESSED ===\n\n{preprocessed_node:#?}");
+
     let (_, root_node) = checker.resolve_type(&preprocessed_node)?;
 
     let postprocessed_node = postprocess::apply_all(&root_node, &checker.enums);

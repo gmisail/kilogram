@@ -200,7 +200,10 @@ impl ConcretePass for FunctionPass {
         match root {
             Integer(..) | Variable(..) | Float(..) | Str(..) | Boolean(..) => root.to_owned(),
 
-            Get(_, parent) => self.expand_generic_declarations(parent),
+            Get(field, parent) => Get(
+                field.clone(),
+                Box::new(self.expand_generic_declarations(parent)),
+            ),
 
             RecordDeclaration(name, fields, type_params, body) => RecordDeclaration(
                 name.clone(),

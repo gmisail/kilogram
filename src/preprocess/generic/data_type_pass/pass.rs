@@ -207,8 +207,12 @@ impl ConcretePass for DataTypePass {
             | UntypedNode::Variable(..)
             | UntypedNode::Float(..)
             | UntypedNode::Str(..)
-            | UntypedNode::Boolean(..)
-            | UntypedNode::Get(..) => root.to_owned(),
+            | UntypedNode::Boolean(..) => root.to_owned(),
+
+            UntypedNode::Get(field, parent) => UntypedNode::Get(
+                field.clone(),
+                Box::new(self.expand_generic_declarations(parent)),
+            ),
 
             UntypedNode::RecordDeclaration(name, fields, type_params, body) => {
                 UntypedNode::RecordDeclaration(
