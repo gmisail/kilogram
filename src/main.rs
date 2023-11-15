@@ -60,7 +60,7 @@ fn compile(file: &str) -> Result<(), String> {
 }
 
 fn main() {
-    match compile("./syntax/enum.kg") {
+    match compile("./syntax/basic.kg") {
         Ok(()) => println!("Done."),
         Err(e) => panic!("{e}"),
     }

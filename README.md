@@ -5,7 +5,7 @@ into C11 and does not use any external dependencies.
 
 ### Example
 
-```lua
+```
 enum Sequence['T]
     None,
     Cons('T, Sequence['T])

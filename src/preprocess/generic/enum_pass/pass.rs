@@ -166,8 +166,16 @@ impl ConcretePass for EnumPass {
                 }
             }
 
+            UntypedNode::CaseOf(expr, arms) => {
+                self.find_unique_types(expr);
+
+                for (pattern, value) in arms {
+                    self.find_unique_types(pattern);
+                    self.find_unique_types(value);
+                }
+            }
+
             UntypedNode::AnonymousRecord(..) => todo!("add generic checking to anonymous records"),
-            UntypedNode::CaseOf(_expr, _arms) => todo!("add generic checking to case of"),
         }
     }
 
@@ -402,8 +410,16 @@ impl ConcretePass for EnumPass {
 
             UntypedNode::AnonymousRecord(..) => todo!("handle anonymous records"),
 
-            UntypedNode::CaseOf(_expr, _arms) => {
-                todo!("add generic checking to case of")
+            UntypedNode::CaseOf(expr, arms) => {
+                UntypedNode::CaseOf(
+                    Box::new(self.expand_generic_declarations(expr)),
+                    arms
+                        .iter()
+                        .map(|(pattern, value)| {
+                            (self.expand_generic_declarations(pattern), self.expand_generic_declarations(value))
+                        })
+                        .collect()
+                )
             }
         }
     }

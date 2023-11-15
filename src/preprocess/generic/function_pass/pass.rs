@@ -187,8 +187,16 @@ impl ConcretePass for FunctionPass {
                 }
             }
 
-            AnonymousRecord(..) => todo!("add generic checking to anonymous records"),
-            CaseOf(_expr, _arms) => todo!("add generic checking to case of"),
+            CaseOf(expr, arms) => {
+                self.find_unique_types(expr);
+
+                for (pattern, value) in arms {
+                    self.find_unique_types(pattern);
+                    self.find_unique_types(value);
+                }
+            }
+
+            AnonymousRecord(..) => todo!("add generic checking to anonymous records")
         }
     }
 
@@ -354,17 +362,6 @@ impl ConcretePass for FunctionPass {
                 EnumDeclaration(
                     name.clone(),
                     variants.clone(),
-                    // .iter()
-                    // .map(|(variant_name, variant_types)| {
-                    //     (
-                    //         variant_name.clone(),
-                    //         variant_types
-                    //             .iter()
-                    //             .map(|variant_type| variant_type.as_concrete())
-                    //             .collect(),
-                    //     )
-                    // })
-                    // .collect(),
                     type_params.clone(),
                     Box::new(self.expand_generic_declarations(body)),
                 )
@@ -383,11 +380,6 @@ impl ConcretePass for FunctionPass {
                     _ => panic!("expected generic function call to be named."),
                 };
 
-                // let resolved_sub_types = sub_types
-                //     .iter()
-                //     .map(|sub_type| sub_type.as_concrete())
-                //     .collect();
-
                 // Function instances are tricky -- at this phase, they
                 // also represent generic enums since they're identical at a syntax level. So, we
                 // need to check what we're dealing with to make sure we're not converting an enum
@@ -404,8 +396,16 @@ impl ConcretePass for FunctionPass {
 
             AnonymousRecord(..) => todo!("handle anonymous records"),
 
-            CaseOf(_expr, _arms) => {
-                todo!("add generic checking to case of")
+            CaseOf(expr, arms) => {
+                CaseOf(
+                    Box::new(self.expand_generic_declarations(expr)),
+                    arms
+                        .iter()
+                        .map(|(pattern, value)| {
+                            (self.expand_generic_declarations(pattern), self.expand_generic_declarations(value))
+                        })
+                        .collect()
+                )
             }
         }
     }

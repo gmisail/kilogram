@@ -33,7 +33,7 @@ fn unify_variant(
                             if let UntypedNode::Variable(name) = &**parent {
                                 unbound.extend(unify_variant(name, variants, arguments)?);
                             } else {
-                                return Err("Cannot unify non-enum type.".to_string());
+                                return Err("(FC) Cannot unify non-enum type.".to_string());
                             };
                         }
 
@@ -55,15 +55,20 @@ pub fn unify_enum(
     expression: &UntypedNode,
     variants: &BTreeMap<String, Vec<Rc<DataType>>>,
 ) -> Result<HashMap<String, Rc<DataType>>, String> {
-    if let UntypedNode::Variable(name) = expression {
-        unify_variant(name, variants, &[])
-    } else if let UntypedNode::FunctionCall(parent, arguments) = expression {
-        if let UntypedNode::Variable(name) = &**parent {
-            unify_variant(name, variants, arguments)
-        } else {
-            Err("Cannot unify non-enum type.".to_string())
-        }
-    } else {
-        Err("Cannot unify non-enum type.".to_string())
+    match expression {
+        // Sequence.Nil, where field = Nil and parent = Sequence
+        UntypedNode::Get(field, parent) => {
+            unify_variant(field, variants, &[])
+        },
+
+        UntypedNode::FunctionCall(parent, arguments) => {
+            if let UntypedNode::Get(enum_field, enum_parent) = &**parent {
+                unify_variant(enum_field, variants, arguments)
+            } else {
+                Err("Cannot unify non-enum type.".to_string())
+            }
+        },
+
+        _ => Err("Cannot unify non-enum type.".to_string())
     }
 }

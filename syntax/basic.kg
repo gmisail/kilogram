@@ -7,41 +7,40 @@ enum Sequence
 	Nil
 end
 
-
 let rec length = function(seq: Sequence): int
 	case seq of
-		Cons(num, tail) -> 1 + length(tail),
-		Nil -> 0
+		Sequence.Cons(num, tail) -> 1 + length(tail),
+		Sequence.Nil -> 0
 	end
 end
 
 let rec map = function(seq: Sequence, f: (int) -> int): Sequence
     case seq of
-        Cons(num, tail) -> Cons(f(num), map(tail, f)),
-        Nil -> Nil
+        Sequence.Cons(num, tail) -> Sequence.Cons(f(num), map(tail, f)),
+        Sequence.Nil -> Nil
     end
 end
 
 let rec filter = function(seq: Sequence, f: (int) -> bool): Sequence 
 	case seq of
-		Cons(num, tail) -> 
+		Sequence.Cons(num, tail) ->
 			let filtered_tail = filter(tail, f)
-			if f(num) then Cons(num, filtered_tail) 
+			if f(num) then Sequence.Cons(num, filtered_tail)
 			else filtered_tail,
-		Nil -> seq
+		Sequence.Nil -> seq
 	end
 end
 
 let rec print_list = function(seq: Sequence): int
     case seq of
-        Cons(num, tail) ->
+        Sequence.Cons(num, tail) ->
             let res = print(int_to_string(num))
             print_list(tail),
-        Nil -> 0
+        Sequence.Nil -> 0
     end
 end
 
-let initial_list = Cons(1, Cons(2, Cons(3, Cons(4, Cons(5, Nil)))))
+let initial_list = Sequence.Cons(1, Sequence.Cons(3, Sequence.Cons(3, Sequence.Cons(3, Sequence.Cons(5, Sequence.Nil)))))
 
 print_list(
     filter(
