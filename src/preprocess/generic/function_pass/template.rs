@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use crate::ast::untyped::ast_type::AstType;
 use crate::ast::untyped::untyped_node::UntypedNode;
 use crate::ast::untyped::untyped_node::UntypedNode::*;
@@ -82,11 +83,20 @@ impl Template for FunctionTemplate {
             [] => body,
         }
     }
+
+    /// When registering a generic, check if it contains generic fields. This indicates a nested
+    /// type that contains a generic, i.e. `List['T]` containing `Cons('T, List['T])`
+    fn is_instance_generic(&self, ast_type: &AstType) -> bool {
+        let param_set: HashSet<String> = HashSet::from_iter(self.type_params.iter().cloned());
+        ast_type.is_generic(&param_set)
+    }
 }
 
 pub fn substitute_body(root: UntypedNode, substitutions: &Vec<(String, AstType)>) -> UntypedNode {
     match root {
-        Integer(..) | Variable(..) | Float(..) | Str(..) | Boolean(..) | Get(..) => root,
+        Integer(..) | Variable(..) | Float(..) | Str(..) | Boolean(..) => root,
+
+        Get(field, parent) => Get(field, Box::new(substitute_body(*parent, substitutions))),
 
         RecordDeclaration(name, fields, type_params, body) => {
             // TODO: check for collisions in types, i.e. if 'T is being substituted, 'T can't be a type param of the record declaration
@@ -252,10 +262,27 @@ pub fn substitute_body(root: UntypedNode, substitutions: &Vec<(String, AstType)>
         ),
 
         AnonymousRecord(..) => todo!("handle anonymous records"),
-        FunctionInstance(..) => todo!("handle generic functions"),
 
-        CaseOf(_expr, _arms) => {
-            todo!("add generic checking to case of")
-        }
+        FunctionInstance(base, sub_types) => {
+            FunctionInstance(
+                Box::new(substitute_body(*base, substitutions)),
+                sub_types
+                    .iter()
+                    .map(|ast_type| substitute_all(ast_type.clone(), substitutions))
+                    .collect()
+            )
+        },
+
+        CaseOf(expr, arms) => CaseOf(
+            Box::new(substitute_body(*expr, substitutions)),
+            arms.iter()
+                .map(|(pattern, value)| {
+                    (
+                        substitute_body(pattern.clone(), substitutions),
+                        substitute_body(value.clone(), substitutions),
+                    )
+                })
+                .collect(),
+        ),
     }
 }

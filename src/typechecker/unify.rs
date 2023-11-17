@@ -57,9 +57,7 @@ pub fn unify_enum(
 ) -> Result<HashMap<String, Rc<DataType>>, String> {
     match expression {
         // Sequence.Nil, where field = Nil and parent = Sequence
-        UntypedNode::Get(field, parent) => {
-            unify_variant(field, variants, &[])
-        },
+        UntypedNode::Get(field, parent) => unify_variant(field, variants, &[]),
 
         UntypedNode::FunctionCall(parent, arguments) => {
             if let UntypedNode::Get(enum_field, enum_parent) = &**parent {
@@ -67,8 +65,8 @@ pub fn unify_enum(
             } else {
                 Err("Cannot unify non-enum type.".to_string())
             }
-        },
+        }
 
-        _ => Err("Cannot unify non-enum type.".to_string())
+        _ => Err("Cannot unify non-enum type.".to_string()),
     }
 }

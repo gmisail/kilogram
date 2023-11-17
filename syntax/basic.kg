@@ -2,15 +2,15 @@ extern panic: (int) -> int
 extern print: (string) -> int
 extern int_to_string: (int) -> string
 
-enum Sequence
-	Cons(int, Sequence),
+enum Sequence['T]
+	Cons('T, Sequence['T]),
 	Nil
 end
 
-let rec length = function(seq: Sequence): int
-	case seq of
-		Sequence.Cons(num, tail) -> 1 + length(tail),
-		Sequence.Nil -> 0
+function length['T](seq: Sequence['T]): int
+    case seq of
+		Sequence['T].Cons(num, tail) -> 1 + length['T](tail),
+		Sequence['T].Nil -> 0
 	end
 end
 
@@ -44,9 +44,11 @@ let initial_list = Sequence.Cons(1, Sequence.Cons(3, Sequence.Cons(3, Sequence.C
 
 print_list(
     filter(
-        initial_list,
+    initial_list,
         function(i: int): bool 
             i == 3 
         end
     )
 )
+
+

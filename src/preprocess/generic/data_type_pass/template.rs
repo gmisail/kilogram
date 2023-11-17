@@ -1,7 +1,7 @@
-use std::collections::HashSet;
-use tracing::info;
 use crate::ast::untyped::{ast_type::AstType, untyped_node::UntypedNode};
 use crate::preprocess::generic::template::{substitute_all, Template};
+use std::collections::HashSet;
+use tracing::info;
 
 #[derive(Debug)]
 pub struct RecordTemplate {
@@ -15,11 +15,6 @@ impl RecordTemplate {
             type_params,
             fields,
         }
-    }
-
-    pub fn is_instance_generic(&self, ast_type: &AstType) -> bool {
-        let param_set: HashSet<String> = HashSet::from_iter(self.type_params.iter().cloned());
-        ast_type.is_generic(&param_set)
     }
 }
 
@@ -58,5 +53,12 @@ impl Template for RecordTemplate {
 
             [] => body,
         }
+    }
+
+    /// When registering a generic, check if it contains generic fields. This indicates a nested
+    /// type that contains a generic, i.e. `List['T]` containing `Cons('T, List['T])`
+    fn is_instance_generic(&self, ast_type: &AstType) -> bool {
+        let param_set: HashSet<String> = HashSet::from_iter(self.type_params.iter().cloned());
+        ast_type.is_generic(&param_set)
     }
 }

@@ -428,20 +428,19 @@ impl ConcretePass for DataTypePass {
                 UntypedNode::FunctionInstance(base.clone(), resolved_sub_types)
             }
 
-
             UntypedNode::AnonymousRecord(..) => todo!("handle anonymous records"),
 
-            UntypedNode::CaseOf(expr, arms) => {
-                UntypedNode::CaseOf(
-                    Box::new(self.expand_generic_declarations(expr)),
-                    arms
-                        .iter()
-                        .map(|(pattern, value)| {
-                            (self.expand_generic_declarations(pattern), self.expand_generic_declarations(value))
-                        })
-                        .collect()
-                )
-            }
+            UntypedNode::CaseOf(expr, arms) => UntypedNode::CaseOf(
+                Box::new(self.expand_generic_declarations(expr)),
+                arms.iter()
+                    .map(|(pattern, value)| {
+                        (
+                            self.expand_generic_declarations(pattern),
+                            self.expand_generic_declarations(value),
+                        )
+                    })
+                    .collect(),
+            ),
         }
     }
 }

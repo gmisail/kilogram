@@ -2,6 +2,7 @@ use crate::ast::untyped::{ast_type::AstType, untyped_node::UntypedNode};
 
 pub trait Template {
     fn substitute(&self, variants: &[AstType], body: UntypedNode) -> UntypedNode;
+    fn is_instance_generic(&self, ast_type: &AstType) -> bool;
 }
 
 pub fn substitute_all(subject_type: AstType, types: &[(String, AstType)]) -> AstType {

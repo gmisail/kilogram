@@ -16,13 +16,6 @@ impl EnumTemplate {
             variants,
         }
     }
-
-    /// When registering a generic, check if it contains generic fields. This indicates a nested
-    /// type that contains a generic, i.e. `List['T]` containing `Cons('T, List['T])`
-    pub fn is_instance_generic(&self, ast_type: &AstType) -> bool {
-        let param_set: HashSet<String> = HashSet::from_iter(self.type_params.iter().cloned());
-        ast_type.is_generic(&param_set)
-    }
 }
 
 impl Template for EnumTemplate {
@@ -65,5 +58,12 @@ impl Template for EnumTemplate {
 
             [] => body,
         }
+    }
+
+    /// When registering a generic, check if it contains generic fields. This indicates a nested
+    /// type that contains a generic, i.e. `List['T]` containing `Cons('T, List['T])`
+    fn is_instance_generic(&self, ast_type: &AstType) -> bool {
+        let param_set: HashSet<String> = HashSet::from_iter(self.type_params.iter().cloned());
+        ast_type.is_generic(&param_set)
     }
 }

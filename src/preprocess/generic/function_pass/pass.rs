@@ -38,7 +38,15 @@ impl FunctionPass {
 
 impl ConcretePass for FunctionPass {
     fn register_type(&mut self, name: String, ast_type: AstType) {
-        self.state.register_type(name, ast_type);
+        if let Some(template) = self.state.get_template(&name) {
+            let is_generic = template.is_instance_generic(&ast_type);
+
+            println!("Registering {name} with {ast_type:?}");
+
+            if !is_generic {
+                self.state.register_type(name, ast_type);
+            }
+        }
     }
 
     /// Search the AST for generic types and save all unique configurations.
@@ -68,7 +76,7 @@ impl ConcretePass for FunctionPass {
 
                     if let Variable(function_name) = &**base {
                         // TODO: maybe we should separate this into separate sets, i.e. not mix functions and other types?
-                        self.state.register_type(
+                        self.register_type(
                             function_name.clone(),
                             AstType::Generic(function_name.clone(), sub_types.clone()),
                         );
@@ -122,7 +130,7 @@ impl ConcretePass for FunctionPass {
                     self.resolve_generic_type(sub_type);
                 }
 
-                self.state.register_type(
+                self.register_type(
                     name.clone(),
                     AstType::Generic(name.clone(), sub_types.clone()),
                 );
@@ -196,7 +204,7 @@ impl ConcretePass for FunctionPass {
                 }
             }
 
-            AnonymousRecord(..) => todo!("add generic checking to anonymous records")
+            AnonymousRecord(..) => todo!("add generic checking to anonymous records"),
         }
     }
 
@@ -396,17 +404,17 @@ impl ConcretePass for FunctionPass {
 
             AnonymousRecord(..) => todo!("handle anonymous records"),
 
-            CaseOf(expr, arms) => {
-                CaseOf(
-                    Box::new(self.expand_generic_declarations(expr)),
-                    arms
-                        .iter()
-                        .map(|(pattern, value)| {
-                            (self.expand_generic_declarations(pattern), self.expand_generic_declarations(value))
-                        })
-                        .collect()
-                )
-            }
+            CaseOf(expr, arms) => CaseOf(
+                Box::new(self.expand_generic_declarations(expr)),
+                arms.iter()
+                    .map(|(pattern, value)| {
+                        (
+                            self.expand_generic_declarations(pattern),
+                            self.expand_generic_declarations(value),
+                        )
+                    })
+                    .collect(),
+            ),
         }
     }
 }

@@ -1,21 +1,19 @@
-enum Sequence['T]
-    Cons('T, Sequence['T]),
-    Nil
+extern panic: (int) -> int
+extern print: (string) -> int
+extern int_to_string: (int) -> string
+
+enum List['T]
+	Cons('T, List['T]),
+	Nil
 end
 
-record List['T]
-    value: 'T,
-    next: List['T]
+function length['T](list: List['T]): int
+    case list of
+		List['T].Cons(num, tail) -> 1 + length['T](tail),
+		List['T].Nil -> 0
+	end
 end
 
-function double['T](value: 'T): 'T
-    value * 2
-end
+let initial_list = List[int].Cons(1, List[int].Cons(3, List[int].Cons(3, List[int].Cons(3, List[int].Cons(5, List[int].Nil)))))
 
-let test = double[int]
-let nil_seq = Sequence[int].Nil
-let cons_seq = Sequence[int].Cons(10, nil_seq)
-
-let bool_list = Sequence[bool].Cons(true, Sequence[bool].Cons(false, Sequence[bool].Nil))
-
-test(10)
+print(int_to_string(length[int](initial_list)))
